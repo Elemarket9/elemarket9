@@ -1,5 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
-import { getSql } from "@/lib/db";
+import { getSql, withTransaction } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { getEmailAdapter } from "./registry.server";
 
@@ -70,8 +70,8 @@ export async function requestEmailOtp(
     await sql.query(`update otp_challenges set status='superseded', updated_at=now() where id=$1 and status in ('sending','pending')`, [active[0].id]);
   }
 
-  const userRows = await sql.query<{ id: string }>(`select "id" as id from "user" where lower("email") = $1 limit 1`, [email]);
-  if (input.purpose === "signup" && !input.userId && userRows[0]) {
+  const userRows = await sql.query<{ id: string; emailVerified: boolean }>(`select "id" as id, "emailVerified" from "user" where lower("email") = $1 limit 1`, [email]);
+  if (input.purpose === "signup" && !input.userId && userRows[0]?.emailVerified) {
     throw new Error("An account already exists for this email; use sign in or password reset");
   }
   const resolvedUserId = input.userId ?? userRows[0]?.id ?? null;
@@ -142,19 +142,26 @@ export async function verifyEmailOtp(input: { challengeId: string; code: string;
     throw new Error("Invalid OTP code");
   }
 
-  const consumed = await sql.query<{ id: string }>(
-    `update otp_challenges set status='verified',verified_at=now(),updated_at=now() where id=$1 and status='pending' returning id`,
-    [challenge.id],
-  );
-  if (!consumed[0]) throw new Error("OTP has already been consumed");
-
-  if (challenge.purpose === "signup" || challenge.purpose === "login") {
-    await sql.query(
-      `update "user" set "emailVerified" = true, "updatedAt" = now()
-        where "id" = $1 and lower("email") = $2`,
-      [challenge.user_id, challenge.destination],
+  // Attempts remain committed even when verification fails. Consumption and
+  // account verification must commit together so an account-write failure
+  // cannot strand the user with a consumed code and an unverified account.
+  await withTransaction(async (tx) => {
+    const consumed = await tx.query<{ id: string }>(
+      `update otp_challenges set status='verified',verified_at=now(),updated_at=now()
+        where id=$1 and status='pending' and expires_at>now() returning id`,
+      [challenge.id],
     );
-  }
+    if (!consumed[0]) throw new Error("OTP is expired or has already been consumed");
+
+    if (challenge.purpose === "signup" || challenge.purpose === "login") {
+      const verified = await tx.query<{ id: string }>(
+        `update "user" set "emailVerified" = true, "updatedAt" = now()
+          where "id" = $1 and lower("email") = $2 returning "id"`,
+        [challenge.user_id, challenge.destination],
+      );
+      if (!verified[0]) throw new Error("Verification account is unavailable or its email has changed");
+    }
+  });
 
   return { verified: true as const, purpose: challenge.purpose, userId: challenge.user_id, destination: challenge.destination };
 }

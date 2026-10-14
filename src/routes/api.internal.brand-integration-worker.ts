@@ -14,7 +14,7 @@ export const Route = createFileRoute("/api/internal/brand-integration-worker")({
         ))) {
           return new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
         }
-        await enforceRateLimit("brand-integration-worker-global", { windowSeconds: 60, maxRequests: 30 });
+        await enforceRateLimit("brand-integration-worker-global", { identity: "subject", subject: "authenticated-scheduler", windowSeconds: 60, maxRequests: 30 });
         const [webhooks, orders] = await Promise.all([
           processBrandIntegrationWebhooks(50),
           processBrandIntegrationOrderOutbox(50),

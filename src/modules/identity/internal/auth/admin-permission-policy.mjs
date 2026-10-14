@@ -14,6 +14,7 @@ export const ADMIN_CAPABILITIES = Object.freeze([
 ]);
 
 /** A few legacy/managerial bundle grants expand into explicit backend capabilities. */
+/** @type {Readonly<Record<string, readonly string[]>>} */
 const IMPLIED = Object.freeze({
   'admin.operations': ['admin.merchants.review','admin.merchants.moderate',
     'admin.customers.moderate','admin.products.moderate','admin.categories.manage'],
@@ -22,8 +23,9 @@ const IMPLIED = Object.freeze({
 });
 
 /** Expand stored grants before evaluating navigation, data projection or API access. */
+/** @param {readonly string[]} grants */
 export function expandAdminCapabilities(grants) {
-  const found = new Set();
+  const found = new Set(/** @type {string[]} */ ([]));
   for (const grant of Array.isArray(grants) ? grants : []) {
     if (!ADMIN_CAPABILITIES.includes(grant)) continue;
     found.add(grant);
@@ -40,6 +42,7 @@ export function canGrantedAdminPerform(role, grants, capability) {
 }
 
 /** Manager may delegate only privileges already held, never Main Admin rights. */
+/** @param {{actorOwner: boolean, actorCapabilities: string[], oldCapabilities: string[], nextCapabilities: string[], oldPrimaryRole: string, nextPrimaryRole: string}} input */
 export function canDelegatedAdminManageRoles({ actorOwner, actorCapabilities, oldCapabilities,
   nextCapabilities, oldPrimaryRole, nextPrimaryRole }) {
   if (actorOwner) return true;
@@ -49,6 +52,7 @@ export function canDelegatedAdminManageRoles({ actorOwner, actorCapabilities, ol
 }
 
 /** Retain the original pure compatibility policy for existing verifications. */
+/** @param {string | null | undefined} staffRole @param {string} capability */
 export function canAdminPerform(staffRole, capability) {
   const baseline = staffRole === 'operations' ? ['admin.operations']
     : staffRole === 'support' ? ['admin.support'] : [];

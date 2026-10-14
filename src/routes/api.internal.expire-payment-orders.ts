@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/internal/expire-payment-orders")({
     handlers: {
       GET: async ({ request }) => {
         await assertCronAuthorization(request);
-        await enforceRateLimit("internal-expire-payment-orders", { windowSeconds: 60, maxRequests: 6 });
+        await enforceRateLimit("internal-expire-payment-orders", { identity: "subject", subject: "authenticated-scheduler", windowSeconds: 60, maxRequests: 6 });
         const sql = await getSql();
         const rows = await sql.query<{ count: number }>(
           `select expire_payment_pending_orders(100) as count`,

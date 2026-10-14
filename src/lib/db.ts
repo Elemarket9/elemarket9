@@ -103,7 +103,7 @@ function createPostgresSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    globalRef.__pgPoolPromise__ ??= Promise.resolve(new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000 }));
+    globalRef.__pgPoolPromise__ ??= Promise.resolve(new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000, allowExitOnIdle: true }));
     const pool = await globalRef.__pgPoolPromise__;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
@@ -130,6 +130,7 @@ async function isolatedSql(lane: "discovery" | "maintenance"): Promise<Sql> {
     max: lane === "discovery" ? 2 : 1,
     connectionTimeoutMillis: 1000,
     idleTimeoutMillis: 30000,
+    allowExitOnIdle: true,
     options: `-c statement_timeout=${lane === "discovery" ? 1500 : 4000} -c lock_timeout=250`,
   }));
   const pool = await intelligencePools[key];

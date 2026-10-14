@@ -22,7 +22,7 @@ export const Route = createFileRoute("/api/internal/reconcile-payments")({
             headers: { "cache-control": "no-store" },
           });
         }
-        await enforceRateLimit("internal-reconcile-payments", {
+        await enforceRateLimit("internal-reconcile-payments", { identity: "subject", subject: "authenticated-scheduler",
           windowSeconds: 60,
           maxRequests: 6,
         });

@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {randomBytes,randomUUID} from 'node:crypto';
+import pg from 'pg';
+import {hashPassword} from 'better-auth/crypto';
+
+const database=process.env.DATABASE_URL,host=process.env.ELEMARKET_SELLER_HOST;
+if(!database || new URL(database).hostname!=='127.0.0.1' || !new URL(database).pathname.endsWith('_test') || host!=='seller.elemarket.localhost') throw new Error('Local synthetic workspace fixture only');
+const browser=(...args)=>{try{const result=JSON.parse(execFileSync('coderabbit-agent-browser',[...args,'--json'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));assert.equal(result.success,true);return result.data;}catch{throw new Error(`Browser ${args[0]} failed; sensitive arguments omitted`);}};
+const evaluate=code=>{new Function(code);return browser('eval',code).result;};
+const click=(role,name)=>browser('find','role',role,'click','--name',name,'--exact');
+const fill=(label,value)=>browser('find','label',label,'fill',value);
+const wait=async(predicate,message)=>{for(let n=0;n<60;n++){if(await predicate())return;await new Promise(resolve=>setTimeout(resolve,200));}throw new Error(message);};
+const id=`workspace_${randomUUID().replaceAll('-','')}`,merchant=`merchant_${id}`;
+const email=`${id}@example.test`,password=randomBytes(24).toString('base64url');
+const db=new pg.Client({connectionString:database});await db.connect();
+try{
+ await db.query('insert into "user"(id,name,email,"emailVerified") values($1,\'Synthetic Workspace Merchant\',$2,true)',[id,email]);
+ await db.query('insert into account(id,"accountId","providerId","userId",password,"updatedAt") values($1,$2,\'credential\',$2,$3,now())',[`account_${id}`,id,await hashPassword(password)]);
+ await db.query("insert into merchants(id,name,category,catalog_categories,status,verified,tier,address,city,neighborhood,lat,lon) values($1,'Synthetic Workspace Merchant','electronics',ARRAY['electronics'],'active',true,'merchant','123 Synthetic Street','Accra','Test',5.6,-0.18)",[merchant]);
+ await db.query('insert into merchant_accounts(merchant_id,user_id) values($1,$2)',[merchant,id]);
+ browser('--ignore-https-errors','open',`https://${host}/merchant/login`);
+ browser('set','viewport','390','844');fill('Merchant email',email);fill('Password',password);click('button','Sign in to merchant portal');
+ await wait(()=>evaluate('location.pathname==="/merchant/dashboard" && document.body.innerText.includes("Synthetic Workspace Merchant")'),'Merchant dashboard did not load');
+ assert.equal(evaluate('document.documentElement.scrollWidth>innerWidth'),false);
+ click('tab','Products');
+ browser('find','placeholder','Product name','fill','Synthetic Browser Listing');
+ browser('select','select[aria-label="Category"]','electronics');
+ browser('find','placeholder','GHS price','fill','100000001');click('button','Add product');
+ await wait(()=>evaluate('!Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="Add product")?.disabled'),'Product request did not finish');
+ assert.equal(evaluate('Array.from(document.querySelectorAll("input")).find(i=>i.placeholder==="Product name").value'),'Synthetic Browser Listing','Rejected create must retain user input');
+ assert.equal(evaluate('Array.from(document.querySelectorAll("input")).find(i=>i.placeholder==="GHS price").value'),'100000001');
+ assert.equal((await db.query('select count(*)::int n from products where merchant_id=$1',[merchant])).rows[0].n,0);
+ browser('find','placeholder','GHS price','fill','125');click('button','Add product');
+ let product;
+ await wait(async()=>{product=(await db.query('select id,price,status from products where merchant_id=$1',[merchant])).rows[0];return !!product;},'Valid listing was not saved');
+ assert.equal(product.status,'pending_review');assert.equal(Number(product.price),125);
+ await wait(()=>evaluate('document.body.innerText.includes("Synthetic Browser Listing")'),'Dashboard did not refresh listing');
+ click('tab','Inventory');fill('Adjustment (+ receive, − remove)','3');fill('Reason','Synthetic received stock');click('button','Apply inventory change');
+ await wait(async()=>Number((await db.query('select stock from products where id=$1',[product.id])).rows[0].stock)===3,'Inventory was not saved');
+ browser('reload');await wait(()=>evaluate('!!document.querySelector("[role=tablist]")'),'Dashboard failed refresh');click('tab','Products');click('button','Edit');
+ fill('Name','Revised Browser Listing');fill('Price','100000001');click('button','Save changes');
+ await wait(()=>evaluate('!Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="Save changes")?.disabled'),'Edit request did not finish');
+ assert.equal(evaluate('Array.from(document.querySelectorAll("input")).some(i=>i.value==="Revised Browser Listing")'),true,'Rejected edit must keep the edit form open');
+ fill('Price','150');click('button','Save changes');
+ await wait(async()=>(await db.query('select name from products where id=$1',[product.id])).rows[0].name==='Revised Browser Listing','Product edit was not saved');
+ browser('reload');await wait(()=>evaluate('!!document.querySelector("[role=tablist]")'),'Dashboard failed refresh');click('tab','Products');click('button','Archive');
+ await wait(async()=>(await db.query('select status from products where id=$1',[product.id])).rows[0].status==='archived','Product was not archived');
+ console.log('PASS: real merchant password login; mobile workspace; rejected forms retain data; create/edit/inventory/archive persist through refresh');
+}finally{
+ await db.query('delete from merchant_inventory_adjustments where merchant_id=$1',[merchant]);
+ await db.query('delete from products where merchant_id=$1',[merchant]);
+ await db.query('delete from merchants where id=$1',[merchant]);
+ await db.query('delete from profiles where user_id=$1',[id]);
+ await db.query('delete from "user" where id=$1',[id]);await db.end();
+ browser('--ignore-https-errors','open','https://elemarket.localhost/');
+}

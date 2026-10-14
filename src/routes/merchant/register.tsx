@@ -59,6 +59,22 @@ function MerchantRegister() {
     }).catch(() => undefined);
   }, [signedIn, user]);
 
+  async function sendPhoneCode() {
+    // The application is already persisted. Delivery failures must not return
+    // the user to a consumed email code or imply that the application was lost.
+    setStage("phone");
+    setBusy(true);
+    setError(null);
+    try {
+      const otp = await requestOtpCode({ data: { number: phone.trim(), purpose: "phone_verification" } });
+      setPhoneChallengeId(otp.challengeId);
+    } catch {
+      setError("Your application is saved. We could not send a phone verification code. Try again later; your application remains pending.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -82,9 +98,7 @@ function MerchantRegister() {
       if (signedIn) {
         await saveSignupProfile({ data: { name: name.trim(), phone: phone.trim() } });
         await createMerchantApplication({ data: applicationData });
-        const otp = await requestOtpCode({ data: { number: phone.trim(), purpose: "phone_verification" } });
-        setPhoneChallengeId(otp.challengeId);
-        setStage("phone");
+        await sendPhoneCode();
         return;
       }
 
@@ -109,7 +123,7 @@ function MerchantRegister() {
     setError(null);
     try {
       await verifyEmailOtpCode({ data: { challengeId: emailChallengeId, code: emailCode, purpose: "signup" } });
-      const signed = await authClient.signIn.email({ email: email.trim(), password, callbackURL: "/merchant/register" });
+      const signed = await authClient.signIn.email({ email: email.trim(), password,});
       if (signed.error) throw new Error(signed.error.message ?? "Email verified, but sign-in failed");
       await saveSignupProfile({ data: { name: name.trim(), phone: phone.trim() } });
       await createMerchantApplication({
@@ -119,9 +133,7 @@ function MerchantRegister() {
           vatRegistrationStatus: vatRegistrationStatus || null,
         },
       });
-      const otp = await requestOtpCode({ data: { number: phone.trim(), purpose: "phone_verification" } });
-      setPhoneChallengeId(otp.challengeId);
-      setStage("phone");
+      await sendPhoneCode();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email verification failed");
     } finally {
@@ -217,12 +229,16 @@ function MerchantRegister() {
         <Link to="/merchant/login" className="mt-4 block text-center text-sm font-bold text-market-green">Already have an account? Sign in</Link>
       </>}
       {stage === "email" && <Verification title="Verify your email" description={`Enter the 6-digit code sent to ${email}.`} value={emailCode} setValue={setEmailCode} onVerify={verifyEmail} busy={busy} error={error} />}
-      {stage === "phone" && <Verification title="Verify your phone" description={`Enter the 6-digit code sent to ${phone}.`} value={phoneCode} setValue={setPhoneCode} onVerify={verifyPhone} busy={busy} error={error} />}
+      {stage === "phone" && <>
+        <Verification title="Verify your phone" description={phoneChallengeId ? `Enter the 6-digit code sent to ${phone}.` : "Your application is saved. Phone verification is still required before approval."} value={phoneCode} setValue={setPhoneCode} onVerify={verifyPhone} busy={busy} unavailable={!phoneChallengeId} error={error} />
+        <button type="button" disabled={busy} onClick={() => void sendPhoneCode()} className="mt-4 block w-full text-sm font-bold text-market-green disabled:opacity-50">{phoneChallengeId ? "Resend code" : "Send phone code"}</button>
+        <Link to="/merchant/status" className="mt-4 block text-center text-sm font-bold text-market-green">View application status</Link>
+      </>}
       {stage === "done" && <div className="mt-7 rounded-2xl border border-market-line bg-market-soft p-6"><h1 className="text-2xl font-black">Application submitted</h1><p className="mt-2 text-sm leading-6 text-market-muted">Your email and phone are verified and your business is in the ELEMARKET review queue. You can keep using the marketplace with this same account while the review is completed.</p><div className="mt-4 rounded-xl bg-white p-4 text-sm"><b>What happens next</b><ul className="mt-2 list-disc space-y-1 pl-5 text-market-muted"><li>ELEMARKET reviews the business information and any verification evidence.</li><li>Approval activates the merchant workspace; automated verification is supporting evidence, not the only approval path.</li><li>Once active, add products, inventory, promotions and advertising from the merchant dashboard.</li></ul></div><a href={portalHref("marketplace")} className="mt-5 inline-flex h-11 items-center rounded-xl bg-market-green px-5 text-sm font-black text-white">Continue to marketplace</a></div>}
     </section>
   </main>;
 }
 
-function Verification({ title, description, value, setValue, onVerify, busy, error }: { title:string; description:string; value:string; setValue:(v:string)=>void; onVerify:()=>void; busy:boolean; error:string|null }) {
-  return <div className="mt-7 rounded-2xl border border-market-line bg-market-soft p-5"><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-sm text-market-muted">{description}</p><input value={value} onChange={e=>setValue(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" className="mt-5 h-14 w-full rounded-xl border border-market-line bg-white text-center text-2xl font-black tracking-[.35em]" />{error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}<button type="button" disabled={busy || value.length!==6} onClick={onVerify} className="mt-4 h-12 w-full rounded-xl bg-market-orange text-sm font-black text-white disabled:opacity-50">{busy ? "Verifying…" : "Verify"}</button></div>;
+function Verification({ title, description, value, setValue, onVerify, busy, error, unavailable = false }: { title:string; description:string; value:string; setValue:(v:string)=>void; onVerify:()=>void; busy:boolean; error:string|null; unavailable?:boolean }) {
+  return <div className="mt-7 rounded-2xl border border-market-line bg-market-soft p-5"><h1 className="text-2xl font-black">{title}</h1><p className="mt-2 text-sm text-market-muted">{description}</p><input value={value} onChange={e=>setValue(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" className="mt-5 h-14 w-full rounded-xl border border-market-line bg-white text-center text-2xl font-black tracking-[.35em]" />{error && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}<button type="button" disabled={busy || unavailable || value.length!==6} onClick={onVerify} className="mt-4 h-12 w-full rounded-xl bg-market-orange text-sm font-black text-white disabled:opacity-50">{busy ? "Verifying…" : "Verify"}</button></div>;
 }

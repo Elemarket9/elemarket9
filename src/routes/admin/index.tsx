@@ -33,7 +33,6 @@ function AdminEntry() {
       const result = await authClient.signIn.email({
         email: email.trim(),
         password,
-        callbackURL: "/admin",
       });
       if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
       if (result.error) throw new Error("Invalid administrator credentials");

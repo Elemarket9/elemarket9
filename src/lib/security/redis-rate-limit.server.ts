@@ -139,6 +139,10 @@ function establishConnection(config: Config): Promise<State> {
         clearTimeout(connectTimer);
         socket.removeListener("error", fail);
         socket.on("error", () => destroyConnection());
+        // The HTTP listener owns server lifetime. An idle cache connection
+        // must not retain a drained server after SIGTERM. Each command's
+        // timeout keeps the event loop alive until its response or failure.
+        socket.unref();
         resolve(state);
       })().catch(fail);
     });

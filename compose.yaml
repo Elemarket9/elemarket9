@@ -20,6 +20,13 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: ${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
     volumes: [redis_data:/data]
     networks: [private]
   app:
@@ -33,7 +40,7 @@ services:
     restart: unless-stopped
     depends_on:
       postgres: {condition: service_healthy}
-      redis: {condition: service_started}
+      redis: {condition: service_healthy}
     env_file: .env.production
     environment:
       DATABASE_URL: postgresql://${ELEMARKET_DB_USER:?set ELEMARKET_DB_USER}:${ELEMARKET_DB_PASSWORD:?set ELEMARKET_DB_PASSWORD}@postgres:5432/${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
@@ -51,6 +58,15 @@ services:
       ELEMARKET_PROXY_OVERWRITES_FORWARDED_FOR: "1"
       BETTER_AUTH_IP_HEADER: x-forwarded-for
     networks: [private]
+    init: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "node", "scripts/app-health.mjs"]
+      interval: 10s
+      start_period: 90s
+      timeout: 6s
+      retries: 6
   # Optional, private matcher/PAD bridge. DO NOT enable biometric sign-in until
   # an independently reviewed PAD service is available and tested.
   executive-face-bridge:
@@ -102,16 +118,19 @@ services:
     restart: unless-stopped
     command: ["node", "scripts/scheduler.mjs"]
     depends_on:
-      app: {condition: service_started}
-    env_file: .env.production
+      app: {condition: service_healthy}
     environment:
+      CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
       ELEMARKET_ENV: production
       ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
       ELEMARKET_SCHEDULER_BASE_URL: http://app:8080
+      ELEMARKET_PORTAL_HOST_ROUTING: "1"
+      ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
     healthcheck:
       test: ["CMD", "node", "scripts/scheduler-health.mjs"]
       interval: 60s
-      start_period: 150s
+      # First beta job is due at the next five-minute boundary.
+      start_period: 360s
       timeout: 5s
       retries: 2
     networks: [private]
@@ -129,7 +148,8 @@ services:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [app]
+    depends_on:
+      app: {condition: service_healthy}
     networks: [private]
 volumes:
   postgres_data:

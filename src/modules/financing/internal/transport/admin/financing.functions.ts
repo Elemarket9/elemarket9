@@ -1,4 +1,3 @@
-import type { JsonObject } from "@/lib/db-types";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
@@ -31,9 +30,18 @@ const providerSchema = z.object({
   reason: z.string().trim().min(12).max(1000),
 });
 
+type FinancingProviderAdmin = Omit<z.infer<typeof providerSchema>, "reason" | "providerSuppliedReference" | "applicationUrl" | "minimumApplicationAmount" | "maximumApplicationAmount"> & {
+  providerSuppliedReference: string | null;
+  applicationUrl: string | null;
+  minimumApplicationAmount: number | null;
+  maximumApplicationAmount: number | null;
+  currency: string;
+  updatedAt: string;
+};
+
 export const loadFinancingProvidersAdmin = createServerFn({method:"GET"}).middleware([authMiddleware]).handler(async({context})=>{
   const userId=getAuthenticatedUserId(context); await requireAdminForUserId(userId, "admin.financing.manage"); const sql=await getSql();
-  return sql.query<JsonObject>(`select id,provider_key as "providerKey",name,provider_legal_name as "providerLegalName",audience,product_type as "productType",status,
+  return sql.query<FinancingProviderAdmin>(`select id,provider_key as "providerKey",name,provider_legal_name as "providerLegalName",audience,product_type as "productType",status,
     marketplace_enabled as "marketplaceEnabled",marketplace_partner_status as "marketplacePartnerStatus",security_review_status as "securityReviewStatus",
     integration_status as "integrationStatus",commercial_status as "commercialStatus",customer_channel_enabled as "customerChannelEnabled",
     provider_supplied_reference as "providerSuppliedReference",integration_mode as "integrationMode",application_url as "applicationUrl",

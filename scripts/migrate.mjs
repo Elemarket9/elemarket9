@@ -80,10 +80,8 @@ async function main() {
       if (row.checksum && row.checksum !== expected)
         throw new Error(`[migrate] applied migration checksum drift detected: ${row.name}`);
       if (!row.checksum)
-        await client.query("UPDATE _migrations SET checksum=$1 WHERE name=$2", [
-          expected,
-          row.name,
-        ]);
+        throw new Error(`[migrate] applied migration checksum missing: ${row.name}. ` +
+          "Historical contents cannot be inferred from today's source. Restore verified migration evidence and perform a reviewed reconciliation before upgrading.");
     }
     const applied = appliedRows.map((r) => r.name);
 
