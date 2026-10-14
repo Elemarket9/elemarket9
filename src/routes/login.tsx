@@ -44,7 +44,6 @@ function Login() {
         const result = await authClient.signIn.email({
           email: email.trim(),
           password,
-          callbackURL: "/",
         });
         const err = result.error;
         if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
@@ -78,7 +77,6 @@ function Login() {
       const signInResult = await authClient.signIn.email({
         email: email.trim(),
         password,
-        callbackURL: "/",
       });
       if (signInResult.data && "twoFactorRedirect" in signInResult.data && signInResult.data.twoFactorRedirect) return;
       if (signInResult.error) throw new Error(signInResult.error.message ?? "Email verified, but sign-in failed");

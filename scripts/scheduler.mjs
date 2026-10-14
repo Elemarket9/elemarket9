@@ -3,7 +3,9 @@
  * Put it behind the private Docker network; never expose its signed secrets.
  */
 import { writeFile } from 'node:fs/promises';
-import { JOBS, dueJobs, signedHeaders } from './scheduler-core.mjs';
+import { JOBS, dueJobs } from './scheduler-core.mjs';
+import { nextHeartbeat } from './scheduler-heartbeat.mjs';
+import { runScheduledJob } from './scheduler-request.mjs';
 import { isDeveloperBeta } from '../src/lib/security/launch-profile.mjs';
 const baseUrl = process.env.ELEMARKET_SCHEDULER_BASE_URL || 'http://app:8080';
 const cronSecret = process.env.CRON_SECRET?.trim();
@@ -20,22 +22,12 @@ const betaAllowed = new Set(['/api/internal/refresh-eide']);
 const enabledJobs = betaMode ? JOBS.filter(job => betaAllowed.has(job.path)) : JOBS;
 const heartbeatPath = process.env.ELEMARKET_SCHEDULER_HEARTBEAT || '/tmp/elemarket-scheduler-heartbeat.json';
 let lastMinute = -1;
+let heartbeat = null;
 let executing = false;
 let stopping = false;
 const abortController = new AbortController();
-const MAX_RESPONSE = 2000;
 async function runOne(job) {
-  const url = new URL(job.path, base);
-  const response = await fetch(url, {
-    method: 'GET', headers: signedHeaders({ secret:cronSecret, path:job.path }),
-    signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(40000)]),
-    redirect: 'error',
-  });
-  if (!response.ok) {
-    const message = (await response.text()).slice(0,MAX_RESPONSE).replace(/\s+/g,' ');
-    throw new Error(`HTTP ${response.status}: ${message}`);
-  }
-  await response.body?.cancel();
+  await runScheduledJob({ base, path: job.path, secret: cronSecret, signal: abortController.signal });
 }
 async function tick() {
   const minute = Math.floor(Date.now() / 60000);
@@ -54,7 +46,8 @@ async function tick() {
     }));
     // Missed/failed tasks remain observable; health check goes unhealthy when
     // there is a failure, rather than silently declaring the scheduler healthy.
-    await writeFile(heartbeatPath, JSON.stringify({minute, failures, checkedAt:Date.now(), jobs:jobs.length}));
+    heartbeat = nextHeartbeat(heartbeat, { jobs: jobs.length, failures });
+    await writeFile(heartbeatPath, JSON.stringify(heartbeat));
   } finally { executing=false; }
 }
 process.on('SIGINT',()=>{stopping=true;abortController.abort();});

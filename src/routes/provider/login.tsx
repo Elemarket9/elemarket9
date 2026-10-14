@@ -14,7 +14,7 @@ function ProviderLogin(){
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError(null);try{
   if(!authEnabled) throw new Error("Provider sign-in is unavailable in this environment");
   sessionStorage.setItem("elemarket.auth.post2faCallback", "/provider/login");
-  const result=await authClient.signIn.email({email:email.trim(),password,callbackURL:"/provider/dashboard"});
+  const result=await authClient.signIn.email({email:email.trim(),password,});
   if(result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
   if(result.error) throw new Error(result.error.message??"Invalid provider credentials");
   const ctx=await getProviderGatewayContext();

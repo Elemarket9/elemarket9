@@ -40,6 +40,8 @@ export function faceEngineConfigured() {
   } catch { return false; }
 }
 
+/** @typedef {{operation: string, challengeId: string, nonce: string, prompt: string, requestDigest: string, identityMatched: boolean, livenessPassed: boolean, reference: string, policyId: string}} FaceDecision */
+/** @param {FaceDecision} decision */
 export function attestationPayload(decision) {
   return JSON.stringify([
     'eide-executive-face-v2',
@@ -49,6 +51,7 @@ export function attestationPayload(decision) {
   ]);
 }
 
+/** @param {Response} response @param {number} [maxBytes] */
 async function readBoundedBody(response, maxBytes = MAX_REPLY_BYTES) {
   if (Number(response.headers.get('content-length') || '0') > maxBytes) {
     await response.body?.cancel().catch(() => {});
@@ -73,6 +76,7 @@ async function readBoundedBody(response, maxBytes = MAX_REPLY_BYTES) {
   return new TextDecoder('utf-8', { fatal: true }).decode(joined);
 }
 
+/** @param {{operation: string, challengeId: string, nonce: string, prompt: string, frames: unknown, reference?: string}} input */
 export async function verifyLiveFace({operation, challengeId, nonce, prompt, frames, reference}) {
   if (!faceEngineConfigured()) throw new Error('EIDE biometric verifier unavailable');
   if (!['login', 'enroll'].includes(operation) ||
@@ -85,12 +89,14 @@ export async function verifyLiveFace({operation, challengeId, nonce, prompt, fra
   }
 
   const secret = process.env.EIDE_EXEC_FACE_ENGINE_SECRET;
+  const engineUrl = process.env.EIDE_EXEC_FACE_ENGINE_URL;
+  if (!secret || !engineUrl) throw new Error('EIDE biometric verifier unavailable');
   const body = JSON.stringify({ operation, challengeId, nonce, prompt, frames, reference: reference ?? null });
   const requestDigest = createHash('sha256').update(body).digest('hex');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(process.env.EIDE_EXEC_FACE_ENGINE_URL, {
+    const response = await fetch(engineUrl, {
       method: 'POST', headers: {
         'content-type':'application/json',
         'x-eide-exec-request-signature': hmacHex(secret, body),
@@ -119,6 +125,7 @@ export async function verifyLiveFace({operation, challengeId, nonce, prompt, fra
 /** Best-effort orphan template cleanup, never called by the browser.
  * Response must be signed by the same isolated bridge as the matcher.
  */
+/** @param {string} reference */
 export async function removeOrphanFaceReference(reference) {
   if (!faceEngineConfigured() || typeof reference !== 'string' ||
       !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference))
@@ -126,7 +133,9 @@ export async function removeOrphanFaceReference(reference) {
   const nonce=randomBytes(32).toString('base64url');
   const body=JSON.stringify({reference,nonce});
   const key=process.env.EIDE_EXEC_FACE_ENGINE_SECRET;
-  const url=new URL(process.env.EIDE_EXEC_FACE_ENGINE_URL);
+  const engineUrl=process.env.EIDE_EXEC_FACE_ENGINE_URL;
+  if (!key || !engineUrl) throw new Error('Template cleanup unavailable');
+  const url=new URL(engineUrl);
   url.pathname='/v1/remove';
   const response=await fetch(url,{method:'POST',cache:'no-store',redirect:'error',
     signal:AbortSignal.timeout(8000),headers:{'content-type':'application/json',

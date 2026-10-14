@@ -56,7 +56,7 @@ const trustedProxyList = (env("BETTER_AUTH_TRUSTED_PROXIES") ?? "")
 if (deployed && env("ELEMARKET_TRUST_PROXY") === "1" && !authIpHeader && trustedProxyList.length === 0) {
   throw new Error("Trusted proxy mode requires BETTER_AUTH_IP_HEADER or BETTER_AUTH_TRUSTED_PROXIES for authentication rate-limit identity.");
 }
-const database = databaseUrl ? new Pool({ connectionString: databaseUrl }) : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
+const database = databaseUrl ? new Pool({ connectionString: databaseUrl, allowExitOnIdle: true }) : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 const globalAuthRef = globalThis as typeof globalThis & { __elemarketAuthSecret__?: string };
 function localAuthSecret(): string {
   globalAuthRef.__elemarketAuthSecret__ ??= randomBytes(32).toString("hex");

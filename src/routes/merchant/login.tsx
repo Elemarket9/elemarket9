@@ -44,7 +44,6 @@ function MerchantLogin() {
       const result = await authClient.signIn.email({
         email: email.trim(),
         password,
-        callbackURL: "/merchant/dashboard",
       });
       if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
       if (result.error) throw new Error(result.error.message ?? "Invalid merchant credentials");

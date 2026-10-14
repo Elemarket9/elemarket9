@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/internal/sync-enterprise-catalogs")({
     handlers: {
       GET: async ({ request }) => {
         await assertCronAuthorization(request);
-        await enforceRateLimit("internal-sync-enterprise-catalogs", { windowSeconds: 60, maxRequests: 2 });
+        await enforceRateLimit("internal-sync-enterprise-catalogs", { identity: "subject", subject: "authenticated-scheduler", windowSeconds: 60, maxRequests: 2 });
         try {
           const results = await syncAllEnterpriseCatalogs();
           // Legacy maintenance is retained for compatibility; independent EIDE scheduling is available.

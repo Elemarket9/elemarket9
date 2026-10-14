@@ -102,14 +102,9 @@ export const markPhoneVerified = createServerFn({ method: "POST" })
       userId,
       expectedPurpose: "phone_verification",
     });
-    const { getSql } = await import("../../../../lib/db");
-    const sql = await getSql();
-    const rows = await sql.query<{ verified: boolean }>(
-      `select confirm_phone_verification($1,$2) as verified`,
-      [userId, data.challengeId],
-    );
-    if (!result.verified || rows[0]?.verified !== true) throw new Error("Phone verification was not persisted");
-    return { verified: true as const };
+    // The OTP service commits consumption and profile/application proof in one
+    // transaction, including calls through the generic OTP verification route.
+    return { verified: result.verified };
   });
 
 

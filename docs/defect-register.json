@@ -1,0 +1,236 @@
+[
+  {
+    "id": "D01",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Nonreproducible root installation",
+    "source": "package-lock.json:5808",
+    "detail": "npm ci failed because the lockfile omitted a required lru-cache dependency. Repaired lock resolution; root clean install and Docker npm ci passed.",
+    "evidence": "baseline install failure; repaired install and final-csp-docker-build"
+  },
+  {
+    "id": "D02",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Type and generated-route failures",
+    "source": "src/routeTree.gen.ts:59",
+    "detail": "Stale route generation plus invalid/narrow types and an incorrect Better Auth session call prevented type checking. Regenerated routes and corrected contracts without changing grants.",
+    "evidence": "baseline-typecheck; final-csp-typecheck; final-csp-production-build"
+  },
+  {
+    "id": "D03",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Empty test gate falsely succeeded",
+    "source": "scripts/test.mjs:6",
+    "detail": "The missing tests glob returned success with zero executed tests. Added nonempty discovery and real regression suites.",
+    "evidence": "baseline-test; unit and integration passes listed below"
+  },
+  {
+    "id": "D04",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Private portal pages accepted wrong hosts",
+    "source": "src/start.ts:9",
+    "detail": "Application relied on ingress for page isolation. Baseline unknown Host and marketplace /admin returned200. Application now rejects unknown hosts and private paths on other portals. Resource authorization remains separate.",
+    "evidence": "http-portals-trusted-ingress; final-csp-portals"
+  },
+  {
+    "id": "D05",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Sibling origin could mutate executive credentials",
+    "source": "src/lib/security/portal-policy.mjs:113",
+    "detail": "Better Auth allowed every portal origin. A valid executive session and current password could change its password from the marketplace Origin. Added receiving-host Origin and Fetch-Metadata enforcement. This was not a passwordless takeover.",
+    "evidence": "auth-sibling-origin-before-fix; executive-workspace-browser API assertions"
+  },
+  {
+    "id": "D06",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Signup rejected its newly created account",
+    "source": "src/modules/identity/internal/auth/email/email-otp.server.ts:73",
+    "detail": "Signup creates an unverified identity before requesting its code; the existence test rejected it. Only an already verified account now causes the duplicate signup error.",
+    "evidence": "signup-regression-before-fix; customer/provider/merchant signup browser checks"
+  },
+  {
+    "id": "D07",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Email proof could commit without account verification",
+    "source": "src/modules/identity/internal/auth/email/email-otp.server.ts:148",
+    "detail": "OTP consumption and emailVerified update used separate commits. Fault injection stranded the account. Both now commit atomically and recheck expiry/identity.",
+    "evidence": "email-otp-atomicity-before-fix; combined-postgres-integrity"
+  },
+  {
+    "id": "D08",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Phone proof could commit without profile verification",
+    "source": "src/modules/identity/internal/auth/otp/otp.server.ts:165",
+    "detail": "OTP consumption and profile confirmation were separate; selected adapter was not bound in claim SQL. Added atomic confirmation, consistent lock ordering, provider binding and expiry recheck.",
+    "evidence": "phone-otp-atomicity-before-fix; combined-postgres-integrity"
+  },
+  {
+    "id": "D09",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Merchant writes could outlive failed audit persistence",
+    "source": "src/modules/merchants/internal/transport/merchant/dashboard.functions.ts:171",
+    "detail": "Create/edit/archive committed before audit insertion. Real PostgreSQL fault injection reproduced all three partial writes. Each mutation and its audit now share a transaction; edit row lock spans the update.",
+    "evidence": "merchant-authorization-baseline; complete-authorization-integration"
+  },
+  {
+    "id": "D10",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Missing migration checksums silently fabricated history",
+    "source": "scripts/migrate.mjs:82",
+    "detail": "Migrator stamped current checksums on historical rows with no proof. It now refuses unknown history and requests evidence-based reconciliation. No migration was edited or deleted.",
+    "evidence": "migration-missing-checksum-reproduction; migration-missing-checksum-fixed; migration-normal-history-preserved"
+  },
+  {
+    "id": "D11",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Premature authentication navigation",
+    "source": "src/routes/provider/login.tsx:17",
+    "detail": "Better Auth callbackURL redirected before application-specific follow-up and routing. Removed redundant sign-in redirects across affected forms, retaining TOTP redirects. Provider password form now agrees with minimum length.",
+    "evidence": "provider-signup-browser; provider-signup-browser-fixed; merchant-workspace-recovery-fixed"
+  },
+  {
+    "id": "D12",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Unavailable SMS stranded merchant onboarding",
+    "source": "src/routes/merchant/register.tsx:62",
+    "detail": "Application was saved but UI stayed on consumed email verification after SMS failure. Added honest pending-phone state, retry, status link and disabled verification without a challenge.",
+    "evidence": "merchant-onboarding-before-fix; origin-merchant-browser"
+  },
+  {
+    "id": "D13",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Rejected merchant forms erased input",
+    "source": "src/routes/merchant/dashboard.tsx:108",
+    "detail": "Action wrapper handled rejection but resolved its promise; unconditional then reset/close erased create/edit input. Removed those post-action handlers; successful writes already reload.",
+    "evidence": "merchant-workspace-baseline-corrected; merchant-workspace-recovery-fixed"
+  },
+  {
+    "id": "D14",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Scheduler could not reach host-isolated workers",
+    "source": "scripts/scheduler-request.mjs:10",
+    "detail": "Private-network requests lacked configured Host and worker limits expected public forwarded identity. Requests now preserve configured Host with node:http and signed internal subject limits. HMAC/replay checks retained.",
+    "evidence": "scheduler-private-ingress-before-fix; scheduler-live-after-fix"
+  },
+  {
+    "id": "D15",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Scheduler idle ticks misreported health",
+    "source": "scripts/scheduler-heartbeat.mjs:3",
+    "detail": "Five-minute beta cadence conflicted with per-minute health expectations; idle ticks erased failed work. Separate loop freshness and last completed run, preserving failures until successful work.",
+    "evidence": "scheduler-idle-health-baseline; scheduler-heartbeat-fixed; compose-start-mount-repaired"
+  },
+  {
+    "id": "D16",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Idle database/cache connections retained shutdown",
+    "source": "src/lib/security/redis-rate-limit.server.ts:145",
+    "detail": "Idle Redis socket and PostgreSQL pools held the event loop after HTTP shutdown. Unref idle socket and allow idle pools to exit; pending work remains awaited.",
+    "evidence": "redis-process-exit-before-fix; redis-process-exit-after-fix; graceful-shutdown-after-fix"
+  },
+  {
+    "id": "D17",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Optional push blocked beta builds",
+    "source": "scripts/validate-push-client-env.mjs:14",
+    "detail": "Shared beta build demanded a push provider despite optional notifications. Permit both settings absent only for explicit beta/local; hide unavailable push UI and still reject mismatches.",
+    "evidence": "beta-production-build failure; unit-tests-with-build-gate; final-csp-production-build"
+  },
+  {
+    "id": "D18",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Compose start sequencing did not prove readiness",
+    "source": "compose.yaml:13",
+    "detail": "Added app and authenticated cache health, dependency readiness, scheduler grace and least-privilege app capabilities; limited scheduler secrets.",
+    "evidence": "compose-network-tls-isolation; final-csp-image-tls-health"
+  },
+  {
+    "id": "D19",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "SSR errors erased the access-denied page",
+    "source": "src/start.ts:22",
+    "detail": "Loader-error response lost nonce-bearing CSP headers. Browser blocked inline router bootstrap and replaced SSR message with blank content. Apply security headers to final response, preserving request nonce and response status.",
+    "evidence": "provider-workspace-browser failure; final-csp-unit; provider-workspace-csp-fixed"
+  },
+  {
+    "id": "D20",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Referenced discovery browser suite missing",
+    "source": "tests/discovery-browser.e2e.mjs:1",
+    "detail": "Restored advertised browser command with actual search/cart/mobile/API-boundary checks.",
+    "evidence": "discovery-browser-selector-fixed"
+  },
+  {
+    "id": "D21",
+    "severity": "P1",
+    "status": "Fixed",
+    "title": "Executive moderation dashboard crashes on database dates",
+    "source": "src/modules/administration/internal/transport/admin/moderation.functions.ts:23",
+    "detail": "Customer/product timestamp SQL returned Date objects while the API claimed strings; React rejected them and the authenticated dashboard displayed an access error. PostgreSQL regression reproduced object!=string. Explicit UTC text projection repairs the transport contract.",
+    "evidence": "executive-browser-after-rate-window; moderation-date-baseline; moderation-date-fixed; final executive browser"
+  },
+  {
+    "id": "D22",
+    "severity": "P2",
+    "status": "Fixed",
+    "title": "Long audit IDs overflow the executive mobile dashboard",
+    "source": "src/routes/admin/dashboard.tsx:350",
+    "detail": "Implicit mobile grid tracks expanded to the minimum width of unbroken audit identifiers. Explicit minmax(0,1fr) grid column and wrapping keep audit content readable within the viewport.",
+    "evidence": "executive-browser-navigation-stable; final executive browser"
+  },
+  {
+    "id": "R01",
+    "severity": "P1",
+    "status": "Open",
+    "title": "Mobile dependency security gate fails",
+    "source": "mobile/package-lock.json:3629",
+    "detail": "35 affected packages:21high/14moderate, propagated from five advisory causes. Latest braces3.0.3 and node-forge1.4.0 still vulnerable. Nonbreaking audit fix did not resolve; no forced unsupported SDK change.",
+    "evidence": "mobile-dependency-audit; registry inspection2026-10-14"
+  },
+  {
+    "id": "R02",
+    "severity": "P1",
+    "status": "Unverified history",
+    "title": "Existing database upgrade provenance unavailable",
+    "source": "migrations.sha256.json:41",
+    "detail": "186 current migrations pass fresh/repeat/restore checks. Number0034 is absent and source history says0041/0105 were rewritten before this audit. No original artifacts provided; unknown upgrades cannot be certified.",
+    "evidence": "postgres-fresh-migration; migration-normal-history-preserved"
+  },
+  {
+    "id": "R03",
+    "severity": "P2",
+    "status": "Open",
+    "title": "Total executive factor-loss recovery not verified",
+    "source": "docs/deployment.md:65",
+    "detail": "Unused TOTP recovery codes work and cannot be replayed. Loss of authenticator plus every recovery code lacks a verified audited recovery flow. No bypass introduced.",
+    "evidence": "executive-recovery-configured"
+  },
+  {
+    "id": "R04",
+    "severity": "P1",
+    "status": "Disabled",
+    "title": "Face matching and spoof resistance unverified",
+    "source": "src/modules/identity/internal/auth/executive/engine.server.mjs:22",
+    "detail": "Experimental protocol/PAD tests do not validate real matching, liveness, camera or spoof resistance. Face login stays disabled in shared environments and device-independent in architecture.",
+    "evidence": "pad-contract-tests; executive-workspace-browser API assertions"
+  }
+]

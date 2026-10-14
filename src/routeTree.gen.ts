@@ -25,15 +25,19 @@ import { Route as SupportRouteImport } from './routes/support'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TwoFactorRouteImport } from './routes/two-factor'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as AdminCampaignsRouteImport } from './routes/admin/campaigns'
-import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
-import { Route as AdminFinancingRouteImport } from './routes/admin/financing'
-import { Route as AdminPartnersRouteImport } from './routes/admin/partners'
-import { Route as AdminSecurityRouteImport } from './routes/admin/security'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
+import { Route as AdminCampaignsRouteImport } from './routes/admin/campaigns'
+import { Route as AdminCommissionsRouteImport } from './routes/admin/commissions'
+import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
+import { Route as AdminEnterpriseRouteImport } from './routes/admin/enterprise'
+import { Route as AdminExecutiveFaceRouteImport } from './routes/admin/executive-face'
+import { Route as AdminFinancingRouteImport } from './routes/admin/financing'
 import { Route as AdminOperationsRouteImport } from './routes/admin/operations'
-import { Route as AdminTeamRouteImport } from './routes/admin/team'
+import { Route as AdminPartnersRouteImport } from './routes/admin/partners'
+import { Route as AdminRefundsRouteImport } from './routes/admin/refunds'
+import { Route as AdminSecurityRouteImport } from './routes/admin/security'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
+import { Route as AdminTeamRouteImport } from './routes/admin/team'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiSearchRouteImport } from './routes/api.search'
 import { Route as FinancingDepositPreviewRouteImport } from './routes/financing/deposit-preview'
@@ -41,6 +45,7 @@ import { Route as FinancingDepositReturnRouteImport } from './routes/financing/d
 import { Route as MerchantDashboardRouteImport } from './routes/merchant/dashboard'
 import { Route as MerchantLoginRouteImport } from './routes/merchant/login'
 import { Route as MerchantRegisterRouteImport } from './routes/merchant/register'
+import { Route as MerchantStatusRouteImport } from './routes/merchant/status'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as PartnerDeliveryRouteImport } from './routes/partner.delivery'
 import { Route as PartnerFinancingRouteImport } from './routes/partner.financing'
@@ -60,6 +65,7 @@ import { Route as StoresIdRouteImport } from './routes/stores.$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiDeliveryQuoteRouteImport } from './routes/api.delivery.quote'
 import { Route as ApiEmailWebhookRouteImport } from './routes/api.email.webhook'
+import { Route as ApiExecutiveFaceRouteImport } from './routes/api.executive.face'
 import { Route as ApiInternalBrandIntegrationWorkerRouteImport } from './routes/api.internal.brand-integration-worker'
 import { Route as ApiInternalDispatchDeliveriesRouteImport } from './routes/api.internal.dispatch-deliveries'
 import { Route as ApiInternalEnterpriseOrderOutboxRouteImport } from './routes/api.internal.enterprise-order-outbox'
@@ -76,6 +82,7 @@ import { Route as ApiMobilePaymentIntentRouteImport } from './routes/api.mobile.
 import { Route as ApiMobilePaymentStatusRouteImport } from './routes/api.mobile.payment-status'
 import { Route as ApiMobileProfileRouteImport } from './routes/api.mobile.profile'
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api.payments.webhook'
+import { Route as ApiProductMediaMediaIdRouteImport } from './routes/api.product-media.$mediaId'
 import { Route as SitemapsProductsChar123pageChar125DotxmlRouteImport } from './routes/sitemaps.products.{$page}[.]xml'
 import { Route as ApiBrandIntegrationWebhookRouteImport } from './routes/api.brand.integration.webhook'
 import { Route as ApiEnterpriseCatalogSyncRouteImport } from './routes/api.enterprise.catalog.sync'
@@ -162,9 +169,19 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminActivityRoute = AdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCampaignsRoute = AdminCampaignsRouteImport.update({
   id: '/admin/campaigns',
   path: '/admin/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCommissionsRoute = AdminCommissionsRouteImport.update({
+  id: '/admin/commissions',
+  path: '/admin/commissions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
@@ -172,24 +189,19 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: '/admin/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminEnterpriseRoute = AdminEnterpriseRouteImport.update({
+  id: '/admin/enterprise',
+  path: '/admin/enterprise',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminExecutiveFaceRoute = AdminExecutiveFaceRouteImport.update({
+  id: '/admin/executive-face',
+  path: '/admin/executive-face',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFinancingRoute = AdminFinancingRouteImport.update({
   id: '/admin/financing',
   path: '/admin/financing',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminPartnersRoute = AdminPartnersRouteImport.update({
-  id: '/admin/partners',
-  path: '/admin/partners',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminSecurityRoute = AdminSecurityRouteImport.update({
-  id: '/admin/security',
-  path: '/admin/security',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminActivityRoute = AdminActivityRouteImport.update({
-  id: '/admin/activity',
-  path: '/admin/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminOperationsRoute = AdminOperationsRouteImport.update({
@@ -197,14 +209,29 @@ const AdminOperationsRoute = AdminOperationsRouteImport.update({
   path: '/admin/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminTeamRoute = AdminTeamRouteImport.update({
-  id: '/admin/team',
-  path: '/admin/team',
+const AdminPartnersRoute = AdminPartnersRouteImport.update({
+  id: '/admin/partners',
+  path: '/admin/partners',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRefundsRoute = AdminRefundsRouteImport.update({
+  id: '/admin/refunds',
+  path: '/admin/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSecurityRoute = AdminSecurityRouteImport.update({
+  id: '/admin/security',
+  path: '/admin/security',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSupportRoute = AdminSupportRouteImport.update({
   id: '/admin/support',
   path: '/admin/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTeamRoute = AdminTeamRouteImport.update({
+  id: '/admin/team',
+  path: '/admin/team',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -240,6 +267,11 @@ const MerchantLoginRoute = MerchantLoginRouteImport.update({
 const MerchantRegisterRoute = MerchantRegisterRouteImport.update({
   id: '/merchant/register',
   path: '/merchant/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MerchantStatusRoute = MerchantStatusRouteImport.update({
+  id: '/merchant/status',
+  path: '/merchant/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
@@ -337,6 +369,11 @@ const ApiEmailWebhookRoute = ApiEmailWebhookRouteImport.update({
   path: '/api/email/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExecutiveFaceRoute = ApiExecutiveFaceRouteImport.update({
+  id: '/api/executive/face',
+  path: '/api/executive/face',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInternalBrandIntegrationWorkerRoute =
   ApiInternalBrandIntegrationWorkerRouteImport.update({
     id: '/api/internal/brand-integration-worker',
@@ -424,6 +461,11 @@ const ApiPaymentsWebhookRoute = ApiPaymentsWebhookRouteImport.update({
   path: '/api/payments/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiProductMediaMediaIdRoute = ApiProductMediaMediaIdRouteImport.update({
+  id: '/api/product-media/$mediaId',
+  path: '/api/product-media/$mediaId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapsProductsChar123pageChar125DotxmlRoute =
   SitemapsProductsChar123pageChar125DotxmlRouteImport.update({
     id: '/sitemaps/products/{$page}.xml',
@@ -471,15 +513,19 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/two-factor': typeof TwoFactorRoute
-  '/admin/campaigns': typeof AdminCampaignsRoute
-  '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/financing': typeof AdminFinancingRoute
-  '/admin/partners': typeof AdminPartnersRoute
-  '/admin/security': typeof AdminSecurityRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/campaigns': typeof AdminCampaignsRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/enterprise': typeof AdminEnterpriseRoute
+  '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
-  '/admin/team': typeof AdminTeamRoute
+  '/admin/partners': typeof AdminPartnersRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
+  '/admin/team': typeof AdminTeamRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
   '/financing/deposit-preview': typeof FinancingDepositPreviewRoute
@@ -487,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/merchant/dashboard': typeof MerchantDashboardRoute
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
+  '/merchant/status': typeof MerchantStatusRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -507,6 +554,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
   '/api/email/webhook': typeof ApiEmailWebhookRoute
+  '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
@@ -523,6 +571,7 @@ export interface FileRoutesByFullPath {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
   '/api/enterprise/catalog/sync': typeof ApiEnterpriseCatalogSyncRoute
@@ -545,15 +594,19 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/two-factor': typeof TwoFactorRoute
-  '/admin/campaigns': typeof AdminCampaignsRoute
-  '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/financing': typeof AdminFinancingRoute
-  '/admin/partners': typeof AdminPartnersRoute
-  '/admin/security': typeof AdminSecurityRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/campaigns': typeof AdminCampaignsRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/enterprise': typeof AdminEnterpriseRoute
+  '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
-  '/admin/team': typeof AdminTeamRoute
+  '/admin/partners': typeof AdminPartnersRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
+  '/admin/team': typeof AdminTeamRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
   '/financing/deposit-preview': typeof FinancingDepositPreviewRoute
@@ -561,6 +614,7 @@ export interface FileRoutesByTo {
   '/merchant/dashboard': typeof MerchantDashboardRoute
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
+  '/merchant/status': typeof MerchantStatusRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -581,6 +635,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
   '/api/email/webhook': typeof ApiEmailWebhookRoute
+  '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
@@ -597,6 +652,7 @@ export interface FileRoutesByTo {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
   '/api/enterprise/catalog/sync': typeof ApiEnterpriseCatalogSyncRoute
@@ -620,15 +676,19 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
   '/two-factor': typeof TwoFactorRoute
-  '/admin/campaigns': typeof AdminCampaignsRoute
-  '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/financing': typeof AdminFinancingRoute
-  '/admin/partners': typeof AdminPartnersRoute
-  '/admin/security': typeof AdminSecurityRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/campaigns': typeof AdminCampaignsRoute
+  '/admin/commissions': typeof AdminCommissionsRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/enterprise': typeof AdminEnterpriseRoute
+  '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
-  '/admin/team': typeof AdminTeamRoute
+  '/admin/partners': typeof AdminPartnersRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
+  '/admin/team': typeof AdminTeamRoute
   '/api/health': typeof ApiHealthRoute
   '/api/search': typeof ApiSearchRoute
   '/financing/deposit-preview': typeof FinancingDepositPreviewRoute
@@ -636,6 +696,7 @@ export interface FileRoutesById {
   '/merchant/dashboard': typeof MerchantDashboardRoute
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
+  '/merchant/status': typeof MerchantStatusRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -656,6 +717,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
   '/api/email/webhook': typeof ApiEmailWebhookRoute
+  '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
@@ -672,6 +734,7 @@ export interface FileRoutesById {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
   '/api/enterprise/catalog/sync': typeof ApiEnterpriseCatalogSyncRoute
@@ -696,15 +759,19 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/two-factor'
-    | '/admin/campaigns'
-    | '/admin/dashboard'
-    | '/admin/financing'
-    | '/admin/partners'
-    | '/admin/security'
     | '/admin/activity'
+    | '/admin/campaigns'
+    | '/admin/commissions'
+    | '/admin/dashboard'
+    | '/admin/enterprise'
+    | '/admin/executive-face'
+    | '/admin/financing'
     | '/admin/operations'
-    | '/admin/team'
+    | '/admin/partners'
+    | '/admin/refunds'
+    | '/admin/security'
     | '/admin/support'
+    | '/admin/team'
     | '/api/health'
     | '/api/search'
     | '/financing/deposit-preview'
@@ -712,6 +779,7 @@ export interface FileRouteTypes {
     | '/merchant/dashboard'
     | '/merchant/login'
     | '/merchant/register'
+    | '/merchant/status'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -732,6 +800,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/delivery/quote'
     | '/api/email/webhook'
+    | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
@@ -748,6 +817,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
     | '/api/enterprise/catalog/sync'
@@ -770,15 +840,19 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/two-factor'
-    | '/admin/campaigns'
-    | '/admin/dashboard'
-    | '/admin/financing'
-    | '/admin/partners'
-    | '/admin/security'
     | '/admin/activity'
+    | '/admin/campaigns'
+    | '/admin/commissions'
+    | '/admin/dashboard'
+    | '/admin/enterprise'
+    | '/admin/executive-face'
+    | '/admin/financing'
     | '/admin/operations'
-    | '/admin/team'
+    | '/admin/partners'
+    | '/admin/refunds'
+    | '/admin/security'
     | '/admin/support'
+    | '/admin/team'
     | '/api/health'
     | '/api/search'
     | '/financing/deposit-preview'
@@ -786,6 +860,7 @@ export interface FileRouteTypes {
     | '/merchant/dashboard'
     | '/merchant/login'
     | '/merchant/register'
+    | '/merchant/status'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -806,6 +881,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/delivery/quote'
     | '/api/email/webhook'
+    | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
@@ -822,6 +898,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
     | '/api/enterprise/catalog/sync'
@@ -844,15 +921,19 @@ export interface FileRouteTypes {
     | '/support'
     | '/terms'
     | '/two-factor'
-    | '/admin/campaigns'
-    | '/admin/dashboard'
-    | '/admin/financing'
-    | '/admin/partners'
-    | '/admin/security'
     | '/admin/activity'
+    | '/admin/campaigns'
+    | '/admin/commissions'
+    | '/admin/dashboard'
+    | '/admin/enterprise'
+    | '/admin/executive-face'
+    | '/admin/financing'
     | '/admin/operations'
-    | '/admin/team'
+    | '/admin/partners'
+    | '/admin/refunds'
+    | '/admin/security'
     | '/admin/support'
+    | '/admin/team'
     | '/api/health'
     | '/api/search'
     | '/financing/deposit-preview'
@@ -860,6 +941,7 @@ export interface FileRouteTypes {
     | '/merchant/dashboard'
     | '/merchant/login'
     | '/merchant/register'
+    | '/merchant/status'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -880,6 +962,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/delivery/quote'
     | '/api/email/webhook'
+    | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
@@ -896,6 +979,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
     | '/api/enterprise/catalog/sync'
@@ -919,15 +1003,19 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
   TwoFactorRoute: typeof TwoFactorRoute
-  AdminCampaignsRoute: typeof AdminCampaignsRoute
-  AdminDashboardRoute: typeof AdminDashboardRoute
-  AdminFinancingRoute: typeof AdminFinancingRoute
-  AdminPartnersRoute: typeof AdminPartnersRoute
-  AdminSecurityRoute: typeof AdminSecurityRoute
   AdminActivityRoute: typeof AdminActivityRoute
+  AdminCampaignsRoute: typeof AdminCampaignsRoute
+  AdminCommissionsRoute: typeof AdminCommissionsRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminEnterpriseRoute: typeof AdminEnterpriseRoute
+  AdminExecutiveFaceRoute: typeof AdminExecutiveFaceRoute
+  AdminFinancingRoute: typeof AdminFinancingRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
-  AdminTeamRoute: typeof AdminTeamRoute
+  AdminPartnersRoute: typeof AdminPartnersRoute
+  AdminRefundsRoute: typeof AdminRefundsRoute
+  AdminSecurityRoute: typeof AdminSecurityRoute
   AdminSupportRoute: typeof AdminSupportRoute
+  AdminTeamRoute: typeof AdminTeamRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiSearchRoute: typeof ApiSearchRoute
   FinancingDepositPreviewRoute: typeof FinancingDepositPreviewRoute
@@ -935,6 +1023,7 @@ export interface RootRouteChildren {
   MerchantDashboardRoute: typeof MerchantDashboardRoute
   MerchantLoginRoute: typeof MerchantLoginRoute
   MerchantRegisterRoute: typeof MerchantRegisterRoute
+  MerchantStatusRoute: typeof MerchantStatusRoute
   PartnerDeliveryRoute: typeof PartnerDeliveryRoute
   PartnerFinancingRoute: typeof PartnerFinancingRoute
   PaymentPreviewRoute: typeof PaymentPreviewRoute
@@ -954,6 +1043,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiDeliveryQuoteRoute: typeof ApiDeliveryQuoteRoute
   ApiEmailWebhookRoute: typeof ApiEmailWebhookRoute
+  ApiExecutiveFaceRoute: typeof ApiExecutiveFaceRoute
   ApiInternalBrandIntegrationWorkerRoute: typeof ApiInternalBrandIntegrationWorkerRoute
   ApiInternalDispatchDeliveriesRoute: typeof ApiInternalDispatchDeliveriesRoute
   ApiInternalEnterpriseOrderOutboxRoute: typeof ApiInternalEnterpriseOrderOutboxRoute
@@ -970,6 +1060,7 @@ export interface RootRouteChildren {
   ApiMobilePaymentStatusRoute: typeof ApiMobilePaymentStatusRoute
   ApiMobileProfileRoute: typeof ApiMobileProfileRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
+  ApiProductMediaMediaIdRoute: typeof ApiProductMediaMediaIdRoute
   SitemapsProductsChar123pageChar125DotxmlRoute: typeof SitemapsProductsChar123pageChar125DotxmlRoute
   ApiBrandIntegrationWebhookRoute: typeof ApiBrandIntegrationWebhookRoute
   ApiEnterpriseCatalogSyncRoute: typeof ApiEnterpriseCatalogSyncRoute
@@ -1091,11 +1182,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/activity': {
+      id: '/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/campaigns': {
       id: '/admin/campaigns'
       path: '/admin/campaigns'
       fullPath: '/admin/campaigns'
       preLoaderRoute: typeof AdminCampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/commissions': {
+      id: '/admin/commissions'
+      path: '/admin/commissions'
+      fullPath: '/admin/commissions'
+      preLoaderRoute: typeof AdminCommissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/dashboard': {
@@ -1105,32 +1210,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/enterprise': {
+      id: '/admin/enterprise'
+      path: '/admin/enterprise'
+      fullPath: '/admin/enterprise'
+      preLoaderRoute: typeof AdminEnterpriseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/executive-face': {
+      id: '/admin/executive-face'
+      path: '/admin/executive-face'
+      fullPath: '/admin/executive-face'
+      preLoaderRoute: typeof AdminExecutiveFaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/financing': {
       id: '/admin/financing'
       path: '/admin/financing'
       fullPath: '/admin/financing'
       preLoaderRoute: typeof AdminFinancingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/partners': {
-      id: '/admin/partners'
-      path: '/admin/partners'
-      fullPath: '/admin/partners'
-      preLoaderRoute: typeof AdminPartnersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/security': {
-      id: '/admin/security'
-      path: '/admin/security'
-      fullPath: '/admin/security'
-      preLoaderRoute: typeof AdminSecurityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/activity': {
-      id: '/admin/activity'
-      path: '/admin/activity'
-      fullPath: '/admin/activity'
-      preLoaderRoute: typeof AdminActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/operations': {
@@ -1140,11 +1238,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/team': {
-      id: '/admin/team'
-      path: '/admin/team'
-      fullPath: '/admin/team'
-      preLoaderRoute: typeof AdminTeamRouteImport
+    '/admin/partners': {
+      id: '/admin/partners'
+      path: '/admin/partners'
+      fullPath: '/admin/partners'
+      preLoaderRoute: typeof AdminPartnersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/refunds': {
+      id: '/admin/refunds'
+      path: '/admin/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/security': {
+      id: '/admin/security'
+      path: '/admin/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AdminSecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/support': {
@@ -1152,6 +1264,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/team': {
+      id: '/admin/team'
+      path: '/admin/team'
+      fullPath: '/admin/team'
+      preLoaderRoute: typeof AdminTeamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -1201,6 +1320,13 @@ declare module '@tanstack/react-router' {
       path: '/merchant/register'
       fullPath: '/merchant/register'
       preLoaderRoute: typeof MerchantRegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/merchant/status': {
+      id: '/merchant/status'
+      path: '/merchant/status'
+      fullPath: '/merchant/status'
+      preLoaderRoute: typeof MerchantStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders/$id': {
@@ -1336,6 +1462,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEmailWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/executive/face': {
+      id: '/api/executive/face'
+      path: '/api/executive/face'
+      fullPath: '/api/executive/face'
+      preLoaderRoute: typeof ApiExecutiveFaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/internal/brand-integration-worker': {
       id: '/api/internal/brand-integration-worker'
       path: '/api/internal/brand-integration-worker'
@@ -1448,6 +1581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/product-media/$mediaId': {
+      id: '/api/product-media/$mediaId'
+      path: '/api/product-media/$mediaId'
+      fullPath: '/api/product-media/$mediaId'
+      preLoaderRoute: typeof ApiProductMediaMediaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemaps/products/{$page}.xml': {
       id: '/sitemaps/products/{$page}.xml'
       path: '/sitemaps/products/{$page}.xml'
@@ -1513,15 +1653,19 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
   TwoFactorRoute: TwoFactorRoute,
-  AdminCampaignsRoute: AdminCampaignsRoute,
-  AdminDashboardRoute: AdminDashboardRoute,
-  AdminFinancingRoute: AdminFinancingRoute,
-  AdminPartnersRoute: AdminPartnersRoute,
-  AdminSecurityRoute: AdminSecurityRoute,
   AdminActivityRoute: AdminActivityRoute,
+  AdminCampaignsRoute: AdminCampaignsRoute,
+  AdminCommissionsRoute: AdminCommissionsRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
+  AdminEnterpriseRoute: AdminEnterpriseRoute,
+  AdminExecutiveFaceRoute: AdminExecutiveFaceRoute,
+  AdminFinancingRoute: AdminFinancingRoute,
   AdminOperationsRoute: AdminOperationsRoute,
-  AdminTeamRoute: AdminTeamRoute,
+  AdminPartnersRoute: AdminPartnersRoute,
+  AdminRefundsRoute: AdminRefundsRoute,
+  AdminSecurityRoute: AdminSecurityRoute,
   AdminSupportRoute: AdminSupportRoute,
+  AdminTeamRoute: AdminTeamRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiSearchRoute: ApiSearchRoute,
   FinancingDepositPreviewRoute: FinancingDepositPreviewRoute,
@@ -1529,6 +1673,7 @@ const rootRouteChildren: RootRouteChildren = {
   MerchantDashboardRoute: MerchantDashboardRoute,
   MerchantLoginRoute: MerchantLoginRoute,
   MerchantRegisterRoute: MerchantRegisterRoute,
+  MerchantStatusRoute: MerchantStatusRoute,
   PartnerDeliveryRoute: PartnerDeliveryRoute,
   PartnerFinancingRoute: PartnerFinancingRoute,
   PaymentPreviewRoute: PaymentPreviewRoute,
@@ -1548,6 +1693,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiDeliveryQuoteRoute: ApiDeliveryQuoteRoute,
   ApiEmailWebhookRoute: ApiEmailWebhookRoute,
+  ApiExecutiveFaceRoute: ApiExecutiveFaceRoute,
   ApiInternalBrandIntegrationWorkerRoute:
     ApiInternalBrandIntegrationWorkerRoute,
   ApiInternalDispatchDeliveriesRoute: ApiInternalDispatchDeliveriesRoute,
@@ -1567,6 +1713,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMobilePaymentStatusRoute: ApiMobilePaymentStatusRoute,
   ApiMobileProfileRoute: ApiMobileProfileRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
+  ApiProductMediaMediaIdRoute: ApiProductMediaMediaIdRoute,
   SitemapsProductsChar123pageChar125DotxmlRoute:
     SitemapsProductsChar123pageChar125DotxmlRoute,
   ApiBrandIntegrationWebhookRoute: ApiBrandIntegrationWebhookRoute,

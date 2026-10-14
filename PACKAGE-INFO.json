@@ -1,0 +1,10 @@
+{
+  "decision": "NO-GO for public exposure",
+  "baseline": "71abe2491b1aa1d320a8f383d86ea7c91b74aa61",
+  "source": "corrected uncommitted working tree",
+  "package": "developer",
+  "version": "2.11.3",
+  "files": 695,
+  "exclusions": "Git metadata, ignored/private files, dependencies, generated builds; clean package also omits tests and CI",
+  "limitations": "See docs/release-assessment.md. Optional mobile/biometric source is not certified."
+}
