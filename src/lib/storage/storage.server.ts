@@ -134,17 +134,12 @@ export class InvalidUploadedObjectError extends Error {}
 
 export async function verifyUploadedObject(key: string, expected: Pick<UploadPolicy, "contentType" | "sizeBytes">): Promise<void> {
   const provider = getStorageProvider();
-  try {
-    const meta = await provider.headObject(key);
+  // Propagate provider failures without deleting potentially valid content.
+  const meta = await provider.headObject(key);
     if (meta.sizeBytes !== expected.sizeBytes) throw new InvalidUploadedObjectError("Stored object size does not match the authorized upload");
     if ((meta.contentType ?? "").toLowerCase() !== expected.contentType.toLowerCase()) throw new InvalidUploadedObjectError("Stored object content type does not match the authorized upload");
     const bytes = await provider.readObject(key, expected.sizeBytes);
     if (bytes.length !== expected.sizeBytes || !matchesMagic(expected.contentType, bytes)) throw new InvalidUploadedObjectError("Stored object content does not match the authorized file type");
-  } catch (error) {
-    // Never delete an apparently valid object merely because an external storage provider was temporarily unreachable.
-    // Rejected content is cleaned by the existing durable storage cleanup worker.
-    throw error;
-  }
 }
 
 export async function createUploadIntent(userId: string, input: UploadPolicy) {

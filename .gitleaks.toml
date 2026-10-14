@@ -1,0 +1,12 @@
+title = "ELEMARKET source secret scanning"
+[extend]
+useDefault = true
+
+# These values are public SHA256 migration digests, independently checked by
+# validate:deployment-package. No other file, field, or key format is excluded.
+[[allowlists]]
+description = "Verified SQL migration checksum entries"
+condition = "AND"
+paths = ['''(^|/)migrations\.sha256\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"[0-9]{4}_[a-z0-9_]+\.sql": "[a-f0-9]{64}",?\s*$''']

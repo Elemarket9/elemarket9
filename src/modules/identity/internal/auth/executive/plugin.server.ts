@@ -33,7 +33,7 @@ export const executiveBiometric = () => ({
         const {userId} = await verifyExecutiveLogin(ctx.request,ctx.body);
         const user = await ctx.context.internalAdapter.findUserById(userId);
         if (!user || user.id !== userId) throw new Error('Executive identity not found');
-        const session = await ctx.context.internalAdapter.createSession(userId,ctx.request);
+        const session = await ctx.context.internalAdapter.createSession(userId);
         if (!session) throw new Error('Unable to establish executive session');
         try {
           const sql = await getSql();

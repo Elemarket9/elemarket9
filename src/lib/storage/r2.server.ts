@@ -135,7 +135,8 @@ export class CloudflareR2StorageProvider implements StorageProvider {
       ...(isUpload ? [["content-length", String(contentLength ?? 0)], ["if-none-match", "*"]] as Array<[string,string]> : []),
       ...(contentType ? [["content-type",canonicalHeaderValue(contentType)]] as Array<[string,string]> : []),
       ["host", url.host],
-    ].sort(([a],[b])=>a<b?-1:a>b?1:0);
+    ];
+    headerEntries.sort(([a],[b])=>a<b?-1:a>b?1:0);
     const signedHeaders = headerEntries.map(([key])=>key).join(";");
     url.searchParams.set("X-Amz-SignedHeaders", signedHeaders);
     const canonicalHeaders = headerEntries.map(([key,value])=>`${key}:${value}\n`).join("");

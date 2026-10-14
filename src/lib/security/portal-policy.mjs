@@ -80,3 +80,47 @@ export function adminPortalKind(requestHost, env = process.env) {
   const portal = portalFromRequestHost(requestHost, env);
   return portal === "executive" || portal === "staff" ? portal : "legacy";
 }
+
+/** Mirror ingress isolation in the application so a proxy mistake cannot expose
+ * another portal's pages. Resource authorization still runs in each handler.
+ * @param {string | null | undefined} requestHost
+ * @param {string} pathname
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function portalAllowsPath(requestHost, pathname, env = process.env) {
+  const portal = portalFromRequestHost(requestHost, env);
+  if (portal === 'legacy') return true;
+  if (!portal) return false;
+  let path;
+  try { path = decodeURIComponent(pathname); } catch { return false; }
+  if (!path.startsWith('/') || path.includes('\\') || path.includes('%')) return false;
+  path = path.replace(/\/{2,}/g, '/');
+  const under = (/** @type {string} */ prefix) => path === prefix || path.startsWith(`${prefix}/`);
+  if (under('/admin')) return portal === 'executive' || portal === 'staff';
+  if (under('/merchant')) return portal === 'seller';
+  if (under('/provider') || under('/partner/delivery') || under('/partner/financing')) return portal === 'provider';
+  if (under('/api/executive') || under('/api/auth/executive')) return portal === 'executive';
+  if (path === '/manifest.webmanifest' || path === '/app-sw.js') return portal === 'marketplace';
+  return true;
+}
+
+/** Better Auth's origin allowlist includes every portal for redirect validation.
+ * Browser API calls must still originate on the particular receiving portal.
+ * Native clients without Origin/Fetch-Metadata retain the normal auth checks.
+ * @param {Request} request
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function portalAllowsAuthRequest(request, env = process.env) {
+  const config = getPortalConfiguration(env);
+  if (!config) return true;
+  const portal = portalFromRequestHost(request.headers.get('host'), env);
+  if (!portal) return false;
+  const origin = request.headers.get('origin');
+  if (origin !== null && origin !== `https://${config.hosts[portal]}`) return false;
+  const site = request.headers.get('sec-fetch-site');
+  if (site === 'same-site' || site === 'cross-site') {
+    return request.method === 'GET' && request.headers.get('sec-fetch-mode') === 'navigate' &&
+      request.headers.get('sec-fetch-dest') === 'document';
+  }
+  return true;
+}

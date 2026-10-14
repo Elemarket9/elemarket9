@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isDeveloperBeta } from "../src/lib/security/launch-profile.mjs";
 import { readFileSync } from "node:fs";
 
 // Generic build gate: adapter-specific browser configuration lives in the
@@ -10,8 +11,8 @@ const isShared = process.argv.includes("--require-shared") ||
   ["production", "staging"].includes((process.env.ELEMARKET_ENV ?? "").trim().toLowerCase()) ||
   process.env.NODE_ENV === "production";
 
-if (!serverProvider && !browserProvider && !isShared) {
-  console.log("[push] no provider selected for local preview; browser push check skipped.");
+if (!serverProvider && !browserProvider && (!isShared || isDeveloperBeta(process.env))) {
+  console.log("[push] push disabled: no provider selected for local preview/developer beta.");
   process.exit(0);
 }
 if (!serverProvider || browserProvider !== serverProvider) {

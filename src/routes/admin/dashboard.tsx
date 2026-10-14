@@ -61,8 +61,7 @@ function Dashboard() {
   const [manualLocationById, setManualLocationById] = useState<Record<string, { enabled: boolean; latitude: string; longitude: string; city: string; neighborhood: string; justification: string }>>({});
   function setLocationField(applicationId: string, field: "enabled" | "latitude" | "longitude" | "city" | "neighborhood" | "justification", value: string | boolean) {
     setManualLocationById(current => ({ ...current, [applicationId]: {
-      enabled: false, latitude: "", longitude: "", city: "", neighborhood: "", justification: "",
-      ...current[applicationId], [field]: value,
+      ...(current[applicationId] ?? { enabled: false, latitude: "", longitude: "", city: "", neighborhood: "", justification: "" }), [field]: value,
     } }));
   }
   const [message, setMessage] = useState<string | null>(null);
@@ -348,7 +347,7 @@ function Dashboard() {
         </div>
       </section>
 
-      <div className="mt-10 grid gap-6 lg:grid-cols-2">
+      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section id="payment-exceptions" className="rounded-2xl border border-market-line bg-white p-6 shadow-market">
           <h2 className="text-xl font-black">Payment exceptions</h2>
           <div className="mt-4 space-y-3">
@@ -384,7 +383,7 @@ function Dashboard() {
 
         <section className="rounded-2xl border border-market-line bg-white p-6 shadow-market">
           <h2 className="text-xl font-black">Audit trail</h2>
-          <div className="mt-4 max-h-96 space-y-2 overflow-auto">
+          <div className="mt-4 max-h-96 space-y-2 overflow-auto [overflow-wrap:anywhere]">
             {data.auditEvents.length === 0 ? <p className="text-sm text-market-muted">No audit events recorded.</p> : data.auditEvents.map((event: AdminDashboardData["auditEvents"][number]) => (
               <div key={event.id} className="rounded-xl border border-market-line p-3 text-xs">
                 <div className="flex flex-wrap justify-between gap-2 font-bold"><span>{event.eventType}</span><span>{event.outcome}</span></div>

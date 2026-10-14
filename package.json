@@ -26,7 +26,7 @@
     "security:ci": "npm run security:deps && npm run security:signatures",
     "release:verify": "npm run check:architecture && npm run validate:startup && npm run validate:deployment-package && npm run security:ci && npm run typecheck && npm run lint && npm run build:production",
     "validate:deployment-package": "node scripts/validate-deployment-package.mjs",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node scripts/test.mjs",
     "test:integration:concurrency": "node --test tests/integration.test.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
     "test:frontend": "node tests/frontend.e2e.mjs",
@@ -35,7 +35,8 @@
     "test:eide": "node --test tests/eide*.test.mjs",
     "evaluate:eide": "node scripts/eide-v11-evaluate.mjs",
     "test:discovery:browser": "node tests/discovery-browser.e2e.mjs",
-    "validate:push-client": "node scripts/validate-push-client-env.mjs"
+    "validate:push-client": "node scripts/validate-push-client-env.mjs",
+    "test:integration:authorization": "node --test tests/authorization.integration.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

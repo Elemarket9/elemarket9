@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getSql } from "@/lib/db";
+import { getSql, withTransaction } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import type { OtpPurpose, OtpProviderAdapter } from "./types";
 import { getOtpAdapter } from "./registry.server";
@@ -135,13 +135,14 @@ export async function verifyOtp(
     `update otp_challenges
         set attempts = attempts + 1, updated_at = now()
       where id = $1
+        and provider = $4
         and status = 'pending'
         and expires_at > now()
         and attempts < max_attempts
         and ($2::text is null or user_id = $2)
         and ($3::text is null or purpose = $3)
       returning id, destination, attempts, max_attempts, expires_at, purpose, user_id`,
-    [input.challengeId, input.userId ?? null, input.expectedPurpose ?? null],
+    [input.challengeId, input.userId ?? null, input.expectedPurpose ?? null, adapter.key],
   );
 
   const challenge = claimed[0];
@@ -161,14 +162,27 @@ export async function verifyOtp(
   }
 
   if (result.code === "verified") {
-    const consumed = await sql.query<{ id: string }>(
-      `update otp_challenges
-          set status='verified', verified_at=now(), updated_at=now()
-        where id=$1 and status='pending'
-        returning id`,
-      [challenge.id],
-    );
-    if (!consumed[0]) throw new Error("OTP has already been consumed");
+    await withTransaction(async (tx) => {
+      // Match confirm_phone_verification's profile -> challenge lock order.
+      if (challenge.purpose === "phone_verification") {
+        await tx.query(`select user_id from profiles where user_id=$1 for update`, [challenge.user_id]);
+      }
+      const consumed = await tx.query<{ id: string }>(
+        `update otp_challenges
+            set status='verified', verified_at=now(), updated_at=now()
+          where id=$1 and status='pending' and expires_at>now()
+          returning id`,
+        [challenge.id],
+      );
+      if (!consumed[0]) throw new Error("OTP is expired or has already been consumed");
+      if (challenge.purpose === "phone_verification") {
+        const persisted = await tx.query<{ verified: boolean }>(
+          `select confirm_phone_verification($1,$2) as verified`,
+          [challenge.user_id, challenge.id],
+        );
+        if (persisted[0]?.verified !== true) throw new Error("Phone verification was not persisted");
+      }
+    });
     return { verified: true as const, purpose: challenge.purpose, userId: challenge.user_id, destination: challenge.destination };
   }
 

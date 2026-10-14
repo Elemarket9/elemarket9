@@ -19,3 +19,7 @@ Thumbs.db
 !.env.example
 .tmp/
 /tmp/
+# Python research integration caches and Expo local state
+__pycache__/
+*.py[cod]
+.expo/

@@ -1,6 +1,20 @@
 import type { EmailProviderAdapter, EmailSendInput, EmailSendResult } from "../types";
 
-const RESEND_API_URL = "https://api.resend.com/emails";
+/** Explicit local transport override for synthetic integration tests. Never
+ * redirects production credentials or production verification email. */
+function resendApiUrl(): string {
+  const override = optionalEnv("RESEND_BASE_URL");
+  if (!override) return "https://api.resend.com/emails";
+  if (!["development", "preview", "staging"].includes(process.env.ELEMARKET_ENV ?? "")) {
+    throw new Error("RESEND_BASE_URL is restricted to local non-production email simulation");
+  }
+  const url = new URL(override);
+  if (url.protocol !== "http:" || !["127.0.0.1", "[::1]"].includes(url.hostname) ||
+      url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new Error("RESEND_BASE_URL must be a loopback HTTP origin");
+  }
+  return new URL("/emails", url).href;
+}
 
 function requiredEnv(key: string): string {
   const value = process.env[key]?.trim();
@@ -17,6 +31,7 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
   readonly key = "resend";
 
   async send(input: EmailSendInput): Promise<EmailSendResult> {
+    const apiUrl = resendApiUrl();
     const apiKey = requiredEnv("RESEND_API_KEY");
     const from = requiredEnv("RESEND_FROM_EMAIL");
     const replyTo = optionalEnv("RESEND_REPLY_TO");
@@ -35,7 +50,7 @@ export class ResendEmailAdapter implements EmailProviderAdapter {
     let lastError: unknown;
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
-        const response = await fetch(RESEND_API_URL, {
+        const response = await fetch(apiUrl, {
           method: "POST",
           headers: {
             authorization: `Bearer ${apiKey}`,

@@ -15,7 +15,7 @@ export function PushNotificationButton() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const available = typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator && window.isSecureContext;
+    const available = Boolean(import.meta.env.VITE_ELEMARKET_PUSH_PROVIDER) && typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator && window.isSecureContext;
     setSupported(available);
     try { setEnabled(available && Notification.permission === "granted" && localStorage.getItem(STORAGE_KEY) === "1"); } catch { setEnabled(false); }
   }, []);
