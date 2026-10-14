@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: elemarket-web
+    env: node
+    buildCommand: npm ci && npm run build:production
+    startCommand: node scripts/start.mjs
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ELEMARKET_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22

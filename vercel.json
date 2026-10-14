@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": [
+    "lhr1"
+  ],
+  "crons": [
+    {
+      "path": "/api/internal/expire-payment-orders",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/sync-enterprise-catalogs",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/enterprise-order-outbox",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/enterprise-webhook-worker",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/reconcile-payments",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/refresh-eide",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/dispatch-deliveries",
+      "schedule": "* * * * *"
+    }
+  ]
+}

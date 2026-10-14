@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "ELEMARKET",
+    "slug": "elemarket",
+    "version": "1.0.0",
+    "scheme": "elemarket",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "android": {
+      "package": "com.elevora.elemarket",
+      "usesCleartextTraffic": false
+    },
+    "ios": {
+      "bundleIdentifier": "com.elevora.elemarket",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
+    }
+  }
+}

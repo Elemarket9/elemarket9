@@ -1,0 +1,7 @@
+# Research adapter only; lock to reviewed versions in a deployment repository.
+# The vendor source and pretrained weights MUST be supplied separately.
+numpy>=1.26,<2
+opencv-python-headless>=4.8,<5
+mediapipe>=0.10.14,<0.11
+torch>=2.3,<3
+Pillow>=10,<12

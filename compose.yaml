@@ -1,0 +1,141 @@
+# Single-VPS deployment, not a claim of certified production readiness.
+name: elemarket
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
+      POSTGRES_USER: ${ELEMARKET_DB_USER:?set ELEMARKET_DB_USER}
+      POSTGRES_PASSWORD: ${ELEMARKET_DB_PASSWORD:?set ELEMARKET_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+    networks: [private]
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}"]
+    volumes: [redis_data:/data]
+    networks: [private]
+  app:
+    build:
+      context: .
+      args:
+        VITE_ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
+        VITE_ELEMARKET_MARKETPLACE_ORIGIN: https://${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
+        VITE_ELEMARKET_SELLER_ORIGIN: https://${ELEMARKET_SELLER_HOST:?set ELEMARKET_SELLER_HOST}
+        VITE_ELEMARKET_PROVIDER_ORIGIN: https://${ELEMARKET_PROVIDER_HOST:?set ELEMARKET_PROVIDER_HOST}
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_started}
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgresql://${ELEMARKET_DB_USER:?set ELEMARKET_DB_USER}:${ELEMARKET_DB_PASSWORD:?set ELEMARKET_DB_PASSWORD}@postgres:5432/${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
+      REDIS_URL: redis://:${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}@redis:6379
+      ELEMARKET_ENV: production
+      ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
+      ELEMARKET_PORTAL_HOST_ROUTING: "1"
+      ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
+      ELEMARKET_EXECUTIVE_HOST: ${ELEMARKET_EXECUTIVE_HOST:?set ELEMARKET_EXECUTIVE_HOST}
+      ELEMARKET_STAFF_HOST: ${ELEMARKET_STAFF_HOST:?set ELEMARKET_STAFF_HOST}
+      ELEMARKET_SELLER_HOST: ${ELEMARKET_SELLER_HOST:?set ELEMARKET_SELLER_HOST}
+      ELEMARKET_PROVIDER_HOST: ${ELEMARKET_PROVIDER_HOST:?set ELEMARKET_PROVIDER_HOST}
+      ELEMARKET_EXECUTIVE_USER_ID: ${ELEMARKET_EXECUTIVE_USER_ID:?set ELEMARKET_EXECUTIVE_USER_ID}
+      ELEMARKET_TRUST_PROXY: "1"
+      ELEMARKET_PROXY_OVERWRITES_FORWARDED_FOR: "1"
+      BETTER_AUTH_IP_HEADER: x-forwarded-for
+    networks: [private]
+  # Optional, private matcher/PAD bridge. DO NOT enable biometric sign-in until
+  # an independently reviewed PAD service is available and tested.
+  executive-face-bridge:
+    profiles: [executive-biometrics]
+    build:
+      context: .
+      dockerfile: integrations/executive-face/Dockerfile
+    restart: unless-stopped
+    # Pass ONLY scoped biometric-service credentials. The bridge must not receive
+    # database passwords, Better Auth secrets, platform provider keys, etc.
+    environment:
+      EIDE_EXEC_BRIDGE_PORT: "8091"
+      EIDE_EXEC_FACE_ENGINE_SECRET: ${EIDE_EXEC_FACE_ENGINE_SECRET:-}
+      EIDE_EXEC_FACE_ENGINE_POLICY_ID: ${EIDE_EXEC_FACE_ENGINE_POLICY_ID:-}
+      COMPREFACE_BASE_URL: ${COMPREFACE_BASE_URL:-http://compreface:8000}
+      COMPREFACE_RECOGNITION_API_KEY: ${COMPREFACE_RECOGNITION_API_KEY:-}
+      COMPREFACE_MATCH_THRESHOLD: ${COMPREFACE_MATCH_THRESHOLD:-0.85}
+      EIDE_EXEC_PAD_URL: ${EIDE_EXEC_PAD_URL:-}
+      EIDE_EXEC_PAD_SECRET: ${EIDE_EXEC_PAD_SECRET:-}
+      EIDE_EXEC_PAD_POLICY_ID: ${EIDE_EXEC_PAD_POLICY_ID:-}
+    networks: [private]
+    # NO published ports: never expose biometric images, template IDs or API keys.
+  # Optional isolated *experimental* passive PAD + challenge-motion evaluator.
+  # No public port, no camera-source hardware assurance. Production activation
+  # requires independent security evaluation. Vendor models are NOT bundled.
+  pad-verifier:
+    profiles: [executive-biometrics]
+    build:
+      context: .
+      dockerfile: integrations/executive-pad/Dockerfile
+    restart: unless-stopped
+    environment:
+      EIDE_EXEC_PAD_PORT: "8092"
+      EIDE_EXEC_PAD_SECRET: ${EIDE_EXEC_PAD_SECRET:-}
+      EIDE_EXEC_PAD_POLICY_ID: ${EIDE_EXEC_PAD_POLICY_ID:-}
+      EIDE_PAD_INDEPENDENTLY_ASSESSED: ${EIDE_PAD_INDEPENDENTLY_ASSESSED:-0}
+      MINIVISION_PAD_REPO: /opt/minivision
+      MINIVISION_PAD_MODELS_DIR: /opt/minivision/resources/anti_spoof_models
+      MINIVISION_PAD_MIN_LIVE_SCORE: ${MINIVISION_PAD_MIN_LIVE_SCORE:-0.85}
+      MINIVISION_PAD_YAW_SIGN: ${MINIVISION_PAD_YAW_SIGN:-1}
+    volumes:
+      - ./integrations/executive-pad/upstream:/opt/minivision:ro
+    networks: [private]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    # NO published ports. In default mode this service refuses all decisions.
+  scheduler:
+    build: .
+    restart: unless-stopped
+    command: ["node", "scripts/scheduler.mjs"]
+    depends_on:
+      app: {condition: service_started}
+    env_file: .env.production
+    environment:
+      ELEMARKET_ENV: production
+      ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
+      ELEMARKET_SCHEDULER_BASE_URL: http://app:8080
+    healthcheck:
+      test: ["CMD", "node", "scripts/scheduler-health.mjs"]
+      interval: 60s
+      start_period: 150s
+      timeout: 5s
+      retries: 2
+    networks: [private]
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
+      ELEMARKET_EXECUTIVE_HOST: ${ELEMARKET_EXECUTIVE_HOST:?set ELEMARKET_EXECUTIVE_HOST}
+      ELEMARKET_STAFF_HOST: ${ELEMARKET_STAFF_HOST:?set ELEMARKET_STAFF_HOST}
+      ELEMARKET_SELLER_HOST: ${ELEMARKET_SELLER_HOST:?set ELEMARKET_SELLER_HOST}
+      ELEMARKET_PROVIDER_HOST: ${ELEMARKET_PROVIDER_HOST:?set ELEMARKET_PROVIDER_HOST}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+    networks: [private]
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+networks:
+  private:
+    driver: bridge

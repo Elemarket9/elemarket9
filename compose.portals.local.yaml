@@ -1,0 +1,16 @@
+# Local subdomain reverse proxy, separate from the production stack.
+# Start the application separately on port 8080 (npm run dev).
+name: elemarket-portals-local
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./infra/Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - local_caddy_data:/data
+      - local_caddy_config:/config
+volumes:
+  local_caddy_data:
+  local_caddy_config:

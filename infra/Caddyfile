@@ -1,0 +1,70 @@
+# Host-segregated subdomains, all backed by one modular monolith.
+# Hostnames are routing labels, NOT authentication secrets.
+(elemarket_upstream) {
+  encode zstd gzip
+  reverse_proxy app:8080 {
+    # Caddy is the only exposed ingress; do not trust forwarded headers from clients.
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host {host}
+  }
+}
+
+{$ELEMARKET_DOMAIN} {
+  # The public storefront must never serve administration/provider/seller pages.
+  @private_routes path /admin /admin/* /merchant /merchant/* /provider /provider/* /partner.delivery /partner.financing
+  respond @private_routes "Not Found" 404
+  @exec_face path /api/executive/* /api/auth/executive/*
+  respond @exec_face "Not Found" 404
+  import elemarket_upstream
+}
+
+{$ELEMARKET_EXECUTIVE_HOST} {
+  @storefront_pwa path /manifest.webmanifest /app-sw.js
+  respond @storefront_pwa "Not Found" 404
+  # An administrative hostname is not a customer, seller, or provider portal.
+  @other_portals path /merchant /merchant/* /provider /provider/*
+  respond @other_portals "Not Found" 404
+  header Cache-Control "no-store"
+  @portal_root path /
+  redir @portal_root /admin/ 302
+  import elemarket_upstream
+}
+
+{$ELEMARKET_STAFF_HOST} {
+  @exec_face path /api/executive/* /api/auth/executive/*
+  respond @exec_face "Not Found" 404
+  @storefront_pwa path /manifest.webmanifest /app-sw.js
+  respond @storefront_pwa "Not Found" 404
+  # An administrative hostname is not a customer, seller, or provider portal.
+  @other_portals path /merchant /merchant/* /provider /provider/*
+  respond @other_portals "Not Found" 404
+  header Cache-Control "no-store"
+  @portal_root path /
+  redir @portal_root /admin/ 302
+  import elemarket_upstream
+}
+
+{$ELEMARKET_SELLER_HOST} {
+  @exec_face path /api/executive/* /api/auth/executive/*
+  respond @exec_face "Not Found" 404
+  @storefront_pwa path /manifest.webmanifest /app-sw.js
+  respond @storefront_pwa "Not Found" 404
+  @other_portals path /admin /admin/* /provider /provider/*
+  respond @other_portals "Not Found" 404
+  @portal_root path /
+  redir @portal_root /merchant/login 302
+  import elemarket_upstream
+}
+
+{$ELEMARKET_PROVIDER_HOST} {
+  @exec_face path /api/executive/* /api/auth/executive/*
+  respond @exec_face "Not Found" 404
+  @storefront_pwa path /manifest.webmanifest /app-sw.js
+  respond @storefront_pwa "Not Found" 404
+  @other_portals path /admin /admin/* /merchant /merchant/*
+  respond @other_portals "Not Found" 404
+  @portal_root path /
+  redir @portal_root /provider/ 302
+  import elemarket_upstream
+}

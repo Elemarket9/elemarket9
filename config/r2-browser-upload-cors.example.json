@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://your-elemarket-domain.example"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type", "If-None-Match"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

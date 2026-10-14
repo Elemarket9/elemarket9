@@ -1,0 +1,11 @@
+{
+  "name": "ELEMARKET",
+  "short_name": "ELEMARKET",
+  "description": "Marketplace shopping, merchant stores and customer support.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f4",
+  "theme_color": "#0b3d2e",
+  "icons": [{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}

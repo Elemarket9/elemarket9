@@ -1,0 +1,67 @@
+{
+  "$schema": "elemarket-provider-capabilities/v1",
+  "email": {
+    "resend": {
+      "requiredEnv": [
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "RESEND_WEBHOOK_SECRET"
+      ]
+    }
+  },
+  "otp": {
+    "arkesel": {
+      "requiredEnv": [
+        "ARKESEL_API_KEY"
+      ]
+    }
+  },
+  "storage": {
+    "r2": {
+      "requiredEnv": [
+        "CLOUDFLARE_R2_ACCOUNT_ID",
+        "CLOUDFLARE_R2_ACCESS_KEY_ID",
+        "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+        "CLOUDFLARE_R2_BUCKET"
+      ]
+    }
+  },
+  "location": {
+    "geoapify": {
+      "requiredEnv": [
+        "GEOAPIFY_API_KEY"
+      ]
+    }
+  },
+  "push": {
+    "fcm": {
+      "requiredEnv": [
+        "FCM_SERVICE_ACCOUNT_JSON"
+      ],
+      "jsonCredential": {
+        "env": "FCM_SERVICE_ACCOUNT_JSON",
+        "fields": [
+          "project_id",
+          "client_email",
+          "private_key"
+        ]
+      },
+      "clientRequiredEnv": [
+        "VITE_FIREBASE_API_KEY",
+        "VITE_FIREBASE_AUTH_DOMAIN",
+        "VITE_FIREBASE_PROJECT_ID",
+        "VITE_FIREBASE_STORAGE_BUCKET",
+        "VITE_FIREBASE_MESSAGING_SENDER_ID",
+        "VITE_FIREBASE_APP_ID",
+        "VITE_FIREBASE_VAPID_KEY"
+      ]
+    }
+  },
+  "kyb": {
+    "fylings": {
+      "requiredEnv": [
+        "FYLINGS_API_KEY"
+      ]
+    }
+  }
+}
