@@ -20,8 +20,24 @@ jobs:
             assert hashlib.sha256(archive.read()).hexdigest() == '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
           PYTHON
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
-          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner
-          "$RUNNER_TEMP/gitleaks" dir . --redact --no-banner
+          scan_status=0
+          "$RUNNER_TEMP/gitleaks" git . --redact --no-banner --report-format json --report-path "$RUNNER_TEMP/gitleaks-history.json" || scan_status=$?
+          "$RUNNER_TEMP/gitleaks" dir . --redact --no-banner --report-format json --report-path "$RUNNER_TEMP/gitleaks-source.json" || scan_status=$?
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          for scope in ('history', 'source'):
+            report = Path(os.environ['RUNNER_TEMP']) / f'gitleaks-{scope}.json'
+            if not report.exists():
+              print(f'{scope}: scanner did not produce a report; inspect the scanner error above')
+              continue
+            findings = json.loads(report.read_text()) or []
+            for finding in findings:
+              # Print location metadata only. Never print Secret, Match or source context.
+              safe = {key: finding.get(key) for key in ('RuleID', 'File', 'StartLine', 'Commit', 'Fingerprint')}
+              print(f'{scope} finding: {json.dumps(safe, ensure_ascii=True)}')
+          PYTHON
+          exit "$scan_status"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
