@@ -14,7 +14,7 @@
     "expo": "~55.0.0",
     "expo-build-properties": "~55.0.18",
     "expo-constants": "~55.0.17",
-    "expo-crypto": "~55.0.19",
+    "expo-crypto": "~58.0.6",
     "expo-linking": "~55.0.17",
     "expo-router": "~55.0.18",
     "expo-secure-store": "~55.0.18",
