@@ -1,5 +1,5 @@
 import { portalHref } from "@/lib/portal-links";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "@/modules/identity/public/auth/client";
 import { adminDefaultRoute } from "@/modules/administration/public/admin-default-route";

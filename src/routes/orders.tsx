@@ -32,7 +32,7 @@ function Orders() {
       .catch(() => { if (active) setError("Orders could not be loaded. Please try again."); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [isPending, user, retry]);
+  }, [isPending, user?.id, retry]);
 
   return <div className="min-h-screen bg-market-bg">
     <MarketHeader /><ContactSupportWidget mode="order" />

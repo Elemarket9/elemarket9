@@ -1,5 +1,5 @@
 import { portalHref } from "@/lib/portal-links";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { JsonObject } from "@/lib/db-types";
 import React, { useState, type FormEvent, type ButtonHTMLAttributes, type ReactNode } from "react";
 import {
