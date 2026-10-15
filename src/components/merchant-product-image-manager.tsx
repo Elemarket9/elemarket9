@@ -16,7 +16,7 @@ export function MerchantProductImageManager({merchantId,productId,productName,ex
   const [primary,setPrimary]=useState(existing.length===0);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState<string|null>(null);
-  useEffect(()=>{setFile(null);setAlt(productName);setPrimary(existing.length===0);setMessage(null)},[productId,productName]);
+  useEffect(()=>{setFile(null);setAlt(productName);setPrimary(existing.length===0);setMessage(null)},[productId,productName,existing.length]);
   useEffect(()=>{
     if(!file){setPreview(null);return}
     const url=URL.createObjectURL(file);setPreview(url);

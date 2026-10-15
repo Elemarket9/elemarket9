@@ -51,7 +51,7 @@ function ProductContent() {
   const [mediaIndex, setMediaIndex] = useState(0);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(data.variants[0]?.id ?? null);
   const [quantity, setQuantity] = useState(1);
-  const [cartItems, setCartItems] = useState<ReturnType<typeof readCart>>([]);
+  const [, setCartItems] = useState<ReturnType<typeof readCart>>([]);
   const [addedNotice, setAddedNotice] = useState(false);
   const { user } = useCurrentUserState();
   const [saved, setSaved] = useState(false);

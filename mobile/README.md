@@ -17,6 +17,12 @@ Native Expo/React Native client for ELEMARKET. It uses the same Better Auth iden
 3. `npx expo start`
 4. Build with EAS or native `expo run:android` / `expo run:ios`.
 
+EAS preview and production profiles use their matching EAS environments. Set
+`EXPO_PUBLIC_API_BASE_URL` in each environment before building; the hostname is
+not embedded in `eas.json`. This value is public build configuration, not a secret.
+Release API origins must use HTTPS and contain no credentials, path, query or
+fragment. Cleartext loopback is permitted only in a development build.
+
 The mobile client includes secure authentication, marketplace browsing/search, profile management, cart, live delivery quotes, server-authoritative checkout, and an in-app WebView payment experience. Payment status is verified by the ELEMARKET server/provider before an order is presented as paid. The mobile client never implements authoritative pricing, order state, or payment verification locally.
 
 ## Validation

@@ -29,7 +29,7 @@ export function AdminWorkspaceNav({ staffRole, capabilities }: {
       if (active) { setLoadedCapabilities(access.capabilities); setResolvedRole(access.staffRole); }
     }).catch(() => { if (active) setLoadedCapabilities([]); });
     return () => { active = false; };
-  }, [capabilities]);
+  }, [capabilities, staffRole]);
   if (!resolvedRole) return null;
   const mainAdmin = resolvedRole === "owner";
   const allowed = (permission: string) => mainAdmin || loadedCapabilities.includes(permission);

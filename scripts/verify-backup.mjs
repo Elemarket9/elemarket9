@@ -10,6 +10,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 const [, , mode, target] = process.argv;
 const summary = { mode, ok: true, checks: {}, warnings: [] };
@@ -109,7 +110,24 @@ function verifyDump(file) {
   fs.readSync(fd, head, 0, 5, 0);
   fs.closeSync(fd);
   if (head.toString("latin1") === "PGDMP") {
-    pass("format", "PostgreSQL custom format (PGDMP header)");
+    const listing = spawnSync(process.env.PG_RESTORE_BIN || "pg_restore", ["--list", resolved], {
+      encoding: "utf8", timeout: 30_000, maxBuffer: 16 * 1024 * 1024,
+    });
+    if (listing.error || listing.status !== 0) {
+      fail("archive", "pg_restore could not read the archive. Install a compatible PostgreSQL client or set PG_RESTORE_BIN to its executable path.");
+      return;
+    }
+    const tables = new Set(listing.stdout.split(/\r?\n/).flatMap((line) => {
+      const match = /^\d+;\s+\d+\s+\d+\s+TABLE\s+(?:public|"public")\s+(\S+)/.exec(line);
+      return match ? [match[1].replace(/^"|"$/g, "")] : [];
+    }));
+    const missing = CRITICAL_TABLES.filter((table) => !tables.has(table));
+    if (missing.length) {
+      fail("content", `Backup is missing critical tables: ${missing.join(", ")}`);
+      return;
+    }
+    pass("format", "Readable PostgreSQL custom archive with all critical table definitions");
+    warn("Archive listing does not prove a successful data restore; restore into an isolated database before launch.");
     return;
   }
   // Plain SQL dump: validate schema content instead of trusting the extension.
