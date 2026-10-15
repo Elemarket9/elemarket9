@@ -18,7 +18,7 @@
     "expo-linking": "~55.0.17",
     "expo-router": "~55.0.18",
     "expo-secure-store": "~55.0.18",
-    "expo-status-bar": "~55.0.6",
+    "expo-status-bar": "~57.0.1",
     "patched-uri-decoder": "npm:decode-uri-component@0.5.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
