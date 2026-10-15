@@ -1,5 +1,4 @@
 import type { JsonObject } from "@/lib/db-types";
-import { assertCommerceExecutionAllowed } from "@/lib/security/launch-profile.mjs";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
@@ -93,7 +92,6 @@ export const recordFinancingDecision = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(decisionSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("financing provider decision");
     const userId = getAuthenticatedUserId(context);
     const capability = data.audience === "customer" ? "customer_financing" : "merchant_financing";
     const access = await requirePartnerAccess(userId, capability, true);
@@ -299,7 +297,6 @@ export const createFinancingOffer = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(offerSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("createFinancingOffer");
     const userId = getAuthenticatedUserId(context);
     const probe = await getSql();
     const seed = await probe.query<any>(
@@ -402,7 +399,6 @@ export const approveFinancingOffer = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(supervisorOfferSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("approveFinancingOffer");
     const userId = getAuthenticatedUserId(context);
     const probe = await getSql();
     const seed = await probe.query<any>(
@@ -474,7 +470,6 @@ export const recordFinancingServicingUpdate = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(servicingSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("recordFinancingServicingUpdate");
     const userId = getAuthenticatedUserId(context);
     const probe = await getSql();
     const seed = await probe.query<any>(

@@ -19,9 +19,6 @@ import { PAYMENT_QUEUE_KEY, cartTotal, readCart, writeCart, type CartLine } from
 export const Route = createFileRoute("/checkout")({ component: Checkout });
 
 function Checkout() {
-  if (import.meta.env.VITE_ELEMARKET_LAUNCH_PROFILE === "developer_beta") {
-    return <main className="mx-auto max-w-xl p-8"><h1 className="text-3xl font-black">Developer beta — checkout unavailable</h1><p className="mt-4 text-sm">Browse and test ELEMARKET. No real or simulated purchases, payments, deliveries or financing are accepted during this beta.</p><Link to="/" className="mt-5 inline-block underline">Return to marketplace</Link></main>;
-  }
   return (
     <SignInGate fallback={<RedirectToSignIn />}>
       <CheckoutForm />

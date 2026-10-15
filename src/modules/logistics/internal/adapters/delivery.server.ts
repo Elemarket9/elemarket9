@@ -1,4 +1,3 @@
-import { assertCommerceExecutionAllowed } from "@/lib/security/launch-profile.mjs";
 import { z } from "zod";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { getSql } from "@/lib/db";
@@ -88,12 +87,22 @@ class PreviewDeliveryAdapter implements DeliveryCarrierAdapter {
     );
     const merchant = merchants[0];
     if (!merchant) throw new Error("Merchant is not available for delivery");
-    if (input.lat === undefined || input.lon === undefined ||
-        !Number.isFinite(input.lat) || !Number.isFinite(input.lon) ||
-        Math.abs(input.lat) > 90 || Math.abs(input.lon) > 180) {
+    if (
+      input.lat === undefined ||
+      input.lon === undefined ||
+      !Number.isFinite(input.lat) ||
+      !Number.isFinite(input.lon) ||
+      Math.abs(input.lat) > 90 ||
+      Math.abs(input.lon) > 180
+    ) {
       throw new Error("A verified delivery destination is required");
     }
-    const distanceKm = haversineKm(Number(merchant.lat), Number(merchant.lon), input.lat, input.lon);
+    const distanceKm = haversineKm(
+      Number(merchant.lat),
+      Number(merchant.lon),
+      input.lat,
+      input.lon,
+    );
     const tier: DeliveryTier = input.tier ?? "next_day";
     const quoted = quoteDelivery(tier, distanceKm);
     return {
@@ -111,17 +120,15 @@ class PreviewDeliveryAdapter implements DeliveryCarrierAdapter {
 export function getDeliveryAdapter(providerKey: string): DeliveryCarrierAdapter {
   if (!isWorkspacePreview() && providerKey.trim().toLowerCase() === "preview")
     throw new Error("Preview delivery is forbidden in shared environments");
-  if (
-    providerKey === "preview" ||
-    (isWorkspacePreview() && !process.env.ELEMARKET_DELIVERY_PROVIDER)
-  ) {
+  if (providerKey.trim().toLowerCase() === "preview") {
+    if (process.env.ELEMARKET_ENABLE_PREVIEW_COMMERCE !== "1")
+      throw new Error("Preview commerce requires an explicit isolated development opt-in");
     return new PreviewDeliveryAdapter();
   }
   const normalized = providerKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
   const endpoint = process.env[`ELEMARKET_DELIVERY_${normalized}_ENDPOINT`]?.trim();
   const secret = process.env[`ELEMARKET_DELIVERY_${normalized}_SECRET`]?.trim();
   if (!endpoint || !secret) {
-    if (isWorkspacePreview()) return new PreviewDeliveryAdapter();
     throw new Error("Delivery provider endpoint/credentials are not configured");
   }
   return new JsonHttpDeliveryAdapter(endpoint, secret);
@@ -131,7 +138,6 @@ export async function requestDeliveryQuoteServer(input: {
   data: DeliveryQuoteInput;
   userId: string;
 }) {
-  assertCommerceExecutionAllowed("delivery quote");
   await enforceRateLimit("delivery-quote", {
     windowSeconds: 60,
     maxRequests: 30,
@@ -139,7 +145,7 @@ export async function requestDeliveryQuoteServer(input: {
   });
   const principal = await requireCustomerForUserId(input.userId);
   const providerKey =
-    process.env.ELEMARKET_DELIVERY_PROVIDER?.trim() || (isWorkspacePreview() ? "preview" : "");
+    process.env.ELEMARKET_DELIVERY_PROVIDER?.trim() || "";
   if (!providerKey) throw new Error("Delivery provider is not configured");
   const adapter = getDeliveryAdapter(providerKey);
   const data = await resolveDestination(input.data);

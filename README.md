@@ -5,18 +5,18 @@ Better Auth, PostgreSQL and optional Redis. EIDE provides catalog search,
 ranking and discovery. The separate `mobile/` directory contains an optional
 Expo client; `integrations/` contains optional provider and biometric bridges.
 
-**Developer Beta release decision: NO-GO for public exposure.**
-Use `ELEMARKET_LAUNCH_PROFILE=developer_beta` and
-`VITE_ELEMARKET_LAUNCH_PROFILE=developer_beta` for the controlled beta. In staging
-and production this profile disables order creation, payment/refund execution,
-financing execution and delivery dispatch. It must not produce simulated paid
-customer orders or claim real fulfillment. Executive facial login remains
-unavailable in shared environments; Better Auth + TOTP remains operational.
+Marketplace features use backend authorization, active provider records and validated
+adapters. Configure providers independently; unavailable capabilities fail closed.
+Executive facial login remains unavailable in shared environments; Better Auth
++ TOTP remains operational.
 
 See [release assessment](docs/release-assessment.md),
 [verification commands and limitations](docs/verification.md) and
 [deployment/recovery procedures](docs/deployment.md). Historical
 test counts and claims from earlier README revisions are not release evidence.
+Authentication always uses real sessions. Preview commerce requires an explicit
+isolated development opt-in; a new public database has no active sample inventory.
+Portal origins are derived from the configured portal hostnames during the build.
 
 ## Development
 
@@ -89,7 +89,7 @@ only behind ingress that overwrites client-supplied forwarded headers.
   An unavailable SMS service leaves merchant applications pending; it does not
   grant phone verification or merchant access.
 - Push: browser and server provider selections must agree when configured.
-  FCM service-account JSON is server-only. Both selections may be absent in beta.
+  FCM service-account JSON is server-only. Both selections may be absent when push is unavailable.
 - KYB: a configured adapter supplies supporting evidence. Final merchant approval
   remains an administrative decision subject to database verification constraints.
 - Location, storage, payment, financing and delivery: use the selected adapter's
@@ -98,13 +98,13 @@ only behind ingress that overwrites client-supplied forwarded headers.
 ## Transactions and workers
 
 ELEMARKET does not custody customer funds. Provider-managed settlement/refunds
-are separate from the beta, where money-moving operations remain disabled.
+are available only when their configured adapters and authorization allow them.
 The bundled payment adapter does not assert safe checkout-initialization replay
 or uncertain-refund reconciliation. Do not enable live checkout on the basis of
 compilation or simulated provider tests.
 
 `scripts/scheduler.mjs` invokes the approved job catalog over the private network.
-In beta, only EIDE refresh is enabled. With portal routing, configure
+All scheduled jobs run; each handler enforces its prerequisites. With portal routing, configure
 `ELEMARKET_DOMAIN` for the scheduler's Host header. It signs requests using the
 path/method/body-bound protocol in `scripts/scheduler-core.mjs`; worker handlers
 validate signatures and consume nonces. Keep scheduler secrets out of URLs.
@@ -129,9 +129,17 @@ payments, orders or tenant access. `npm run test:eide` runs query regressions;
 `npm run evaluate:eide` uses a synthetic evaluation dataset, not customer metrics.
 
 See [mobile setup](mobile/README.md) and [experimental PAD limitations](integrations/executive-pad/README.md).
-The mobile vulnerability gate currently fails. PAD contract tests do not validate
+Mobile registry auditing and local security regression checks pass; local forks
+require maintenance. PAD contract tests do not validate
 biometric matching, liveness or resistance to spoofing. Keep facial login off.
 
-The source repository is private. Public beta access does not authorize public
+The source repository is private. Public marketplace access does not authorize public
 source publication. No version bump, tag or public deployment is implied by this
 working branch.
+
+## Source ZIP packaging
+
+The corrected source ZIP intentionally omits test suites, installed dependencies and generated
+builds. Install dependencies and build from source. Full tests and GitHub verification require
+the developer checkout with its existing suites; missing suites fail their gates rather than
+being skipped. See docs/verification.md for the deeper checks and unresolved release limits.

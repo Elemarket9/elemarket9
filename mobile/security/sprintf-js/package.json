@@ -1,0 +1,8 @@
+{
+  "name": "elemarket-security-sprintf-js",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/sprintf.js",
+  "license": "BSD-3-Clause",
+  "dependencies": {}
+}

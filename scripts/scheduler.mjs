@@ -6,7 +6,6 @@ import { writeFile } from 'node:fs/promises';
 import { JOBS, dueJobs } from './scheduler-core.mjs';
 import { nextHeartbeat } from './scheduler-heartbeat.mjs';
 import { runScheduledJob } from './scheduler-request.mjs';
-import { isDeveloperBeta } from '../src/lib/security/launch-profile.mjs';
 const baseUrl = process.env.ELEMARKET_SCHEDULER_BASE_URL || 'http://app:8080';
 const cronSecret = process.env.CRON_SECRET?.trim();
 if (!cronSecret || cronSecret.length < 32) throw new Error('CRON_SECRET >= 32 characters required');
@@ -15,11 +14,7 @@ if (!['http:', 'https:'].includes(base.protocol) || base.username || base.passwo
   throw new Error('Invalid scheduler base URL');
 // Private app network only by default; public remote targets require separate audited deployment.
 if (base.protocol !== 'http:' && base.protocol !== 'https:') throw new Error('Unexpected protocol');
-// No external transaction, delivery or enterprise synchronization jobs in public beta.
-// Keep the full immutable scheduler job catalog for normal marketplace launches.
-const betaMode = isDeveloperBeta();
-const betaAllowed = new Set(['/api/internal/refresh-eide']);
-const enabledJobs = betaMode ? JOBS.filter(job => betaAllowed.has(job.path)) : JOBS;
+const enabledJobs = JOBS;
 const heartbeatPath = process.env.ELEMARKET_SCHEDULER_HEARTBEAT || '/tmp/elemarket-scheduler-heartbeat.json';
 let lastMinute = -1;
 let heartbeat = null;
@@ -37,7 +32,7 @@ async function tick() {
   }
   lastMinute = minute;
   executing = true;
-  const jobs = dueJobs(minute).filter(job => !betaMode || betaAllowed.has(job.path));
+  const jobs = dueJobs(minute);
   let failures = 0;
   try {
     await Promise.all(jobs.map(async (job) => {
@@ -52,7 +47,7 @@ async function tick() {
 }
 process.on('SIGINT',()=>{stopping=true;abortController.abort();});
 process.on('SIGTERM',()=>{stopping=true;abortController.abort();});
-console.log(`[scheduler] started for ${enabledJobs.length} jobs at ${base.origin}${betaMode ? " (developer beta safe subset)" : ""}`);
+console.log(`[scheduler] started for ${enabledJobs.length} jobs at ${base.origin}`);
 // Run on the NEXT aligned minute boundary. Do not fire backfilled jobs on boot.
 const delay = 60000 - (Date.now() % 60000);
 setTimeout(()=>{

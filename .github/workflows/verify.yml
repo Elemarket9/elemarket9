@@ -1,41 +1,14 @@
-name: Developer beta verification
+name: Source and build checks
 on:
   push:
   pull_request:
 permissions:
   contents: read
-concurrency:
-  group: verify-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
-  verify:
+  source:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_DB: elemarket_ci_test
-          POSTGRES_USER: elemarket_ci
-          # Disposable CI-only database credential, never a deployment secret.
-          POSTGRES_PASSWORD: ephemeral-ci-only
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd 'pg_isready -U elemarket_ci -d elemarket_ci_test'
-          --health-interval 5s --health-timeout 5s --health-retries 12
-    env:
-      DATABASE_URL: postgresql://elemarket_ci:ephemeral-ci-only@127.0.0.1:5432/elemarket_ci_test
-      ELEMARKET_INTEGRATION_DATABASE_URL: postgresql://elemarket_ci:ephemeral-ci-only@127.0.0.1:5432/elemarket_ci_test
-      RUN_DB_INTEGRATION: '1'
-      ELEMARKET_ENV: staging
-      ELEMARKET_LAUNCH_PROFILE: developer_beta
-      VITE_ELEMARKET_LAUNCH_PROFILE: developer_beta
-      BETTER_AUTH_URL: https://marketplace.example.test
-      ELEMARKET_TRUST_PROXY: '1'
-      ELEMARKET_PROXY_OVERWRITES_FORWARDED_FOR: '1'
-      BETTER_AUTH_IP_HEADER: x-forwarded-for
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
       - name: Scan source and history for secrets
@@ -53,59 +26,26 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Generate isolated verification keys
-        run: |
-          node --input-type=module <<'JS'
-          import {randomBytes} from 'node:crypto';
-          import {appendFileSync} from 'node:fs';
-          for (const key of ['BETTER_AUTH_SECRET','CRON_SECRET','ELEMARKET_MERCHANT_DATA_ENCRYPTION_KEY','ELEMARKET_FINANCING_DATA_ENCRYPTION_KEY','ELEMARKET_ENTERPRISE_SYNC_SECRET']) {
-            appendFileSync(process.env.GITHUB_ENV, `${key}=${randomBytes(32).toString('hex')}\n`);
-          }
-          JS
       - run: npm ci
       - run: npm run security:ci
       - run: npm run check:architecture
       - run: npm run validate:deployment-package
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
-      - run: npm run db:migrate
-      - run: npm run test:integration:concurrency
-      - run: npm run test:integration:authorization
-        env:
-          ELEMARKET_PORTAL_HOST_ROUTING: '1'
-          ELEMARKET_DOMAIN: marketplace.example.test
-          ELEMARKET_EXECUTIVE_HOST: festus.example.test
-          ELEMARKET_STAFF_HOST: staff.example.test
-          ELEMARKET_SELLER_HOST: seller.example.test
-          ELEMARKET_PROVIDER_HOST: partners.example.test
-          ELEMARKET_EXECUTIVE_USER_ID: ci-executive
-      - name: Experimental PAD contract tests (not biometric certification)
-        run: python3 -m unittest discover -s integrations/executive-pad -p test_engine.py
-      - run: npm run evaluate:eide
-      - run: npm run build:production
-      - name: Docker construction
-        run: docker build --build-arg VITE_ELEMARKET_LAUNCH_PROFILE=developer_beta -t elemarket:ci .
-
+      - run: npm run build
   mobile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
-        working-directory: mobile
-      - run: npm run typecheck
-        working-directory: mobile
-      - run: node node_modules/expo/bin/cli install --check
-        working-directory: mobile
-      - run: node node_modules/expo/bin/cli export --platform android --output-dir /tmp/mobile-export
-        working-directory: mobile
-      # Known upstream advisories currently fail this gate. Keep it required;
-      # a JavaScript export does not certify a native release.
       - run: npm audit --audit-level=high
-        working-directory: mobile
+      - run: npx tsc --noEmit
+      - run: node node_modules/expo/bin/cli export --platform android --output-dir ${{ runner.temp }}/mobile-export

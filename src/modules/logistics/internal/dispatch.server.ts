@@ -1,4 +1,3 @@
-import { assertCommerceExecutionAllowed } from "@/lib/security/launch-profile.mjs";
 import { getSql } from "@/lib/db";
 import { isSharedEnvironment } from "@/lib/env.server";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
@@ -6,7 +5,6 @@ import { requireAdminForUserId } from "@/modules/identity/public/auth/authorizat
 
 /** Materialize durable provider-bound work for the partner portal. No carrier transmission. */
 export async function dispatchDeliveries(limit = 25) {
-  assertCommerceExecutionAllowed("delivery dispatch");
   const sql = await getSql();
   const token = crypto.randomUUID();
   const rows = await sql.query<{ order_id: string }>(

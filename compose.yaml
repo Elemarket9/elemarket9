@@ -33,7 +33,6 @@ services:
     build:
       context: .
       args:
-        VITE_ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
         VITE_ELEMARKET_MARKETPLACE_ORIGIN: https://${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
         VITE_ELEMARKET_SELLER_ORIGIN: https://${ELEMARKET_SELLER_HOST:?set ELEMARKET_SELLER_HOST}
         VITE_ELEMARKET_PROVIDER_ORIGIN: https://${ELEMARKET_PROVIDER_HOST:?set ELEMARKET_PROVIDER_HOST}
@@ -46,7 +45,6 @@ services:
       DATABASE_URL: postgresql://${ELEMARKET_DB_USER:?set ELEMARKET_DB_USER}:${ELEMARKET_DB_PASSWORD:?set ELEMARKET_DB_PASSWORD}@postgres:5432/${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
       REDIS_URL: redis://:${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}@redis:6379
       ELEMARKET_ENV: production
-      ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
       ELEMARKET_PORTAL_HOST_ROUTING: "1"
       ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
       ELEMARKET_EXECUTIVE_HOST: ${ELEMARKET_EXECUTIVE_HOST:?set ELEMARKET_EXECUTIVE_HOST}
@@ -122,14 +120,13 @@ services:
     environment:
       CRON_SECRET: ${CRON_SECRET:?set CRON_SECRET}
       ELEMARKET_ENV: production
-      ELEMARKET_LAUNCH_PROFILE: ${ELEMARKET_LAUNCH_PROFILE:-developer_beta}
       ELEMARKET_SCHEDULER_BASE_URL: http://app:8080
       ELEMARKET_PORTAL_HOST_ROUTING: "1"
       ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
     healthcheck:
       test: ["CMD", "node", "scripts/scheduler-health.mjs"]
       interval: 60s
-      # First beta job is due at the next five-minute boundary.
+      # First scheduled job is due at the next five-minute boundary.
       start_period: 360s
       timeout: 5s
       retries: 2

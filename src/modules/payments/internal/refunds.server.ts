@@ -1,4 +1,3 @@
-import { assertCommerceExecutionAllowed } from "@/lib/security/launch-profile.mjs";
 import { getSql } from "@/lib/db";
 import { getPaymentAdapter } from "@/modules/payments/internal/adapters/registry";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
@@ -24,7 +23,6 @@ async function executeProviderRefundForActor(input: { requestId: string; actorId
 }
 
 async function executeRefund(requestId: string) {
-  assertCommerceExecutionAllowed("refund execution");
   const sql = await getSql();
   const token = crypto.randomUUID();
   const claimed = await sql.query<any>(

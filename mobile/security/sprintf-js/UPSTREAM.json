@@ -1,0 +1,13 @@
+{
+  "package": "sprintf-js",
+  "version": "1.0.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexei/sprintf.js.git"
+  },
+  "unmodifiedFileHashes": {
+    "LICENSE": "a4cdda44b5adea4731d53dcae78fb5124f8fd853e994f01e25d8c33a7daf818b",
+    "src/angular-sprintf.js": "0d3fe03f4a50d8f3247f4a2938e53638e11975189fa031cb21289bbac7b9753a",
+    "src/sprintf.js": "9904b0d448280bfdfcb0329bdac995883033597727404f9c058d051d9174b7c7"
+  }
+}

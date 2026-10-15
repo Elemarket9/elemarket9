@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { isDeveloperBeta } from "../src/lib/security/launch-profile.mjs";
 import { getPortalConfiguration } from "../src/lib/security/portal-policy.mjs";
 // Vendor-specific requirements are deployment registry metadata. This gate
 // must never make a particular vendor part of marketplace policy.
-const providerCapabilities = JSON.parse(readFileSync(new URL("../config/provider-capabilities.json", import.meta.url), "utf8"));
+const providerCapabilities = JSON.parse(
+  readFileSync(new URL("../config/provider-capabilities.json", import.meta.url), "utf8"),
+);
 const providerKeyPattern = /^[a-z0-9_-]{2,64}$/;
 function validateProviderCapability(capability, environmentKey) {
   const selected = env(environmentKey)?.toLowerCase();
@@ -17,19 +18,28 @@ function validateProviderCapability(capability, environmentKey) {
     console.error(`[startup] ${capability} provider is not registered in deployment capabilities.`);
     process.exit(1);
   }
-  const missing = descriptor.requiredEnv.filter((key) => !/^[A-Z][A-Z0-9_]*$/.test(key) || !env(key));
+  const missing = descriptor.requiredEnv.filter(
+    (key) => !/^[A-Z][A-Z0-9_]*$/.test(key) || !env(key),
+  );
   if (missing.length) {
-    console.error(`[startup] ${capability} provider credentials/configuration are missing: ${missing.join(', ')}`);
+    console.error(
+      `[startup] ${capability} provider credentials/configuration are missing: ${missing.join(", ")}`,
+    );
     process.exit(1);
   }
   if (descriptor.jsonCredential) {
     const { env: key, fields } = descriptor.jsonCredential;
     try {
       const parsed = JSON.parse(env(key));
-      if (!Array.isArray(fields) || fields.some((name) => typeof parsed?.[name] !== 'string' || !parsed[name].trim()))
-        throw new Error('missing credential properties');
+      if (
+        !Array.isArray(fields) ||
+        fields.some((name) => typeof parsed?.[name] !== "string" || !parsed[name].trim())
+      )
+        throw new Error("missing credential properties");
     } catch {
-      console.error(`[startup] ${capability} provider credentials contain invalid JSON/properties.`);
+      console.error(
+        `[startup] ${capability} provider credentials contain invalid JSON/properties.`,
+      );
       process.exit(1);
     }
   }
@@ -40,7 +50,9 @@ try {
   if (portals) {
     const authOrigin = env("BETTER_AUTH_URL");
     if (!authOrigin || new URL(authOrigin).origin !== `https://${portals.hosts.marketplace}`) {
-      throw new Error("BETTER_AUTH_URL must be the canonical HTTPS marketplace origin when portal routing is active");
+      throw new Error(
+        "BETTER_AUTH_URL must be the canonical HTTPS marketplace origin when portal routing is active",
+      );
     }
   }
 } catch (error) {
@@ -56,11 +68,26 @@ if (env("ELEMARKET_EXEC_FACE_ENABLED") === "1") {
   let safe = false;
   try {
     const parsed = new URL(url);
-    safe = parsed.pathname === "/v1/verify" && !parsed.search && !parsed.hash && !parsed.username && !parsed.password &&
-      (parsed.protocol === "https:" || (parsed.protocol === "http:" && ["127.0.0.1","::1","[::1]"].includes(parsed.hostname)));
-  } catch { /* bad engine URL */ }
-  if (!getPortalConfiguration(process.env) || !safe || key.length < 32 || !/^[a-zA-Z0-9_.:-]{8,128}$/.test(policy)) {
-    console.error("[startup] executive face login requires 5-portal host routing, a valid private evaluator URL, EIDE_EXEC_FACE_ENGINE_SECRET of at least 32 characters, and EIDE_EXEC_FACE_ENGINE_POLICY_ID.");
+    safe =
+      parsed.pathname === "/v1/verify" &&
+      !parsed.search &&
+      !parsed.hash &&
+      !parsed.username &&
+      !parsed.password &&
+      (parsed.protocol === "https:" ||
+        (parsed.protocol === "http:" && ["127.0.0.1", "::1", "[::1]"].includes(parsed.hostname)));
+  } catch {
+    /* bad engine URL */
+  }
+  if (
+    !getPortalConfiguration(process.env) ||
+    !safe ||
+    key.length < 32 ||
+    !/^[a-zA-Z0-9_.:-]{8,128}$/.test(policy)
+  ) {
+    console.error(
+      "[startup] executive face login requires 5-portal host routing, a valid private evaluator URL, EIDE_EXEC_FACE_ENGINE_SECRET of at least 32 characters, and EIDE_EXEC_FACE_ENGINE_POLICY_ID.",
+    );
     process.exit(1);
   }
 }
@@ -83,20 +110,6 @@ if (!production) {
   process.exit(0);
 }
 
-// Developer beta does not accept payments, quote deliveries or fulfill orders.
-const launchProfile = env("ELEMARKET_LAUNCH_PROFILE") || "marketplace";
-if (!["marketplace", "developer_beta"].includes(launchProfile)) {
-  console.error("[startup] Unsupported launch profile.");
-  process.exit(1);
-}
-if (isDeveloperBeta(process.env)) {
-  if (env("ELEMARKET_REAL_API_MODE") === "1" || env("ELEMARKET_ENABLE_PREVIEW_SETTLEMENT") === "1" ||
-      env("ELEMARKET_LAUNCH_PAYMENT_PROVIDERS") || env("ELEMARKET_DELIVERY_PROVIDER")) {
-    console.error("[startup] Developer beta forbids real API mode, preview settlement and active payment/delivery provider selections.");
-    process.exit(1);
-  }
-  console.log("[startup] DEVELOPER BETA: ordering, payments, refunds, financing execution and dispatch are disabled.");
-}
 if (
   env("ELEMARKET_TRUST_PROXY") !== "1" ||
   env("ELEMARKET_PROXY_OVERWRITES_FORWARDED_FOR") !== "1"
@@ -106,41 +119,50 @@ if (
   );
   process.exit(1);
 }
-if (!isDeveloperBeta(process.env)) {
+
+if (!env("BETTER_AUTH_IP_HEADER") && !env("BETTER_AUTH_TRUSTED_PROXIES")) {
+  console.error(
+    "[startup] trusted proxy mode requires BETTER_AUTH_IP_HEADER or BETTER_AUTH_TRUSTED_PROXIES.",
+  );
+  process.exit(1);
+}
+if (env("ELEMARKET_ENABLE_PREVIEW_SETTLEMENT") === "1") {
+  console.error("[startup] preview settlement is forbidden in shared environments.");
+  process.exit(1);
+}
+
 for (const [capability, variable] of [
   ["email", "ELEMARKET_EMAIL_PROVIDER"],
   ["otp", "ELEMARKET_OTP_PROVIDER"],
   ["storage", "ELEMARKET_STORAGE_PROVIDER"],
   ["location", "ELEMARKET_LOCATION_PROVIDER"],
   ["push", "ELEMARKET_PUSH_PROVIDER"],
-]) validateProviderCapability(capability, variable);
+]) {
+  if (env(variable)) validateProviderCapability(capability, variable);
+}
 if (env("ELEMARKET_KYB_PROVIDER")) validateProviderCapability("kyb", "ELEMARKET_KYB_PROVIDER");
 const delivery = env("ELEMARKET_DELIVERY_PROVIDER")?.toLowerCase();
-if (!delivery || !/^[a-z0-9_-]{2,64}$/.test(delivery) || delivery === "preview") {
-  console.error("[startup] marketplace requires a real delivery provider.");
-  process.exit(1);
-}
-const deliveryPrefix = `ELEMARKET_DELIVERY_${delivery.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
-if (!env(`${deliveryPrefix}_ENDPOINT`) || !env(`${deliveryPrefix}_SECRET`)) {
-  console.error("[startup] delivery quote endpoint and credentials are required.");
-  process.exit(1);
-}
-try {
-  if (new URL(env(`${deliveryPrefix}_ENDPOINT`)).protocol !== "https:") throw new Error();
-} catch {
-  console.error("[startup] delivery endpoint must use HTTPS.");
-  process.exit(1);
+if (delivery) {
+  if (!/^[a-z0-9_-]{2,64}$/.test(delivery) || delivery === "preview") {
+    console.error("[startup] marketplace requires a real delivery provider.");
+    process.exit(1);
+  }
+  const deliveryPrefix = `ELEMARKET_DELIVERY_${delivery.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+  if (!env(`${deliveryPrefix}_ENDPOINT`) || !env(`${deliveryPrefix}_SECRET`)) {
+    console.error("[startup] delivery quote endpoint and credentials are required.");
+    process.exit(1);
+  }
+  try {
+    if (new URL(env(`${deliveryPrefix}_ENDPOINT`)).protocol !== "https:") throw new Error();
+  } catch {
+    console.error("[startup] delivery endpoint must use HTTPS.");
+    process.exit(1);
+  }
 }
 const paymentProviders = (env("ELEMARKET_LAUNCH_PAYMENT_PROVIDERS") || "")
   .split(",")
   .map((v) => v.trim())
   .filter(Boolean);
-if (!paymentProviders.length) {
-  console.error(
-    "[startup] ELEMARKET_LAUNCH_PAYMENT_PROVIDERS must name the enabled payment providers.",
-  );
-  process.exit(1);
-}
 for (const provider of paymentProviders) {
   if (!/^[a-z0-9_-]{2,64}$/.test(provider) || provider.startsWith("preview")) {
     console.error("[startup] invalid launch payment provider.");
@@ -180,8 +202,6 @@ for (const provider of paymentProviders) {
   }
 }
 
-}
-
 const required = [
   "DATABASE_URL",
   "BETTER_AUTH_SECRET",
@@ -197,6 +217,12 @@ if (missing.length) {
     `[startup] missing required production environment variables: ${missing.join(", ")}`,
   );
   process.exit(1);
+}
+for (const key of ["CRON_SECRET", "ELEMARKET_ENTERPRISE_SYNC_SECRET"]) {
+  if (env(key).length < 32) {
+    console.error(`[startup] ${key} must be at least 32 characters.`);
+    process.exit(1);
+  }
 }
 const redisUrl = env("REDIS_URL");
 const redisScheme = redisUrl ? new URL(redisUrl).protocol : null;
@@ -294,29 +320,29 @@ try {
   process.exit(1);
 }
 
-if (env("VITE_AUTH_ENABLED") === "false") {
-  console.error("[startup] VITE_AUTH_ENABLED=false is forbidden in shared environments.");
-  process.exit(1);
-}
+// Authentication is always enabled; the obsolete VITE_AUTH_ENABLED switch is ignored.
 
-if (env("ELEMARKET_REAL_API_MODE") === "1") {
+if (env("ELEMARKET_PUBLIC_URL")) {
   const publicUrl = env("ELEMARKET_PUBLIC_URL");
-  if (!publicUrl) {
-    console.error("[startup] real API mode requires ELEMARKET_PUBLIC_URL");
-    process.exit(1);
-  }
   try {
-    if (new URL(publicUrl).protocol !== "https:")
-      throw new Error("ELEMARKET_PUBLIC_URL must use HTTPS");
+    const url = new URL(publicUrl);
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== "/" ||
+      (url.port && url.port !== "443") ||
+      url.origin !== new URL(authUrl).origin
+    )
+      throw new Error("ELEMARKET_PUBLIC_URL must be the canonical HTTPS marketplace origin");
   } catch (error) {
     console.error(
       `[startup] ELEMARKET_PUBLIC_URL is invalid: ${error instanceof Error ? error.message : String(error)}`,
     );
     process.exit(1);
   }
-  console.log(
-    "[startup] real API mode enabled; payment provider credentials/webhook secrets are validated by the active provider adapter and webhook route.",
-  );
 }
 
 if (production && env("SEARCH_CURSOR_SECRET") && env("SEARCH_CURSOR_SECRET").length < 32) {

@@ -1,4 +1,3 @@
-import { assertCommerceExecutionAllowed } from "@/lib/security/launch-profile.mjs";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
@@ -223,7 +222,6 @@ export const startCustomerFinancing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(customerApplicationSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("startCustomerFinancing");
     const [{ requireCustomerForUserId }, { enforceRateLimit }, { getSql }] = await Promise.all([
       import("@/modules/identity/public/auth/authorization.server"),
       import("@/lib/security/rate-limit.server"),
@@ -291,7 +289,6 @@ export const startMerchantFinancing = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(merchantApplicationSchema)
   .handler(async ({ data, context }) => {
-    assertCommerceExecutionAllowed("startMerchantFinancing");
     const [{ requireMerchantOrAdminForUserId, requireMerchantAccessForUserId }, { enforceRateLimit }, { getSql }] = await Promise.all([
       import("@/modules/identity/public/auth/authorization.server"),
       import("@/lib/security/rate-limit.server"),

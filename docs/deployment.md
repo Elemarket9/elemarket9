@@ -1,4 +1,4 @@
-# Single-VPS Developer Beta deployment and recovery
+# Single-VPS marketplace deployment and recovery
 
 **Current decision: NO-GO for public exposure.** This is a deployment procedure,
 not evidence of a public deployment. Resolve the release blockers and complete
@@ -18,8 +18,8 @@ the verification gates before opening ingress. Keep this repository private.
 3. Configure the five DNS names you control to the VPS. Caddy obtains public
    certificates after DNS and inbound ports 80/443 work. `.localhost` names use
    Caddy's private CA for local tests; that is not public TLS certification.
-4. Keep `developer_beta`, facial authentication off, no biometric Compose
-   profile, no live transaction adapters, and no preview settlement. Public
+4. Keep unverified facial authentication and preview settlement off. Configure
+   live transaction adapters only after verification. Public
    signup must verify email ownership through a configured, tested delivery
    adapter. Local inbox emulators must never be exposed as real verification.
    SMS failure leaves merchants pending; storage-dependent operations also
@@ -36,12 +36,12 @@ the verification gates before opening ingress. Keep this repository private.
 logs. The app checks the package/environment and migration checksum ledger
 before binding its port. Migrations serialize with a PostgreSQL advisory lock.
 Redis and PostgreSQL readiness precede app startup; app health precedes ingress
-and scheduler startup. The scheduler needs up to five minutes for its first beta
+and scheduler startup. The scheduler needs up to five minutes for its first scheduled
 job. Its idle heartbeat preserves the last actual job result.
 
 Use immutable images. Record `docker compose images` plus image digests, source
 commit, lockfile/checksum manifests and build inputs privately for each candidate.
-Do not overwrite `.output` under a running Node process. Do not reuse these beta
+Do not overwrite `.output` under a running Node process. Do not reuse these deployment
 instructions for live-money operations.
 
 ## Administration and recovery

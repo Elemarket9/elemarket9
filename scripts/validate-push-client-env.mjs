@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { isDeveloperBeta } from "../src/lib/security/launch-profile.mjs";
 import { readFileSync } from "node:fs";
 
 // Generic build gate: adapter-specific browser configuration lives in the
@@ -7,12 +6,9 @@ import { readFileSync } from "node:fs";
 const registry = JSON.parse(readFileSync(new URL("../config/provider-capabilities.json", import.meta.url), "utf8"));
 const serverProvider = (process.env.ELEMARKET_PUSH_PROVIDER ?? "").trim().toLowerCase();
 const browserProvider = (process.env.VITE_ELEMARKET_PUSH_PROVIDER ?? "").trim().toLowerCase();
-const isShared = process.argv.includes("--require-shared") ||
-  ["production", "staging"].includes((process.env.ELEMARKET_ENV ?? "").trim().toLowerCase()) ||
-  process.env.NODE_ENV === "production";
 
-if (!serverProvider && !browserProvider && (!isShared || isDeveloperBeta(process.env))) {
-  console.log("[push] push disabled: no provider selected for local preview/developer beta.");
+if (!serverProvider && !browserProvider) {
+  console.log("[push] push disabled: no provider selected for this deployment.");
   process.exit(0);
 }
 if (!serverProvider || browserProvider !== serverProvider) {

@@ -172,7 +172,6 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-market-bg text-market-ink">
-      {import.meta.env.VITE_ELEMARKET_LAUNCH_PROFILE === "developer_beta" ? <div role="status" className="bg-amber-100 px-4 py-2 text-center text-sm font-bold text-amber-950">ELEMARKET Developer Beta — browsing and onboarding tests only. Payments, financing and deliveries are disabled.</div> : null}
       <a href="#main-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-2 font-bold text-market-green focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to marketplace content</a>
       <ContactSupportWidget />
       <div className="border-b border-market-green/15 bg-market-green px-4 py-1.5 text-center text-[11px] font-semibold text-white sm:text-xs">Shopping across Ghana · Delivery options and fees confirmed at checkout · Support when you need it</div>
