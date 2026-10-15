@@ -16,7 +16,7 @@
     "expo-constants": "~55.0.17",
     "expo-crypto": "~55.0.19",
     "expo-linking": "~55.0.17",
-    "expo-router": "~55.0.18",
+    "expo-router": "~58.0.17",
     "expo-secure-store": "~55.0.18",
     "expo-status-bar": "~55.0.6",
     "patched-uri-decoder": "npm:decode-uri-component@0.5.0",
