@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Keep locked migration bytes identical on Windows and Linux.
+migrations/*.sql text eol=lf
+migrations.sha256.json text eol=lf
