@@ -10,13 +10,3 @@ condition = "AND"
 paths = ['''(^|/)migrations\.sha256\.json$''']
 regexTarget = "line"
 regexes = ['''^\s*"[0-9]{4}_[a-z0-9_]+\.sql": "[a-f0-9]{64}",?\s*$''']
-
-# A function alias in the maintained upstream cryptography source, not a key.
-# Require the exact path AND complete assignment; keep scanning all other lines.
-[[allowlists]]
-description = "node-forge PKCS12 function alias, not credential material"
-targetRules = ["generic-api-key"]
-condition = "AND"
-paths = ['''(^|/)mobile/security/node-forge/lib/pkcs12\.js$''']
-regexTarget = "line"
-regexes = ['''^\s*p12\.generateKey = forge\.pbe\.generatePkcs12Key;\s*$''']
