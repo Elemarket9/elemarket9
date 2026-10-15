@@ -37,7 +37,7 @@ function MerchantStatus() {
       .then(([result,context])=>{if(active){setStatus(result);setRegistration(context);setLoading(false);}})
       .catch(()=>{if(active){setError("Merchant application status could not be loaded. Please try again.");setLoading(false);}});
     return ()=>{active=false;};
-  },[user?.id,isPending]);
+  },[user,isPending]);
 
   async function sendCode(){
     if(!registration?.signedIn || !registration.phone)return;

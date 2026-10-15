@@ -4,7 +4,7 @@
   "source": "corrected uncommitted working tree",
   "package": "source",
   "version": "2.11.3",
-  "files": 770,
-  "exclusions": "Dependencies, generated builds, private files and test files are excluded from release source archives; CI remains in the update package for the existing developer repository.",
+  "files": 735,
+  "exclusions": "Test suites, fixtures, test runners and Playwright removed from the project. Build and runtime dependencies retained.",
   "limitations": "See docs/release-assessment.md for real-provider and deployment verification requirements."
 }

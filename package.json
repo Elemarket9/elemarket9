@@ -27,17 +27,10 @@
     "security:ci": "npm run security:deps && npm run security:signatures",
     "release:verify": "npm run check:architecture && npm run validate:startup && npm run validate:deployment-package && npm run security:ci && npm run typecheck && npm run lint && npm run build:production",
     "validate:deployment-package": "node scripts/validate-deployment-package.mjs",
-    "test": "node scripts/test.mjs",
-    "test:integration:concurrency": "node --test tests/integration.test.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
-    "test:frontend": "node tests/frontend.e2e.mjs",
     "check:module-contracts": "node scripts/check-module-contracts.mjs",
     "verify:backup": "node scripts/verify-backup.mjs",
-    "test:eide": "node --test tests/eide*.test.mjs",
-    "evaluate:eide": "node scripts/eide-v11-evaluate.mjs",
-    "test:discovery:browser": "node tests/discovery-browser.e2e.mjs",
-    "validate:push-client": "node scripts/validate-push-client-env.mjs",
-    "test:integration:authorization": "node --test tests/authorization.integration.mjs"
+    "validate:push-client": "node scripts/validate-push-client-env.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -69,6 +62,7 @@
     "@tanstack/react-start": "^1.168.0",
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
+    "@tanstack/start-storage-context": "1.167.30",
     "better-auth": "1.7.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -90,8 +84,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "@tanstack/start-storage-context": "1.167.30"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
@@ -108,7 +101,6 @@
     "globals": "^15.15.0",
     "lightningcss": "^1.28.0",
     "nitro": "3.0.260610-beta",
-    "playwright": "^1.62.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.56.1",

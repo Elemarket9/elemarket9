@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AuthProvider } from "@/modules/identity/public/auth/provider";
 import { portalHref, isMarketplaceOrigin } from "@/lib/portal-links";

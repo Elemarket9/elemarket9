@@ -1,4 +1,4 @@
-# CI and mobile security repair — 2026-10-14
+# CI and mobile security repair â€” 2026-10-14
 
 Apply the repair ZIP over the repository root and commit every included file.
 It is an update package, not a replacement for the entire repository. Existing
