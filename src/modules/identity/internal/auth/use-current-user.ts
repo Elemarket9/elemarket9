@@ -1,29 +1,14 @@
 import { useMemo } from "react";
-import { authClient, authEnabled } from "./client";
+import { authClient } from "./client";
 
-/** Normalized user shape used across the app, auth on or off. */
+/** Normalized session user shape used across the app. */
 export type AppUser = {
   id: string;
   displayName: string | null;
   primaryEmail: string | null;
   profileImageUrl: string | null;
-  /** True when this is the sandbox/dev fallback (auth not configured). */
+  /** Retained for compatibility; session-backed users always have false here. */
   isDevFallback: boolean;
-};
-
-/**
- * Stable fallback user, used ONLY when auth is disabled
- * (`VITE_AUTH_ENABLED=false`, the shipped default). With auth on, the sandbox
- * live preview does real sign-in via the baked preview client. Its id is
- * `"dev-user"` — the SAME id `verify.server.ts` returns server-side — so per-user
- * rows written in that mode belong to one consistent owner.
- */
-export const DEV_USER: AppUser = {
-  id: "dev-user",
-  displayName: "Dev User",
-  primaryEmail: "dev@example.com",
-  profileImageUrl: null,
-  isDevFallback: true,
 };
 
 /** `useCurrentUserState()` result: the user plus the session-loading flag. */
@@ -34,39 +19,27 @@ export type CurrentUserState = {
   isPending: boolean;
 };
 
-/**
- * Current user + loading state. Same behavior in live preview and when deployed:
- *   - Auth enabled -> the real signed-in user; `user` is `null` while
- *                            the session resolves (`isPending: true`) and when
- *                            signed out (`isPending: false`). Session comes from
- *                            Better Auth `useSession()` → `/api/auth/get-session`
- *                            (cookie when deployed; bearer in live preview).
- *   - Auth disabled (`VITE_AUTH_ENABLED=false`) -> `DEV_USER`, never pending.
- *
- * Protect a route by waiting out `isPending` before acting on `user` —
- * redirecting on `user: null` alone bounces signed-in visitors to sign-in on
- * every hard reload:
- *
- *   import { RedirectToSignIn } from "@/modules/identity/internal/auth/gates";
- *   const { user, isPending } = useCurrentUserState();
- *   if (isPending) return null;              // still resolving — don't redirect yet
- *   if (!user) return <RedirectToSignIn />;  // definitely signed out
- *
- * `authEnabled` is a module-level constant fixed at load, so the guarded hook
- * call keeps a stable hook order across every render of a given component.
- */
+/** Session-backed identity only; signed-out visitors never receive a synthetic user. */
 export function useCurrentUserState(): CurrentUserState {
-  const localFallbackAllowed = import.meta.env.VITE_AUTH_ENABLED === "false" && !import.meta.env.PROD;
   const { data, isPending } = authClient.useSession();
   const sessionUser = data?.user;
   const id = sessionUser?.id;
   const name = sessionUser?.name;
   const email = sessionUser?.email;
   const image = sessionUser?.image;
-  const user = useMemo<AppUser | null>(() => id ? {
-    id, displayName: name ?? null, primaryEmail: email ?? null, profileImageUrl: image ?? null, isDevFallback: false,
-  } : null, [id, name, email, image]);
-  if (!authEnabled && localFallbackAllowed) return { user: DEV_USER, isPending: false };
+  const user = useMemo<AppUser | null>(
+    () =>
+      id
+        ? {
+            id,
+            displayName: name ?? null,
+            primaryEmail: email ?? null,
+            profileImageUrl: image ?? null,
+            isDevFallback: false,
+          }
+        : null,
+    [id, name, email, image],
+  );
   return { user, isPending };
 }
 

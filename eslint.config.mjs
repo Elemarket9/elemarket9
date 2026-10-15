@@ -14,6 +14,10 @@ export default tseslint.config(
       ".vercel/**",
       ".nitro/**",
       "node_modules/**",
+      // Licensed upstream code with narrow security fixes; checked by mobile CI.
+      "mobile/security/braces/**",
+      "mobile/security/node-forge/**",
+      "mobile/security/sprintf-js/**",
       "src/routeTree.gen.ts",
     ],
   },
@@ -41,6 +45,10 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "off",
     },
+  },
+  {
+    files: ["mobile/security/decode-uri-component/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   // Disable rules that conflict with Prettier formatting.
   prettier,

@@ -41,9 +41,9 @@ function Terms() {
             <p>Do not list unlawful or counterfeit goods, submit misleading reviews, harass other users, exploit promotions, make fraudulent payment or refund claims, or attempt to bypass account and security controls. Only upload content you have permission to share.</p>
             <p>ELEMARKET may restrict accounts, listings or integrations to investigate abuse, protect users, comply with applicable requirements or maintain the service. Contact Support if you believe a restriction is a mistake.</p>
           </section>
-          <section aria-labelledby="terms-beta">
-            <h2 id="terms-beta" className="text-lg font-black text-market-ink">7. Beta availability and changes</h2>
-            <p>During beta, features and availability may change and interruptions may occur. Report errors through Support. These terms may be updated as the service changes; the date above identifies the current version. Review the terms and the information shown for each new order.</p>
+          <section aria-labelledby="terms-availability">
+            <h2 id="terms-availability" className="text-lg font-black text-market-ink">7. Service availability and changes</h2>
+            <p>Features and availability may change and interruptions may occur. Report errors through Support. These terms may be updated as the service changes; the date above identifies the current version. Review the terms and the information shown for each new order.</p>
           </section>
           <section aria-labelledby="terms-contact">
             <h2 id="terms-contact" className="text-lg font-black text-market-ink">8. Support and privacy</h2>

@@ -22,3 +22,21 @@ The mobile client includes secure authentication, marketplace browsing/search, p
 ## Validation
 
 Run `npm run typecheck` and `npx expo install --check`. A JavaScript bundle can be checked with `npx expo export --platform android`; native device testing is still required before release.
+
+## Dependency security update (2026-10-14)
+
+The lockfile pins patched URI decoding (0.5.0) and Xcode UUID generation (11.1.1).
+`security/decode-uri-component` is a small compatibility adapter: query-string 7
+expects a callable CommonJS export, while the patched decoder has a default export.
+The adapter is a direct local dependency, with its transitive override referencing
+that direct dependency, so clean installs resolve the project path consistently.
+The `patched-uri-decoder` dependency is the actual upstream patched package; the
+adapter does not replace its decoding implementation or suppress audit findings.
+Expo Router peers are explicitly installed. Android cleartext traffic remains
+ disabled through the supported expo-build-properties config plugin.
+
+The October 14 repair also supplies licensed local security forks for three
+packages without published upstream patches. The registry audit now reports zero
+known findings, but does not audit these forks: source review, integrity checks
+and advisory regression checks are separate required CI gates. See
+[security maintenance](security/README.md). Native device testing is still required.

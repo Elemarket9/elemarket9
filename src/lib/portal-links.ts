@@ -1,30 +1,24 @@
-/** Non-secret frontend navigation configuration. Server authorization NEVER depends on these URLs.
- * Explicit VITE_* values must match the Caddy environment at build time. */
+/** Public navigation configuration only. Authorization stays on the server. */
 type Portal = "marketplace" | "seller" | "provider";
-const explicitOrigins: Record<Portal, string | undefined> = {
+const origins: Record<string, string | undefined> = {
+  ...(import.meta.env.VITE_ELEMARKET_PORTAL_ORIGINS ?? {}),
+};
+const explicitOrigins = {
   marketplace: import.meta.env.VITE_ELEMARKET_MARKETPLACE_ORIGIN,
   seller: import.meta.env.VITE_ELEMARKET_SELLER_ORIGIN,
   provider: import.meta.env.VITE_ELEMARKET_PROVIDER_ORIGIN,
 };
-const prefixes = ["festus", "staff", "seller", "partners"];
-
-function fallbackOrigin(portal: Portal): string {
-  if (typeof window === "undefined") return "";
-  const { hostname, protocol, port } = window.location;
-  const parts = hostname.split(".");
-  const root = prefixes.includes(parts[0]) ? parts.slice(1).join(".") : hostname;
-  const target = portal === "marketplace" ? root : `${portal === "provider" ? "partners" : "seller"}.${root}`;
-  return `${protocol}//${target}${port ? `:${port}` : ""}`;
+for (const [portal, origin] of Object.entries(explicitOrigins)) {
+  if (origin) origins[portal] = origin.replace(/\/$/, "");
 }
 export function portalHref(portal: Portal, path = "/"): string {
-  const explicit = explicitOrigins[portal]?.replace(/\/$/, "");
-  const origin = explicit || fallbackOrigin(portal);
-  // SSR fallback is same-origin only; use VITE_* origins for deterministic server HTML.
-  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
+  const origin = origins[portal] ?? "";
+  return `${origin}/${path.replace(/^\/+/, "")}`;
 }
 export function isMarketplaceOrigin(): boolean {
   if (typeof window === "undefined") return false;
-  const origin = explicitOrigins.marketplace?.replace(/\/$/, "");
-  if (origin) return window.location.origin === origin;
-  return !prefixes.includes(window.location.hostname.split(".")[0]);
+  if (origins.marketplace) return window.location.origin === origins.marketplace;
+  return !Object.entries(origins).some(
+    ([portal, origin]) => portal !== "marketplace" && origin === window.location.origin,
+  );
 }

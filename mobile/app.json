@@ -8,11 +8,18 @@
     "userInterfaceStyle": "automatic",
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": false
+          }
+        }
+      ]
     ],
     "android": {
-      "package": "com.elevora.elemarket",
-      "usesCleartextTraffic": false
+      "package": "com.elevora.elemarket"
     },
     "ios": {
       "bundleIdentifier": "com.elevora.elemarket",

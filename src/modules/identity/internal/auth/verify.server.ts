@@ -11,24 +11,8 @@ import { auth, authConfigured, readSessionToken } from "./server";
  * client-supplied user id — only the result of this verification.
  */
 
-/** True when a real database is configured server-side. */
-const databaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
-const localDevelopmentFallbackAllowed =
-  process.env.ELEMARKET_ENV === "development" && !databaseConfigured;
-
-/** Re-export so callers can branch on it without importing `server.ts`. */
+/** Re-export the authentication availability contract. */
 export { authConfigured };
-
-if (databaseConfigured && !authConfigured) {
-  console.error(
-    "[auth] DATABASE_URL is set but auth is disabled (VITE_AUTH_ENABLED=false) " +
-      "— requireUserId() will reject every request (fail closed) rather than " +
-      "share one dev user on a real database.",
-  );
-}
-
-/** Dev fallback user id, used only when auth is disabled (VITE_AUTH_ENABLED=false). */
-export const DEV_USER_ID = "dev-user";
 
 /**
  * Thrown by `requireUserId` when the caller has no valid session. Carries
@@ -50,14 +34,10 @@ export type VerifiedUser = { id: string; email: string | null };
  * configured / nobody is signed in. Safe to call from server functions and SSR
  * loaders.
  *
- * `bearerToken` is for the LIVE PREVIEW: the app runs in a partitioned iframe
- * whose cookies don't reach the server, so `authMiddleware` forwards the session
- * as a bearer token, which we present as `Authorization: Bearer …` (the `bearer`
- * plugin resolves it). When deployed no token is passed and the cookie is used.
+ * Request headers carry the verified cookie or native bearer session. The legacy
+ * optional argument is retained for callers but cannot supply an identity.
  */
-export async function getSessionUser(
-  bearerToken?: string,
-): Promise<VerifiedUser | null> {
+export async function getSessionUser(bearerToken?: string): Promise<VerifiedUser | null> {
   if (!authConfigured) return null;
   void bearerToken;
   const request = getRequest();
@@ -68,27 +48,8 @@ export async function getSessionUser(
   return { id: session.user.id, email: session.user.email ?? null };
 }
 
-/**
- * Resolve the current user id for a server function, or throw when unauthorized.
- * Prefer `authMiddleware` (`./middleware`), which calls this for you.
- * - Auth enabled -> the verified session user id; throws
- *   `UnauthorizedError` when signed out. Works in the sandbox preview too (real
- *   sign-in via the baked preview client).
- * - Auth disabled (`VITE_AUTH_ENABLED=false`) + `DATABASE_URL` set -> throw (fail
- *   closed): one shared dev user on a real database would let every visitor
- *   read/write everyone's rows.
- * - Auth disabled + no database -> the shared dev user id.
- */
+/** Require a persisted, verified session in every environment. */
 export async function requireUserId(bearerToken?: string): Promise<string> {
-  if (!authConfigured) {
-    if (!localDevelopmentFallbackAllowed) {
-      throw new Error(
-        "Auth is disabled (VITE_AUTH_ENABLED=false) outside an isolated local development environment — " +
-          "refusing the shared dev user fallback.",
-      );
-    }
-    return DEV_USER_ID;
-  }
   const user = await getSessionUser(bearerToken);
   if (!user) throw new UnauthorizedError();
   return user.id;
@@ -123,7 +84,6 @@ export async function requireFreshSession(
   }
   return session.user.id;
 }
-
 
 export function readCurrentSessionToken(): string | null {
   return readRequestBearerToken() || readSessionCookieToken();

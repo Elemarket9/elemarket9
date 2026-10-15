@@ -19,12 +19,11 @@ import { executiveBiometric } from "./executive/plugin.server";
 
 void ensureDbReady();
 const env = (key: string) => process.env[key]?.trim() || undefined;
-const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 const databaseUrl = env("DATABASE_URL");
 const deployed = getElemarketEnvironment() === "production" || getElemarketEnvironment() === "staging";
 if (deployed && !databaseUrl) throw new Error("Production requires DATABASE_URL for authentication persistence");
 if (deployed && !env("BETTER_AUTH_SECRET")) throw new Error("Production requires BETTER_AUTH_SECRET");
-export const authConfigured = !authDisabled;
+export const authConfigured = true;
 const explicitBaseURL = env("BETTER_AUTH_URL");
 const configuredTrustedOrigins = (env("BETTER_AUTH_TRUSTED_ORIGINS") ?? "")
   .split(",")

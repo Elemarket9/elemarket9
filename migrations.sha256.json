@@ -184,5 +184,6 @@
   "0184_custom_admin_roles_permissions.sql": "cda31a07ecbc4d88c802420c52411b89dafe063c1df4a225710f9da6238300a6",
   "0185_executive_face_auth.sql": "ac69845dcdb5cfe4ea3687d718b6595b608bcf897c8d5a7c9dc6649fee315b77",
   "0186_executive_device_independent.sql": "784f6388a6571bf307700ecba7ac503935ede5238e20b7e7076e45e2ee39a8fa",
-  "0187_executive_biometric_revocation.sql": "3584424605c16304d4a8ff2986c1aeea809ca7ce45c9f916da93b0f200d6de49"
+  "0187_executive_biometric_revocation.sql": "3584424605c16304d4a8ff2986c1aeea809ca7ce45c9f916da93b0f200d6de49",
+  "0188_public_catalog_cleanup.sql": "29f38f691b38afd66812bdd2c00daced19fc1c64dce48a523e714fbe1f167919"
 }

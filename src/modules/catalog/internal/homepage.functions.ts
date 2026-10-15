@@ -35,10 +35,11 @@ function rowToProduct(r: any): ProductCard {
 
 const AD_VISITOR_COOKIE = "elemarket.ad_visitor";
 const AD_VISITOR_MAX_AGE = 60 * 60 * 24 * 30;
+const localAdVisitorSecret = randomBytes(32).toString("hex");
 function adVisitorSecret(): string {
   const configured = env("BETTER_AUTH_SECRET");
   if (configured) return configured;
-  if (isWorkspacePreview()) return "local-ad-analytics-development-secret";
+  if (isWorkspacePreview()) return localAdVisitorSecret;
   throw new Error("BETTER_AUTH_SECRET is required for homepage analytics signing");
 }
 function signAdVisitor(value:string):string {
