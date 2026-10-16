@@ -225,7 +225,14 @@ for (const key of ["CRON_SECRET", "ELEMARKET_ENTERPRISE_SYNC_SECRET"]) {
   }
 }
 const redisUrl = env("REDIS_URL");
-const redisScheme = redisUrl ? new URL(redisUrl).protocol : null;
+let redisInfo;
+try {
+  redisInfo = redisUrl ? new URL(redisUrl) : null;
+} catch {
+  console.error("[startup] REDIS_URL is invalid; check its scheme, host and URL-encoded credentials.");
+  process.exit(1);
+}
+const redisScheme = redisInfo?.protocol ?? null;
 if (redisUrl && !["https:", "redis:", "rediss:"].includes(redisScheme)) {
   console.error("[startup] REDIS_URL must use https://, redis://, or rediss://.");
   process.exit(1);
@@ -238,7 +245,7 @@ if (redisScheme === "https:" && !env("REDIS_HTTP_TOKEN")) {
 }
 if (redisScheme === "redis:" || redisScheme === "rediss:") {
   // Native Redis authentication comes from URL userinfo or REDIS_USERNAME/REDIS_PASSWORD.
-  const info = new URL(redisUrl);
+  const info = redisInfo;
   if (!info.password && !env("REDIS_PASSWORD")) {
     console.error(
       "[startup] Native REDIS_URL requires credentials in the URL userinfo or REDIS_PASSWORD.",
