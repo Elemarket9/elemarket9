@@ -42,3 +42,45 @@ that flag merely to enable checkout. Complete initialization timeout/recovery
 implementation and tests, signed webhook/transaction verification tests, merchant
 subaccount setup, and method availability checks before activating registry rows.
 Bank transfer availability must be confirmed for the account and GHS market.
+
+## Docker Compose deployment
+
+Run these commands from the project folder using CMD. On first setup only,
+create the private environment file (do not overwrite an existing one):
+
+```cmd
+copy .env.example .env.production
+```
+
+Fill in the real domains, database/Redis credentials, application secrets,
+mandatory delivery OTP configuration, and payment variables in that file.
+Keep `ELEMARKET_PUBLIC_URL` empty to use `BETTER_AUTH_URL`, or set both to
+the same HTTPS marketplace origin. The environment example contains empty
+required credentials and example domains; it is not deployable unchanged.
+
+Build and start the stack:
+
+```cmd
+docker compose --env-file .env.production up -d --build
+docker compose --env-file .env.production ps
+docker compose --env-file .env.production logs --tail=100 app
+```
+
+The app service already declares `env_file: .env.production`, so payment
+driver variables and secrets reach the server at runtime. The Docker build
+excludes private environment files; payment secrets are not build arguments.
+The container runs `scripts/start.mjs`, which validates the environment and
+automatically applies pending migrations, including 0211, before starting
+the server. A separate host-side `npm run db:migrate` is unnecessary for this
+Compose deployment. A failed validation or migration prevents server startup;
+inspect the app logs before continuing.
+
+After changing only environment variables, recreate the app container:
+
+```cmd
+docker compose --env-file .env.production up -d --force-recreate app
+```
+
+Restarting a container alone does not refresh its environment. Updating the
+application code or bundled payment driver requires `up -d --build` again.
+The payment readiness and registry activation requirements above still apply.
