@@ -1,5 +1,5 @@
 # Portable modular-monolith build. No external-provider names in app policy.
-FROM node:22-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -15,7 +15,7 @@ ENV VITE_ELEMARKET_MARKETPLACE_ORIGIN=$VITE_ELEMARKET_MARKETPLACE_ORIGIN \
 RUN npm run build
 RUN npm prune --omit=dev --no-audit --no-fund
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:25-bookworm-slim AS runtime
 ENV NODE_ENV=production NITRO_HOST=0.0.0.0 NITRO_PORT=8080
 WORKDIR /app
 COPY --from=builder /app/package.json /app/package-lock.json ./
