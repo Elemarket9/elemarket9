@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
 import { isWorkspacePreview } from "@/lib/env.server";
 import { normalizeProviderKey } from "@/modules/payments/internal/provider-policy.server";
+import { loadBundledPaymentDriver } from "./providers/registry";
 import {
   JsonHttpPaymentAdapter,
   PreviewPaymentAdapter,
@@ -71,7 +72,10 @@ export async function getPaymentAdapter(
   if (!allowedModules.includes(moduleSpecifier))
     throw new Error(`Payment provider driver '${driver}' module is not allowlisted`);
 
-  const loaded = (await import(moduleSpecifier)) as {
+  const bundled = await loadBundledPaymentDriver(moduleSpecifier);
+  if (!bundled && moduleSpecifier.startsWith("builtin:"))
+    throw new Error("Unknown bundled payment driver");
+  const loaded = (bundled ?? (await import(moduleSpecifier))) as {
     createPaymentAdapter?: (args: { providerKey: string }) => PaymentProviderAdapter;
   };
   if (typeof loaded.createPaymentAdapter !== "function") {

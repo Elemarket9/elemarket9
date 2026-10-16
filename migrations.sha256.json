@@ -207,5 +207,6 @@
   "0207_delivery_provider_reassignment.sql": "d4bbc8e2a55ef4a7c2b82d7017936990af71bf30b6b6d80175313a81ed85c9a2",
   "0208_cancelled_parcel_receipt_aggregation.sql": "bed8c60952bf7de814dc75ebb0587d1360288c546368dd0f4cc89593bf500cf5",
   "0209_delivery_return_eligibility_hold.sql": "90bb1f92cbecb550c2451a790326ca81e434c324f62746bd6431eada4a652b01",
-  "0210_provider_tracking_origin_registry.sql": "76701490f5157189fe894c9703ee3d7e17e239aa04d5d5418c23c10da7703978"
+  "0210_provider_tracking_origin_registry.sql": "76701490f5157189fe894c9703ee3d7e17e239aa04d5d5418c23c10da7703978",
+  "0211_paystack_driver_configuration.sql": "92674369278bff0ef82b36a9a63c6a3ec2be893e11b097804eab0113910c89c9"
 }
