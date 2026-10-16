@@ -7,6 +7,7 @@ import { getSql } from "@/lib/db";
 import { encryptMerchantSensitiveData, decryptMerchantSensitiveData } from "@/lib/security/merchant-sensitive.server";
 import { assertPublicHttpsEndpoint } from "@/lib/security/ssrf.server";
 import { CATEGORY_KEYS, isValidSubcategory } from "@/modules/shared/public/categories";
+import { approvedPublicMediaUrl } from "@/lib/security/public-media-origin.server";
 
 const fieldMappingSchema = z.object({
   id: z.string().min(1).max(200),
@@ -97,7 +98,7 @@ function publicEnterpriseImageUrl(value: string | undefined): string | null {
       || url.pathname.length > 2048 || url.search.length > 1024 || url.href.length > 2000) return null;
     if (url.hostname === "localhost" || url.hostname.endsWith(".localhost") || url.hostname.endsWith(".local")
       || url.hostname.endsWith(".internal") || isPrivateOrReservedIp(url.hostname)) return null;
-    return url.href;
+    return approvedPublicMediaUrl(url.href) ?? null;
   } catch { return null; }
 }
 

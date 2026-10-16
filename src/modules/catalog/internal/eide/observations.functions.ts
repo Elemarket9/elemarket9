@@ -4,7 +4,7 @@ import {enforceRateLimit} from '@/lib/security/rate-limit.server';
 import {authMiddleware,getAuthenticatedUserId} from '@/modules/identity/public/auth/middleware';
 import {recordDiscoveryObservation,linkDiscoveryOrder} from './observations.server';
 export const recordSearchObservation=createServerFn({method:'POST'})
-  .validator(z.object({receipt:z.string().max(1024),eventType:z.enum(['impression','click','view','add_to_cart','wishlist','checkout'])}))
+  .validator(z.object({receipt:z.string().max(1024),eventType:z.enum(['impression','click','view'])}))
   .handler(async({data})=>{
     try{await enforceRateLimit('discovery-observation',{windowSeconds:60,maxRequests:180});return {recorded:await recordDiscoveryObservation(data.receipt,data.eventType)};}
     catch{return {recorded:false};}

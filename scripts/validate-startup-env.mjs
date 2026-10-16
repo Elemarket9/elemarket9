@@ -141,6 +141,19 @@ for (const [capability, variable] of [
   if (env(variable)) validateProviderCapability(capability, variable);
 }
 if (env("ELEMARKET_KYB_PROVIDER")) validateProviderCapability("kyb", "ELEMARKET_KYB_PROVIDER");
+// Universal physical handover OTP is a mandatory transaction control.
+// Never start shared/real-payment traffic with an unconfigured SMS transport.
+if (!env("ELEMARKET_HANDOVER_SMS_PROVIDER")) {
+  console.error("[startup] universal delivery OTP requires ELEMARKET_HANDOVER_SMS_PROVIDER");
+  process.exit(1);
+}
+validateProviderCapability("handover_sms", "ELEMARKET_HANDOVER_SMS_PROVIDER");
+const handoverMacKey = env("ELEMARKET_HANDOVER_OTP_HMAC_KEY") || "";
+if (!/^[0-9a-f]{64,}$/i.test(handoverMacKey) || handoverMacKey.length % 2 !== 0) {
+  console.error("[startup] ELEMARKET_HANDOVER_OTP_HMAC_KEY must be 32+ random bytes encoded in hex");
+  process.exit(1);
+}
+
 const delivery = env("ELEMARKET_DELIVERY_PROVIDER")?.toLowerCase();
 if (delivery) {
   if (!/^[a-z0-9_-]{2,64}$/.test(delivery) || delivery === "preview") {
@@ -224,15 +237,13 @@ for (const key of ["CRON_SECRET", "ELEMARKET_ENTERPRISE_SYNC_SECRET"]) {
     process.exit(1);
   }
 }
-const redisUrl = env("REDIS_URL");
-let redisInfo;
-try {
-  redisInfo = redisUrl ? new URL(redisUrl) : null;
-} catch {
-  console.error("[startup] REDIS_URL is invalid; check its scheme, host and URL-encoded credentials.");
+// Distinct credentials for the scheduler and privileged enterprise HMAC workers.
+if (env("CRON_SECRET") === env("ELEMARKET_ENTERPRISE_SYNC_SECRET")) {
+  console.error("[startup] CRON_SECRET and ELEMARKET_ENTERPRISE_SYNC_SECRET must be different secrets.");
   process.exit(1);
 }
-const redisScheme = redisInfo?.protocol ?? null;
+const redisUrl = env("REDIS_URL");
+const redisScheme = redisUrl ? new URL(redisUrl).protocol : null;
 if (redisUrl && !["https:", "redis:", "rediss:"].includes(redisScheme)) {
   console.error("[startup] REDIS_URL must use https://, redis://, or rediss://.");
   process.exit(1);
@@ -245,7 +256,7 @@ if (redisScheme === "https:" && !env("REDIS_HTTP_TOKEN")) {
 }
 if (redisScheme === "redis:" || redisScheme === "rediss:") {
   // Native Redis authentication comes from URL userinfo or REDIS_USERNAME/REDIS_PASSWORD.
-  const info = redisInfo;
+  const info = new URL(redisUrl);
   if (!info.password && !env("REDIS_PASSWORD")) {
     console.error(
       "[startup] Native REDIS_URL requires credentials in the URL userinfo or REDIS_PASSWORD.",

@@ -4,7 +4,7 @@ import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { authorizeInternalHmacRequest } from "@/lib/security/internal-job-auth.server";
 
 async function run(request: Request) {
-  if (!(await authorizeInternalHmacRequest(request, process.env.ELEMARKET_ENTERPRISE_SYNC_SECRET, process.env.CRON_SECRET))) {
+  if (!(await authorizeInternalHmacRequest(request, process.env.ELEMARKET_ENTERPRISE_SYNC_SECRET))) {
     return new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
   }
   await enforceRateLimit("enterprise-catalog-global-sync", { windowSeconds: 60, maxRequests: 2 });

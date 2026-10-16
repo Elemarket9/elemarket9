@@ -20,6 +20,7 @@ export const createPaymentIntent = createServerFn({ method: "POST" })
     await requireCustomerForUserId(context.userId);
     const userId = getAuthenticatedUserId(context);
     await enforceRateLimit("payment-intent", { windowSeconds: 60, maxRequests: 12, subject: userId });
+    await enforceRateLimit("payment-intent-account", { identity:"subject", windowSeconds:60, maxRequests:18, subject:userId });
     const { createExternalPaymentIntent } = await import("@/modules/payments/internal/payment.server");
     return createExternalPaymentIntent({ ...data, userId: userId });
   });
@@ -37,6 +38,7 @@ export const getCustomerPaymentStatus = createServerFn({ method: "GET" })
     await requireCustomerForUserId(context.userId);
     const userId = getAuthenticatedUserId(context);
     await enforceRateLimit("payment-status", { windowSeconds: 60, maxRequests: 30, subject: userId });
+    await enforceRateLimit("payment-status-account", { identity:"subject", windowSeconds:60, maxRequests:60, subject:userId });
     const owned = await requireCustomerPayment(data.paymentId, userId);
     const sqlForGroup = await getSql();
     const groupRows = await sqlForGroup.query<{ group_id: string }>(

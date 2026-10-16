@@ -2,7 +2,8 @@ export type TransactionalEmailKind =
   | "email_otp"
   | "verification"
   | "password_reset"
-  | "security";
+  | "security"
+  | "rider_invitation";
 
 export type EmailSendInput = {
   to: string;

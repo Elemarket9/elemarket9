@@ -60,6 +60,10 @@ export const Route = createFileRoute("/api/financing/merchants/$merchantId/healt
           maxRequests: 30,
           subject: `${access[0].provider_id}:${merchantId}`,
         });
+        await enforceRateLimit("merchant-health-provider-account", {
+          identity: "subject", windowSeconds: 60, maxRequests: 45,
+          subject: `${access[0].provider_id}:${merchantId}`,
+        });
 
         const score = await sql.query<JsonObject>(
           `select score,band,model_version,methodology_version,components,calculated_at::text,

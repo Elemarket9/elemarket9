@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readResponseBodyWithLimit } from "@/lib/security/body.server";
 import type {
   PaymentAdapterInput,
   PaymentAdapterResult,
@@ -8,6 +9,16 @@ import type {
   PaymentRefundResult,
 } from "../payment";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
+
+async function readProviderJson(response: Response): Promise<unknown> {
+  const body = await readResponseBodyWithLimit(response, 512 * 1024);
+  try {
+    return JSON.parse(body);
+  } catch {
+    // JSON parser errors may quote provider response contents into application logs.
+    throw new Error("Invalid payment provider JSON response");
+  }
+}
 
 const initializeResponse = z.object({
   status: z.boolean(),
@@ -112,12 +123,13 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       redirect: "error",
       signal: AbortSignal.timeout(10_000),
     });
-    const parsed = initializeResponse.safeParse(await response.json().catch(() => null));
+    const parsed = initializeResponse.safeParse(await readProviderJson(response));
     if (
       !response.ok ||
       !parsed.success ||
       parsed.data.status !== true ||
       !parsed.data.data?.reference ||
+      parsed.data.data.reference !== reference ||
       !parsed.data.data.authorization_url
     )
       throw new Error(`Provider transaction initialization failed (HTTP ${response.status})`);
@@ -226,7 +238,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       redirect: "error",
       signal: AbortSignal.timeout(10_000),
     });
-    const parsed = refundResponse.safeParse(await response.json().catch(() => null));
+    const parsed = refundResponse.safeParse(await readProviderJson(response));
     const data = parsed.success ? parsed.data.data : null;
     if (!response.ok || !parsed.success || parsed.data.status !== true || !data)
       throw new Error("Payment provider refund request failed");
@@ -273,9 +285,9 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
         signal: AbortSignal.timeout(10_000),
       },
     );
-    const parsed = verifyResponse.safeParse(await response.json().catch(() => null));
     if (!response.ok)
       throw new PaymentProviderError("Provider transaction verification failed", response.status);
+    const parsed = verifyResponse.safeParse(await readProviderJson(response));
     if (!parsed.success || parsed.data.status !== true || !parsed.data.data)
       throw new PaymentProviderError(
         "Provider transaction verification failed",

@@ -6,7 +6,7 @@ import { getIntelligenceSql } from "@/lib/db";
 /** Schedule independently of enterprise synchronization. Protected by CRON_SECRET. */
 export const Route = createFileRoute("/api/internal/refresh-eide")({
   server: { handlers: { GET: async ({ request }) => {
-    if (!(await authorizeScheduledJobRequest(request, process.env.CRON_SECRET, process.env.CRON_SECRET)))
+    if (!(await authorizeScheduledJobRequest(request, process.env.CRON_SECRET)))
       return new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
     await enforceRateLimit("internal-refresh-eide", { identity: "subject", subject: "authenticated-scheduler", windowSeconds: 60, maxRequests: 2 });
     const sql = await getIntelligenceSql();

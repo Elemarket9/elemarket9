@@ -4,6 +4,3 @@
 # Keep locked migration bytes identical on Windows and Linux.
 migrations/*.sql text eol=lf
 migrations.sha256.json text eol=lf
-
-# Preserve licensed security-source bytes covered by integrity manifests.
-mobile/security/** -text

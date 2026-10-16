@@ -43,9 +43,6 @@ export function DiscoveryProductCard({ product, quantity, onAdd, sponsored, offi
       const result = await toggleWishlistProduct({ data: { productId: product.id } });
       setSaved(result.saved);
       setWishlistMessage(result.saved ? "Added to your wishlist." : "Removed from your wishlist.");
-      if (result.saved && product.attributionReceipt) {
-        void recordSearchObservation({ data: { receipt: product.attributionReceipt, eventType: "wishlist" } }).catch(() => undefined);
-      }
     } catch {
       setWishlistMessage("Could not update wishlist. Try again.");
     } finally { wishlistLock.current = false; setWishlistBusy(false); }
@@ -65,14 +62,25 @@ export function DiscoveryProductCard({ product, quantity, onAdd, sponsored, offi
   useEffect(() => {
     const receipt = product.attributionReceipt, node = exposureRef.current;
     if ((!receipt && !impressionCallback.current) || !node || typeof IntersectionObserver === "undefined") return;
+    let dwell: ReturnType<typeof setTimeout> | undefined;
+    const clearDwell = () => { if (dwell) clearTimeout(dwell); dwell = undefined; };
     const observer = new IntersectionObserver(entries => {
-      if (!entries.some(e => e.isIntersecting)) return;
-      observer.disconnect();
-      impressionCallback.current?.();
-      if (receipt) void recordSearchObservation({ data: { receipt, eventType: "impression" } }).catch(() => undefined);
-    }, { threshold: 0.5 });
+      const visible = entries.some(e => e.intersectionRatio >= 0.5) && document.visibilityState === 'visible';
+      if (!visible) { clearDwell(); return; }
+      if (dwell) return;
+      // Count an impression after continuous screen visibility, not merely a
+      // component render or a momentary scroll through the page.
+      dwell = setTimeout(() => {
+        dwell = undefined;
+        if (document.visibilityState !== 'visible') return;
+        observer.disconnect();
+        impressionCallback.current?.();
+        if (receipt) void recordSearchObservation({ data: { receipt, eventType: "impression" } }).catch(() => undefined);
+      }, 2100);
+    }, { threshold: [0, 0.5, 1] });
     observer.observe(node);
-    return () => observer.disconnect();
+    document.addEventListener('visibilitychange', clearDwell);
+    return () => { clearDwell(); observer.disconnect(); document.removeEventListener('visibilitychange', clearDwell); };
   }, [product.attributionReceipt, product.id, sponsored]);
 
   return (

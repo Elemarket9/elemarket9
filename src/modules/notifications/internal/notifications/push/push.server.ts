@@ -20,8 +20,21 @@ export async function registerPushDevice(input: {
   await enforceRateLimit("push-device-register", { windowSeconds: 3600, maxRequests: 20, subject: input.userId });
   const sql = await getSql();
   const tokenHash = hashToken(token);
-  const existing = await sql.query<{ user_id: string }>(`select user_id from push_devices where token_hash=$1`, [tokenHash]);
-  if (existing[0] && existing[0].user_id !== input.userId) throw new Error("Push token is already registered to another account");
+  const registered = await sql.query<{ id: string }>(
+    `insert into push_devices (id, user_id, token, token_hash, platform, app_version, device_id, last_seen_at)
+     values ($3,$1,$2,$3,$4,$5,$6,now())
+     on conflict (token_hash) do update set
+       token = excluded.token,
+       platform = excluded.platform,
+       app_version = excluded.app_version,
+       device_id = excluded.device_id,
+       last_seen_at = now(),
+       disabled_at = null
+     where push_devices.user_id = excluded.user_id
+     returning id`,
+    [input.userId, token, tokenHash, input.platform, input.appVersion ?? null, input.deviceId ?? null],
+  );
+  if (registered.length !== 1) throw new Error("Push token is already registered to another account");
   // Push providers rotate tokens. When the authenticated client identifies the
   // same physical/app device, retire its older token before registering the new
   // one so a rotation cannot leave duplicate active delivery targets behind.
@@ -32,19 +45,6 @@ export async function registerPushDevice(input: {
       [input.userId, input.deviceId.trim(), tokenHash],
     );
   }
-  await sql.query(
-    `insert into push_devices (id, user_id, token, token_hash, platform, app_version, device_id, last_seen_at)
-     values ($3,$1,$2,$3,$4,$5,$6,now())
-     on conflict (token_hash) do update set
-       user_id = excluded.user_id,
-       token = excluded.token,
-       platform = excluded.platform,
-       app_version = excluded.app_version,
-       device_id = excluded.device_id,
-       last_seen_at = now(),
-       disabled_at = null`,
-    [input.userId, token, tokenHash, input.platform, input.appVersion ?? null, input.deviceId ?? null],
-  );
   return { registered: true };
 }
 

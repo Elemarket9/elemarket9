@@ -4,6 +4,7 @@ import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/publi
 import { getSql, withTransaction } from "@/lib/db";
 import { assertPortalOperationHost } from "@/lib/security/portal-access.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
+import { getCookie } from "@tanstack/react-start/server";
 
 const capability = z.enum(["delivery","customer_financing","merchant_financing"]);
 const applicationSchema = z.object({
@@ -58,8 +59,10 @@ export const getProviderGatewayContext = createServerFn({ method:"GET" })
         order by o.id`,
       [userId],
     );
-    if(memberships.length>1) throw new Error("Multiple provider organizations require administrator resolution");
-    if(memberships.length===1) return {authorized:true as const,...memberships[0]};
+    const selected=getCookie('elemarket_company');
+    const matching=selected?memberships.find(m=>m.organizationId===selected):memberships.length===1?memberships[0]:undefined;
+    if(matching) return {authorized:true as const,...matching};
+    if(memberships.length) return {authorized:false as const,selectionRequired:true,application:null};
     const blocked=await sql.query<{organizationName:string;organizationStatus:string;membershipStatus:string}>(
       `select o.name as "organizationName",o.status as "organizationStatus",u.status as "membershipStatus"
          from partner_organization_users u join partner_organizations o on o.id=u.organization_id

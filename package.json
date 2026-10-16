@@ -33,11 +33,16 @@
     "test:frontend": "node tests/frontend.e2e.mjs",
     "check:module-contracts": "node scripts/check-module-contracts.mjs",
     "verify:backup": "node scripts/verify-backup.mjs",
-    "test:eide": "node --test tests/eide*.test.mjs",
+    "test:eide": "node scripts/test.mjs --prefix=eide",
     "evaluate:eide": "node scripts/eide-v11-evaluate.mjs",
     "test:discovery:browser": "node tests/discovery-browser.e2e.mjs",
     "validate:push-client": "node scripts/validate-push-client-env.mjs",
-    "test:integration:authorization": "node --test tests/authorization.integration.mjs"
+    "test:integration:authorization": "node --test tests/authorization.integration.mjs",
+    "test:fulfillment:postgres": "node --test tests/fulfillment.postgres.mjs",
+    "test:runtime": "node --test tests/runtime.integration.mjs",
+    "test:runtime:browser": "node tests/runtime-browser.e2e.mjs",
+    "test:delivery:evidence": "node --test tests/delivery-evidence.postgres.mjs",
+    "test:delivery:operations": "node tests/delivery-operations.e2e.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -66,9 +71,10 @@
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-router": "^1.170.0",
-    "@tanstack/react-start": "^1.168.0",
+    "@tanstack/react-start": "^1.169.2",
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
+    "@tanstack/start-storage-context": "1.167.39",
     "better-auth": "1.7.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -90,8 +96,7 @@
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "zod": "^4.4.0",
-    "zustand": "^5.0.0",
-    "@tanstack/start-storage-context": "1.167.30"
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

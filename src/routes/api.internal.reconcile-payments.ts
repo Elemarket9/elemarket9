@@ -15,7 +15,6 @@ export const Route = createFileRoute("/api/internal/reconcile-payments")({
           !(await authorizeScheduledJobRequest(
             request,
             process.env.CRON_SECRET,
-            process.env.CRON_SECRET,
           ))
         ) {
           throw new Response("Unauthorized", {

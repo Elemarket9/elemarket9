@@ -5,6 +5,8 @@ export const JOBS = Object.freeze([
   { path: '/api/internal/expire-payment-orders', everyMinutes: 1 },
   { path: '/api/internal/reconcile-payments', everyMinutes: 1 },
   { path: '/api/internal/dispatch-deliveries', everyMinutes: 1 },
+  { path: '/api/internal/rider-invitations', everyMinutes: 1 },
+  { path: '/api/internal/collection-notifications', everyMinutes: 1 },
   { path: '/api/internal/enterprise-order-outbox', everyMinutes: 1 },
   { path: '/api/internal/enterprise-webhook-worker', everyMinutes: 1 },
   { path: '/api/internal/sync-enterprise-catalogs', everyMinutes: 5 },

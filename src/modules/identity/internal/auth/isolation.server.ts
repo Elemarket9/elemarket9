@@ -35,7 +35,25 @@ export function assertSameSiteRequest(): void {
   const site = h.get("sec-fetch-site");
   // Non-browser client (no header), the app's own origin, or a direct
   // (address-bar/bookmark) load are all fine.
-  if (!site || site === "same-origin" || site === "none") return;
+  if (site === "same-origin" || site === "none") return;
+  if(!site){
+    // Native/server clients without browser cookies remain supported; cookie
+    // authenticated mutations with missing Fetch Metadata must prove origin.
+    const unsafe=!['GET','HEAD','OPTIONS'].includes(request.method.toUpperCase());
+    const cookie=h.get('cookie');
+    if(!unsafe || !cookie)return;
+    const origin=h.get('origin');
+    // Never trust X-Forwarded-Host from the caller. The edge proxy must set Host.
+    const host=h.get('host');
+    try {
+      if(origin && host){
+        const parsed=new URL(origin);
+        const secure=process.env.ELEMARKET_ENV==='production'||process.env.ELEMARKET_ENV==='staging';
+        if(parsed.origin === `${secure?'https':'http'}://${host}`)return;
+      }
+    }catch{/* malformed origin */}
+    throw new CrossSiteRequestError();
+  }
   // A top-level GET navigation (e.g. the broker's OAuth callback redirect) is
   // fine even when it's cross-site; scripted requests never set navigate mode.
   const dest = h.get("sec-fetch-dest");

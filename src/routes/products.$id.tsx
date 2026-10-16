@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BadgeCheck, Check, ChevronLeft, ChevronRight, CreditCard, Heart, RotateCcw, ShieldCheck, ShoppingBag, Star, Truck } from "lucide-react";
 import { getProduct } from "@/modules/catalog/public/catalog";
 import { recordSearchObservation } from "@/modules/catalog/public/observations.functions";
-import { getCustomerProductEngagement, askProductQuestion, listProductQuestions, listProductReviews, recordProductEvent, recordRecentProduct, setBackInStockSubscription, toggleWishlistProduct } from "@/modules/engagement/public/customer-engagement.functions";
+import { getCustomerProductEngagement, askProductQuestion, listProductQuestions, listProductReviews, recordRecentProduct, setBackInStockSubscription, toggleWishlistProduct } from "@/modules/engagement/public/customer-engagement.functions";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { formatGhs } from "@/modules/shared/public/money";
 import type { JsonValue, ProductVariant } from "@/modules/shared/public/types";
@@ -85,7 +85,6 @@ function ProductContent() {
     const receipt=recallDiscoveryReceipt(productId);if(receipt)void recordSearchObservation({data:{receipt,eventType:'view'}}).catch(()=>undefined);
     let active = true;
     void listProductQuestions({ data: { productId } }).then(rows => { if (active) setQuestions(rows); }).catch(() => undefined);
-    if(!receipt)void recordProductEvent({ data: { eventId: `view_${crypto.randomUUID().replaceAll("-", "")}`, productId, eventType: "view" } }).catch(() => undefined);
     void listProductReviews({ data: { productId, limit: 10 } }).then(result => { if (active) { setReviews(result.reviews); setReviewCursor(result.nextBefore); } }).catch(() => undefined);
     try {
       const value: unknown = JSON.parse(localStorage.getItem("elemarket:compare-products") ?? "[]");
@@ -108,7 +107,7 @@ function ProductContent() {
     if (wishlistPending.current || engagementLoading) return;
     wishlistPending.current = true; setEngagementBusy(true);
     const actor = user.id;
-    try { const result = await toggleWishlistProduct({ data: { productId } }); if (account.current === actor) { setSaved(result.saved);if(result.saved){const receipt=recallDiscoveryReceipt(productId);if(receipt)void recordSearchObservation({data:{receipt,eventType:'wishlist'}}).catch(()=>undefined);} setEngagementMessage(result.saved ? "Saved to your wishlist." : "Removed from your wishlist."); } }
+    try { const result = await toggleWishlistProduct({ data: { productId } }); if (account.current === actor) { setSaved(result.saved); setEngagementMessage(result.saved ? "Saved to your wishlist." : "Removed from your wishlist."); } }
     catch { if (account.current === actor) setEngagementMessage("Could not update your wishlist."); }
     finally { wishlistPending.current = false; setEngagementBusy(false); }
   }
@@ -140,7 +139,7 @@ function ProductContent() {
     description: product.description || undefined,
     sku: product.sku || undefined,
     brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
-    image: product.imagePath ? [product.imagePath] : undefined,
+    image: safeImageSource(product.imagePath) ? [safeImageSource(product.imagePath)] : undefined,
     url: `/products/${encodeURIComponent(product.id)}`,
     offers: {
       "@type": "Offer",
@@ -154,8 +153,6 @@ function ProductContent() {
   const attributes: Array<[string, JsonValue]> = Object.entries({ ...product.attributes, ...(selectedVariant?.attributes ?? {}) }).filter(([_, value]) => value !== null && value !== undefined && value !== "");
   const addToCart = () => {
     const attributionReceipt=recallDiscoveryReceipt(product.id);
-    if(attributionReceipt)void recordSearchObservation({data:{receipt:attributionReceipt,eventType:'add_to_cart'}}).catch(()=>undefined);
-    if(!attributionReceipt)void recordProductEvent({data:{eventId:`cart_${crypto.randomUUID().replaceAll("-","")}`,productId:product.id,eventType:"add_to_cart"}}).catch(()=>undefined);
     const next = addCartLine({
       productId: product.id,
       variantId: selectedVariant?.id ?? null,

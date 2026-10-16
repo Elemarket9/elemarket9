@@ -55,10 +55,12 @@ export async function createExecutiveChallenge(request,{operation}) {
     if (!ownerLock.length) throw new Error('Executive account unavailable');
     const counts = await tx.query(`select
         count(*) filter (where ip_digest=$1)::integer as per_ip,
-        count(*)::integer as total
+        count(*) filter (where expires_at>now() and consumed_at is null)::integer as active_total
       from executive_face_challenges
       where user_id=$2 and created_at>now()-interval '10 minutes'`,[ipDigest,userId]);
-    if (Number(counts[0]?.per_ip) >= 8 || Number(counts[0]?.total) >= 160)
+    // Attackers cannot lock out face-login for 10 minutes merely by burning
+    // globally counted expired/consumed challenges. Capacity recovers in <=90s.
+    if (Number(counts[0]?.per_ip) >= 8 || Number(counts[0]?.active_total) >= 160)
       throw new Error('Too many authentication attempts');
     const profile = await tx.query(`select enabled,locked_until from executive_face_profiles where user_id=$1`,[userId]);
     if (operation === 'login') {

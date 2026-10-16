@@ -83,7 +83,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
                   (o.status in ('delivered','completed') and delivered.delivered_at is not null and now() >= delivered.delivered_at + interval '24 hours' and not active_dispute.exists_flag and window_dispute.dispute_at is null) as withdrawal_eligible,
                   window_dispute.dispute_at as dispute_filed_at
              from orders o
-             left join lateral (select max(h.created_at) as delivered_at from merchant_order_status_history h where h.order_id=o.id and h.to_status='delivered') delivered on true
+             left join lateral (select elemarket_order_delivered_at(o.id) as delivered_at) delivered on true
              left join lateral (select exists(select 1 from customer_order_disputes d where d.order_id=o.id and d.status in ('open','under_review')) as exists_flag) active_dispute on true
              left join lateral (select min(d.created_at) as dispute_at from customer_order_disputes d where d.order_id=o.id and delivered.delivered_at is not null and d.created_at <= delivered.delivered_at + interval '24 hours') window_dispute on true
             where o.merchant_id=$1 order by o.created_at desc limit 100`,[merchant.merchant_id]),

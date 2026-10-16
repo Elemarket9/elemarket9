@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getEmailAdapter } from "./email/registry.server";
 
-type AuthEmailKind = "verification" | "password_reset";
+type AuthEmailKind = "verification" | "password_reset" | "rider_invitation";
 
 type AuthEmailInput = {
   kind: AuthEmailKind;
@@ -28,11 +28,15 @@ export async function sendAuthEmail(input: AuthEmailInput): Promise<void> {
   const adapter = getEmailAdapter();
   const safeName = escapeHtml(input.name);
   const safeUrl = escapeHtml(input.url);
-  const subject = input.kind === "password_reset" ? "Reset your ELEMARKET password" : "Verify your ELEMARKET email";
-  const text = input.kind === "password_reset"
+  const subject = input.kind === "password_reset" ? "Reset your ELEMARKET password" : input.kind === "rider_invitation" ? "Your ELEMARKET delivery rider invitation" : "Verify your ELEMARKET email";
+  const text = input.kind === "rider_invitation"
+    ? `Hello ${input.name}, a delivery company invited you to ELEMARKET. Log in with your OWN verified email and phone, then review and accept at ${input.url}. No manager can accept for you.`
+    : input.kind === "password_reset"
     ? `Hello ${input.name}, use this link to reset your ELEMARKET password: ${input.url}`
     : `Hello ${input.name}, verify your ELEMARKET email: ${input.url}`;
-  const html = input.kind === "password_reset"
+  const html = input.kind === "rider_invitation"
+    ? `<div style="font-family:Arial,sans-serif;line-height:1.5;max-width:560px;margin:auto"><h2>Delivery rider invitation</h2><p>Hello ${safeName},</p><p>Log in with your own verified ELEMARKET identity to review your rider invitation.</p><p><a href="${safeUrl}">Review invitation</a></p><p>No one else may accept this invitation for you.</p></div>`
+    : input.kind === "password_reset"
     ? `<div style="font-family:Arial,sans-serif;line-height:1.5;max-width:560px;margin:auto"><h2>Reset your ELEMARKET password</h2><p>Hello ${safeName},</p><p><a href="${safeUrl}">Reset your password</a></p><p>This link expires according to your account recovery policy.</p></div>`
     : `<div style="font-family:Arial,sans-serif;line-height:1.5;max-width:560px;margin:auto"><h2>Verify your ELEMARKET email</h2><p>Hello ${safeName},</p><p><a href="${safeUrl}">Verify your email address</a></p></div>`;
   const result = await adapter.send({

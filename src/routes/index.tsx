@@ -1,7 +1,6 @@
 import {DiscoveryProductCard} from '@/components/discovery-product-card';
 import {parseDiscoveryState,discoveryFacetOptions,discoveryIdentity,hasDiscoveryFilters,priceRange,appendDiscoveryPage,type DiscoveryState} from '@/modules/catalog/public/discovery-state';
 import * as Dialog from '@radix-ui/react-dialog';
-import { recordSearchObservation } from '@/modules/catalog/public/observations.functions';
 import { portalHref } from "@/lib/portal-links";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -41,7 +40,7 @@ import { ContactSupportWidget } from "@/components/contact-support-widget";
 import { MarketFooter } from "@/components/market-header";
 import { safeImageSource } from "@/modules/shared/public/media";
 import { loadHomepageMerchandising, recordHomepageAdEvent } from "../modules/catalog/public/transport/homepage.functions";
-import { recordProductEvent, saveSearch, searchSuggestions } from "@/modules/engagement/public/customer-engagement.functions";
+import { saveSearch, searchSuggestions } from "@/modules/engagement/public/customer-engagement.functions";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import type { HomepageSection } from "../modules/catalog/public/transport/homepage.functions";
 
@@ -112,9 +111,9 @@ function Home() {
   }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addedNotice, setAddedNotice] = useState(false);
-  const recordAd = (campaignId: string, eventType: "impression" | "click") => {
-    if (!campaignId) return;
-    void recordHomepageAdEvent({ data: { eventId: `${crypto.randomUUID()}${Math.random().toString(36).slice(2, 10)}`, campaignId, eventType } }).catch(() => undefined);
+  const recordAd = (campaignId: string, eventType: "impression" | "click", receipt:string) => {
+    if (!campaignId || !receipt) return;
+    void recordHomepageAdEvent({ data: { eventId: `${crypto.randomUUID()}${Math.random().toString(36).slice(2, 10)}`, campaignId, eventType, receipt } }).catch(() => undefined);
   };
 
 
@@ -162,8 +161,6 @@ function Home() {
   };
 
   const addProductToCart = (product: ProductCard) => {
-    if(product.attributionReceipt)void recordSearchObservation({data:{receipt:product.attributionReceipt,eventType:"add_to_cart"}}).catch(()=>undefined);
-    if(!product.attributionReceipt)void recordProductEvent({data:{eventId:`cart_${crypto.randomUUID().replaceAll("-","")}`,productId:product.id,eventType:"add_to_cart"}}).catch(()=>undefined);
     const next = addCartLine({ productId: product.id, variantId: null, name: product.name, price: product.price, imagePath: product.imagePath, merchantId: product.merchantId, stock: product.stock,attributionReceipt:product.attributionReceipt });
     setCart(next.reduce<Record<string, number>>((totals, line) => { totals[line.productId] = (totals[line.productId] ?? 0) + line.quantity; return totals; }, {}));
     setAddedNotice(true);
@@ -323,8 +320,8 @@ function FlashSaleCountdown({ endsAt }: { endsAt?: string }) {
   return remaining?<span className="rounded-lg bg-market-ink px-2.5 py-1.5 text-xs font-black tabular-nums text-white">Ends in {remaining}</span>:null;
 }
 
-function HomepageMerchandising({ sections,onAdClick,cart,onAdd }: { sections:HomepageSection[]; onAdClick:(id:string,type:"impression"|"click")=>void; cart:Record<string,number>; onAdd:(product:ProductCard)=>void }) {
-  return <>{sections.map(section=>{ if(!section.items.length)return null; const flash=section.key==="flash_sales"; const official=section.key==="official_stores"; return <section key={section.key} className={`mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 ${section.mobileVisible===false?"hidden sm:block":""} ${section.desktopVisible===false?"sm:hidden":""}`}><div className={`mb-4 flex flex-wrap items-end justify-between gap-3 ${flash?"rounded-2xl bg-market-orange px-4 py-3 text-white":""}`}><div><p className={flash?"text-[11px] font-black uppercase tracking-[.14em] text-white/80":"eyebrow"}>{section.eyebrow??"Discover"}</p><h2 className={flash?"text-xl font-black sm:text-2xl":"section-title"}>{section.title}</h2></div><div className="flex items-center gap-3">{flash?<FlashSaleCountdown endsAt={section.items[0]?.saleEndsAt}/>:null}<a href="#catalogue" className={`inline-flex items-center gap-1 text-sm font-bold ${flash?"text-white":"text-market-green"}`}>Browse catalogue <ArrowRight size={15}/></a></div></div><div className={flash?"flex snap-x gap-3 overflow-x-auto pb-2":"grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"}>{section.items.map(product=><div key={`${section.key}:${product.id}:${product.adId??"organic"}`} className={flash?"w-[72vw] max-w-[230px] shrink-0 snap-start sm:w-[230px]":"min-w-0"}><DiscoveryProductCard product={product} quantity={cart[product.id]??0} sponsored={Boolean(product.sponsored)} officialStore={official} originalPrice={product.originalPrice} adTitle={product.adTitle} adSubtitle={product.adSubtitle} onAdClick={product.adId?()=>onAdClick(product.adId!,"click"):undefined} onAdImpression={product.adId?()=>onAdClick(product.adId!,"impression"):undefined} onAdd={()=>onAdd(product)}/></div>)}</div></section>; })}</>;
+function HomepageMerchandising({ sections,onAdClick,cart,onAdd }: { sections:HomepageSection[]; onAdClick:(id:string,type:"impression"|"click",receipt:string)=>void; cart:Record<string,number>; onAdd:(product:ProductCard)=>void }) {
+  return <>{sections.map(section=>{ if(!section.items.length)return null; const flash=section.key==="flash_sales"; const official=section.key==="official_stores"; return <section key={section.key} className={`mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 ${section.mobileVisible===false?"hidden sm:block":""} ${section.desktopVisible===false?"sm:hidden":""}`}><div className={`mb-4 flex flex-wrap items-end justify-between gap-3 ${flash?"rounded-2xl bg-market-orange px-4 py-3 text-white":""}`}><div><p className={flash?"text-[11px] font-black uppercase tracking-[.14em] text-white/80":"eyebrow"}>{section.eyebrow??"Discover"}</p><h2 className={flash?"text-xl font-black sm:text-2xl":"section-title"}>{section.title}</h2></div><div className="flex items-center gap-3">{flash?<FlashSaleCountdown endsAt={section.items[0]?.saleEndsAt}/>:null}<a href="#catalogue" className={`inline-flex items-center gap-1 text-sm font-bold ${flash?"text-white":"text-market-green"}`}>Browse catalogue <ArrowRight size={15}/></a></div></div><div className={flash?"flex snap-x gap-3 overflow-x-auto pb-2":"grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"}>{section.items.map(product=><div key={`${section.key}:${product.id}:${product.adId??"organic"}`} className={flash?"w-[72vw] max-w-[230px] shrink-0 snap-start sm:w-[230px]":"min-w-0"}><DiscoveryProductCard product={product} quantity={cart[product.id]??0} sponsored={Boolean(product.sponsored)} officialStore={official} originalPrice={product.originalPrice} adTitle={product.adTitle} adSubtitle={product.adSubtitle} onAdClick={product.adId?()=>onAdClick(product.adId!,"click",product.adReceipt??""):undefined} onAdImpression={product.adId?()=>onAdClick(product.adId!,"impression",product.adReceipt??""):undefined} onAdd={()=>onAdd(product)}/></div>)}</div></section>; })}</>;
 }
 
 function TrustItem({ icon, title, text }: { icon: ReactNode; title: string; text: string }) { return <div className="flex items-center gap-3 rounded-2xl border border-market-line bg-white p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-market-soft text-market-green">{icon}</div><div><p className="text-sm font-extrabold">{title}</p><p className="text-xs text-market-muted">{text}</p></div></div>; }

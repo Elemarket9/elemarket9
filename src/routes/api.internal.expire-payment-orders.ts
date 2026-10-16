@@ -5,7 +5,7 @@ import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { authorizeScheduledJobRequest } from "@/lib/security/internal-job-auth.server";
 
 async function assertCronAuthorization(request: Request): Promise<void> {
-  if (!(await authorizeScheduledJobRequest(request, process.env.CRON_SECRET, process.env.CRON_SECRET))) {
+  if (!(await authorizeScheduledJobRequest(request, process.env.CRON_SECRET))) {
     throw new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
   }
 }

@@ -276,6 +276,29 @@ export const updateCustomerProfile = createServerFn({ method: "POST" })
       if (existing[0]) throw new Error("That phone number is already registered");
     }
     const address = data.address?.trim() || null;
+    // Do not replace an established contact number through a profile write.
+    // Stage a real old-number VOICE verification request. With no integrated
+    // carrier, the queued change stays pending rather than silently succeeding.
+    const current = await sql.query<{phone:string|null}>(
+      `select phone from profiles where user_id=$1`,[userId]);
+    let phoneChangePending = false;
+    if (current[0]?.phone && current[0].phone !== phone) {
+      if (!phone) throw new Error("Contact removal requires verified account recovery");
+      const pending = await sql.query<{id:string;new_phone:string}>(
+        `select id,new_phone from profile_phone_change_requests where user_id=$1
+          and status in ('pending_old_call','needs_recovery','approved')`,[userId]);
+      if (pending[0] && pending[0].new_phone !== phone)
+        throw new Error("Another phone change is pending; contact support to resolve it");
+      if (!pending[0]) {
+        const changeId=`pc_${crypto.randomUUID().replaceAll('-', '')}`;
+        await sql.query(`insert into profile_phone_change_requests(id,user_id,old_phone,new_phone)
+          values($1,$2,$3,$4)`,[changeId,userId,current[0].phone,phone]);
+        await sql.query(`insert into profile_phone_change_call_outbox(request_id)
+          values($1)`,[changeId]);
+      }
+      phoneChangePending=true;
+    }
+    const savedPhone = phoneChangePending ? (current[0]?.phone ?? null) : phone;
     // Customer coordinates are server-authoritative delivery data. Never accept
     // browser-supplied lat/lon. Clear the cached point whenever the customer
     // changes the address; checkout/quote flow geocodes the authoritative address.
@@ -289,9 +312,9 @@ export const updateCustomerProfile = createServerFn({ method: "POST" })
          lat=null,
          lon=null,
          updated_at=now()`,
-      [userId, data.name, phone, address],
+      [userId, data.name, savedPhone, address],
     );
-    return { saved: true as const };
+    return { saved: true as const, phoneChangePending };
   });
 
 export const getCustomerProfile = createServerFn({ method: "GET" })

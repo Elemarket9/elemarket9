@@ -4,7 +4,7 @@ import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { authorizeScheduledJobRequest } from "@/lib/security/internal-job-auth.server";
 
 async function run(request: Request) {
-  if (!(await authorizeScheduledJobRequest(request, process.env.ELEMARKET_ENTERPRISE_SYNC_SECRET, process.env.CRON_SECRET))) {
+  if (!(await authorizeScheduledJobRequest(request, process.env.ELEMARKET_ENTERPRISE_SYNC_SECRET))) {
     return new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
   }
   await enforceRateLimit("enterprise-order-outbox-global", { identity: "subject", subject: "authenticated-scheduler", windowSeconds: 60, maxRequests: 30 });

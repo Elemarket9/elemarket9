@@ -21,21 +21,6 @@ const reviewSchema = z.object({
 });
 
 
-export const confirmOrderReceived = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator(z.object({ orderId: z.string().trim().min(1).max(128) }))
-  .handler(async ({ data, context }) => {
-    const userId = getAuthenticatedUserId(context);
-    await requireCustomerForUserId(userId);
-    await enforceRateLimit("customer-order-received", { windowSeconds: 3600, maxRequests: 20, subject: userId });
-    const sql = await getSql();
-    const rows = await sql.query<{ result: unknown }>(
-      `select customer_confirm_order_received($1,$2) as result`,
-      [data.orderId, userId],
-    );
-    return rows[0]?.result ?? null;
-  });
-
 export const requestOrderReturn = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(returnSchema)

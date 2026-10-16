@@ -1,4 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
 
@@ -35,7 +35,7 @@ export type PendingCheckoutInput = z.infer<typeof pendingCheckoutSchema>;
 const PAYMENT_METHODS = ["mobile_money", "card", "bank_transfer"] as const;
 export type CheckoutPaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-async function availableCheckoutPaymentMethods() {
+const availableCheckoutPaymentMethods = createServerOnlyFn(async () => {
   const { getSql } = await import("@/lib/db");
   const sql = await getSql();
   const rows = await sql.query<{
@@ -65,7 +65,7 @@ async function availableCheckoutPaymentMethods() {
     }
   }
   return [...available];
-}
+});
 
 export const listAvailableCheckoutPaymentMethods = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
@@ -76,7 +76,7 @@ export const listAvailableCheckoutPaymentMethods = createServerFn({ method: "GET
     return availableCheckoutPaymentMethods();
   });
 
-export async function createPendingCheckoutServer(data: PendingCheckoutInput, userId: string) {
+export const createPendingCheckoutServer = createServerOnlyFn(async (data: PendingCheckoutInput, userId: string) => {
   const [{ getSql }, { requireCustomerForUserId }, { enforceRateLimit }] = await Promise.all([
     import("@/lib/db"),
     import("@/modules/identity/public/auth/authorization.server"),
@@ -84,6 +84,7 @@ export async function createPendingCheckoutServer(data: PendingCheckoutInput, us
   ]);
   await requireCustomerForUserId(userId);
   await enforceRateLimit("checkout-create", { windowSeconds: 60, maxRequests: 8, subject: userId });
+  await enforceRateLimit("checkout-create-account", { identity:"subject", windowSeconds:60, maxRequests:15, subject:userId });
   if (!(await availableCheckoutPaymentMethods()).includes(data.method)) {
     throw new Error("The selected payment method has no configured, enabled payment provider.");
   }
@@ -137,7 +138,7 @@ export async function createPendingCheckoutServer(data: PendingCheckoutInput, us
   );
   if (!orders.length) throw new Error("Checkout group has no owned payable orders");
   return { groupId: result.groupId, replay: "replay" in result && result.replay === true, orders };
-}
+});
 
 export const createPendingCheckout = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

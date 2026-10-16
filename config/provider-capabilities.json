@@ -63,5 +63,12 @@
         "FYLINGS_API_KEY"
       ]
     }
+  },
+  "handover_sms": {
+    "arkesel": {
+      "requiredEnv": [
+        "ARKESEL_API_KEY"
+      ]
+    }
   }
 }

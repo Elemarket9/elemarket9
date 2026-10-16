@@ -10,3 +10,6 @@ tests
 *.zip
 npm-debug.log*
 .DS_Store
+.verification-postgres
+verification
+artifacts

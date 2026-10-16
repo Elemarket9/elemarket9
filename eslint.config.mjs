@@ -14,6 +14,9 @@ export default tseslint.config(
       ".vercel/**",
       ".nitro/**",
       "node_modules/**",
+      ".verification-postgres/**",
+      "verification/**",
+      "artifacts/**",
       // Licensed upstream code with narrow security fixes; checked by mobile CI.
       "mobile/security/braces/**",
       "mobile/security/node-forge/**",

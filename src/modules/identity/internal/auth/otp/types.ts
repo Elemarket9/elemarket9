@@ -3,7 +3,8 @@ export type OtpPurpose =
   | "login"
   | "phone_verification"
   | "password_reset"
-  | "transactional";
+  | "transactional"
+  | "delivery_handover";
 
 export type OtpProviderCode = "accepted" | "verified" | "invalid" | "expired" | "rejected";
 
@@ -13,6 +14,7 @@ export type OtpGenerateInput = {
   length: number;
   message: string;
   senderId?: string;
+  purpose?: OtpPurpose;
 };
 
 export type OtpGenerateResult = {

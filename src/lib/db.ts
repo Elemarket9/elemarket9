@@ -1,5 +1,6 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { getElemarketEnvironment } from "./env.server";
+import {observePostgresPool} from "./postgres-pool.server";
 
 /** Which database backend is active. */
 export type DbSource = "postgres" | "pglite";
@@ -103,7 +104,7 @@ function createPostgresSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    globalRef.__pgPoolPromise__ ??= Promise.resolve(new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000, allowExitOnIdle: true }));
+    globalRef.__pgPoolPromise__ ??= Promise.resolve(observePostgresPool(new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000, allowExitOnIdle: true })));
     const pool = await globalRef.__pgPoolPromise__;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
@@ -125,14 +126,14 @@ const intelligencePools = globalThis as typeof globalThis & {
 async function isolatedSql(lane: "discovery" | "maintenance"): Promise<Sql> {
   if (!databaseUrl) return getSql();
   const key = lane === "discovery" ? "__elemarketDiscoveryPool" : "__elemarketMaintenancePool";
-  intelligencePools[key] ??= import("pg").then(({Pool}) => new Pool({
+  intelligencePools[key] ??= import("pg").then(({Pool}) => observePostgresPool(new Pool({
     connectionString: databaseUrl,
     max: lane === "discovery" ? 2 : 1,
     connectionTimeoutMillis: 1000,
     idleTimeoutMillis: 30000,
     allowExitOnIdle: true,
     options: `-c statement_timeout=${lane === "discovery" ? 1500 : 4000} -c lock_timeout=250`,
-  }));
+  })));
   const pool = await intelligencePools[key];
   return toSql(async <T>(text: string, params: unknown[]) => {
     const result = await pool.query(text, params); return result.rows as T[];
@@ -238,6 +239,9 @@ export async function withTransaction<T>(work: (sql: Sql) => Promise<T>): Promis
     const pool = await globalRef.__pgPoolPromise__;
     if (!pool) throw new Error("PostgreSQL pool failed to initialize");
     const client = await pool.connect();
+    let discard=false;
+    const connectionFailed=()=>{discard=true;};
+    client.on('error',connectionFailed);
     const txSql = toSql(async <R>(text: string, params: unknown[]) => {
       const res = await client.query(text, params);
       return res.rows as R[];
@@ -248,10 +252,11 @@ export async function withTransaction<T>(work: (sql: Sql) => Promise<T>): Promis
       await client.query("COMMIT");
       return result;
     } catch (error) {
-      try { await client.query("ROLLBACK"); } catch { /* preserve original failure */ }
+      try { await client.query("ROLLBACK"); } catch { discard=true; /* preserve original failure */ }
       throw error;
     } finally {
-      client.release();
+      client.release(discard);
+      client.off('error',connectionFailed);
     }
   }
   await getSql();

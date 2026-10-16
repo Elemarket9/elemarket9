@@ -1,0 +1,17 @@
+# Delivery state contract
+
+`deliveryTransportTransitions` is the application contract. PostgreSQL's `enforce_delivery_job_transition()` is the mandatory transactional enforcement boundary. `operationalDeliveryTransitions()` removes `delivered`: no dispatcher, provider callback or generic operations credential can select receipt.
+
+Transport transitions: assigned → accepted/cancelled; accepted → picked_up/failed/cancelled; picked_up → in_transit/failed; in_transit → delivered/failed; delivered or failed → return_requested; return_requested → returned. Returned and cancelled are terminal. Failed transport can return to sender without inventing customer receipt.
+
+Handover is a projection of transport and immutable evidence, not another independently writable status field: assigned/in transit → arrived → challenge requested (`issuing`) → OTP issued/awaiting verification (`issued`, challenge `pending`) → verified challenge plus consumed verifier and immutable handover → receipt confirmed. Failed issuance becomes `failed`; expiry requires a new challenge, not reuse. Pickup arrival records custody and queues a readiness notification; it never issues a code.
+
+The actual authenticated assigned person explicitly requests the code. A delivery job requires an independently accepted rider capability. A pickup job requires an independently accepted attendant capability plus active membership at the parcel's exact collection location. An administrative role alone satisfies neither.
+
+Lock order for handover is organization → provider → base membership → delivery capability/organization capability → pickup location/attendant (if applicable) → order → job → request/challenge/verifier/evidence. Fulfillment mutations lock the order before shipment/items. Management locks the organization before live membership checks. Provider reassignment locks both organizations in sorted identity order, invalidates outstanding requests/challenges, and clears personnel. The replacement must be explicitly assigned. Verified receipts never transfer.
+
+Generation reserves the job before SMS, commits the purpose-bound challenge, sends through the adapter outside the transaction, and revalidates live authority before binding issuance. Verification locks/rechecks authority and consumes the code, verifier, handover, shipment clock/protection deadline and aggregate order state in one transaction. Failed attempts commit their attempt counter; invalid codes never establish receipt. Late storage failure rolls back the entire receipt transaction. A repeated successful verification returns its existing evidence and never restarts protection.
+
+Support holds, cancellation, capability or provider suspension, reassignment and approved contact recovery must win their corresponding locks before they can invalidate authority. Losing operations reject or roll back; deadlock/connection errors must be retried as whole requests, never as partial confirmation. Local regression evidence covers only the scenarios recorded in the report, not every possible failure schedule.
+
+Receipt and return are distinct: a later return preserves the original receipt time and 24-hour deadline. Each shipment is independently verified; order-wide eligibility requires all physical quantities and jobs. External payout restrictions and refund execution require actual provider contracts/evidence. A return request or protection deadline is not a funds hold.

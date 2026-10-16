@@ -7,31 +7,12 @@ import { getRequest } from '@tanstack/react-start/server';
 import { requireSameOrigin, faceEngineConfigured, requireExecutiveHost, createExecutiveChallenge, enrollExecutiveProfile, revokeExecutiveFaceProfile } from '@/modules/identity/public/auth/executive/server';
 
 const noStore = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
+import { readBodyWithLimit } from '@/lib/security/body.server';
+
 async function readJson(request: Request): Promise<Record<string,unknown>> {
-  // A spoofed Content-Length is not a limit. Read incrementally and stop
-  // before an attacker can force us to buffer a huge biometric upload.
-  const MAX_BODY_BYTES = 2_200_000;
-  const announced = request.headers.get('content-length');
-  if (announced && (!/^\d+$/.test(announced) || Number(announced) > MAX_BODY_BYTES)) {
-    throw new Error('Body too large');
-  }
-  if (!request.body) throw new Error('Invalid request');
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const {done,value} = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_BODY_BYTES) throw new Error('Body too large');
-      chunks.push(value);
-    }
-  } finally { await reader.cancel().catch(() => {}); }
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const part of chunks) { bytes.set(part,offset); offset += part.byteLength; }
-  const value = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+  const raw = await readBodyWithLimit(request, 2_200_000, 10_000);
+  if (!raw) throw new Error('Invalid request');
+  const value = JSON.parse(raw);
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid request');
   return value as Record<string,unknown>;
 }
@@ -101,7 +82,7 @@ export const Route = createFileRoute('/api/executive/face')({
       } catch (error) {
         // Do not leak which factor or biometric check failed; no captures logged.
         const msg = error instanceof Error ? error.message : '';
-        const status = msg === 'Body too large' ? 413 : 403;
+        const status = msg === 'Payload too large' ? 413 : msg === 'Request body timed out' ? 408 : 403;
         return data({error:'Executive verification refused or unavailable'},status);
       }
     },

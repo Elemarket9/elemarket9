@@ -18,6 +18,7 @@ export const Route = createFileRoute("/api/mobile/payment-intent")({
     await requireCustomerForUserId(current.user.id);
     try {
       await enforceRateLimit("customer-payment-intent", { windowSeconds: 60, maxRequests: 8, subject: current.user.id });
+      await enforceRateLimit("customer-payment-intent-account", { identity:"subject", windowSeconds:60, maxRequests:12, subject:current.user.id });
     } catch (error) {
       const limited = rateLimitResponse(error);
       if (limited) return limited;

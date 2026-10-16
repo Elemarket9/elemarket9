@@ -10,7 +10,6 @@ export const Route = createFileRoute("/api/internal/brand-integration-worker")({
         if (!(await authorizeInternalHmacRequest(
           request,
           process.env.ELEMARKET_ENTERPRISE_SYNC_SECRET,
-          process.env.CRON_SECRET,
         ))) {
           return new Response("Unauthorized", { status: 401, headers: { "cache-control": "no-store" } });
         }

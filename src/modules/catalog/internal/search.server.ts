@@ -91,7 +91,16 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
   // One source of truth for price filters, sorting, scoring, and displayed cards.
   const listingPrice=`coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price)`;
   for(const [op,value] of [['>=',data.minPrice],['<=',data.maxPrice],['>=',plan.hardFloor],['<=',plan.hardCeiling]] as const)if(value!=null)where.push(`(${listingPrice})${op}${add(value,'numeric')}`);
-  if(data.lat!=null&&data.lon!=null){const lat=add(data.lat,'double precision'),lon=add(data.lon,'double precision'),radius=add(data.radiusKm??100,'double precision');where.push(`6371*2*asin(sqrt(least(1,greatest(0,power(sin(radians(m.lat-${lat})/2),2)+cos(radians(${lat}))*cos(radians(m.lat))*power(sin(radians(m.lon-${lon})/2),2)))))<=${radius}`);}
+  if(data.lat!=null&&data.lon!=null){
+    const lat=add(data.lat,'double precision'),lon=add(data.lon,'double precision'),radius=add(data.radiusKm??100,'double precision');
+    // NEVER run the public radius predicate over precise m.lat/m.lon. Matching
+    // is calculated from fixed ~11 km cells for both endpoints, just like
+    // catalog.ts publicDistanceKm. Delivery/dispatch uses separate exact coords.
+    const grid=(v:string)=>`(floor((${v})*10.0)/10.0+0.05)`;
+    const merchantLat=grid('m.lat'),merchantLon=grid('m.lon');
+    const userLat=grid(lat),userLon=grid(lon);
+    where.push(`6371*2*asin(sqrt(least(1,greatest(0,power(sin(radians(${merchantLat}-${userLat})/2),2)+cos(radians(${userLat}))*cos(radians(${merchantLat}))*power(sin(radians(${merchantLon}-${userLon})/2),2)))))<=${radius}`);
+  }
   const groups=plan.groups;
   const tsOriginal=groups.length?groups.map(g=>`plainto_tsquery('simple',${add(g[0])})`).join(' && '):null;
   const tsExpanded=groups.length?groups.map(g=>`(${g.map(t=>`plainto_tsquery('simple',${add(t)})`).join(' || ')})`).join(' && '):null;

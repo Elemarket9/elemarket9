@@ -4,6 +4,7 @@ import { decryptMerchantSensitiveData, encryptMerchantSensitiveData } from "@/li
 import { assertPublicHttpsEndpoint } from "@/lib/security/ssrf.server";
 import { pinnedGet } from "@/modules/merchants/internal/enterprise-catalog.server";
 import { CATEGORY_KEYS, isValidSubcategory } from "@/modules/shared/public/categories";
+import { approvedPublicMediaUrl } from "@/lib/security/public-media-origin.server";
 
 export type BrandConnectorType = "rest_json" | "csv" | "xml" | "erp_oms_wms" | "manual_feed";
 export type BrandEnvironment = "sandbox" | "production";
@@ -80,7 +81,7 @@ function validateExternalImageUrl(value: string | undefined): string | undefined
     const url = new URL(value);
     if (url.protocol !== "https:" || url.username || url.password || url.port) return undefined;
     if (url.hostname.length > 253 || url.search.length > 1024 || url.pathname.length > 2048) return undefined;
-    return url.toString().slice(0, 2000);
+    return approvedPublicMediaUrl(url.toString().slice(0, 2000));
   } catch {
     return undefined;
   }

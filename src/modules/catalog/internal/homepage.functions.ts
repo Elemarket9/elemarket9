@@ -15,10 +15,10 @@ import { env, isWorkspacePreview } from "@/lib/env.server";
 export type HomepageSection = {
   key: string; title: string; eyebrow: string | null; priority: number; maxItems: number;
   mobileVisible: boolean; desktopVisible: boolean;
-  items: Array<ProductCard & { sponsored?: boolean; adId?: string; adTitle?: string; adSubtitle?: string; destinationType?: string; destinationId?: string; originalPrice?: string; saleEndsAt?: string }>;
+  items: Array<ProductCard & { sponsored?: boolean; adId?: string; adReceipt?: string; adTitle?: string; adSubtitle?: string; destinationType?: string; destinationId?: string; originalPrice?: string; saleEndsAt?: string }>;
 };
 
-const productSelect = `select p.id,p.merchant_id,m.name as merchant_name,m.neighborhood,m.city,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,p.return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text as price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,(select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,(select count(*)::int from reviews r where r.product_id=p.id) as review_count,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,m.address as merchant_address from products p join merchants m on m.id=p.merchant_id and m.status='active' and m.verified=true join category_taxonomy ct on ct.category_key=p.category and ct.active=true left join category_subcategories cs on cs.category_key=p.category and cs.subcategory_key=p.subcategory`;
+const productSelect = `select p.id,p.merchant_id,m.name as merchant_name,m.neighborhood,m.city,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,p.return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text as price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,(select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,(select count(*)::int from reviews r where r.product_id=p.id) as review_count,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) as merchant_address from products p join merchants m on m.id=p.merchant_id and m.status='active' and m.verified=true join category_taxonomy ct on ct.category_key=p.category and ct.active=true left join category_subcategories cs on cs.category_key=p.category and cs.subcategory_key=p.subcategory`;
 
 function rowToProduct(r: any): ProductCard {
   return {
@@ -64,10 +64,34 @@ function ensureAdVisitor():string {
   return nonce;
 }
 
+/** Signed proof that this campaign was actually included in a served homepage
+ * response for this browser visitor. This is not fraud-proof human viewing. */
+function createAdReceipt(campaignId:string, visitor:string, placement:string):string {
+  const expires=Math.floor(Date.now()/1000)+10*60;
+  const payload=`${campaignId}|${placement}|${visitor}|${expires}`;
+  const mac=createHmac("sha256",adVisitorSecret()).update(payload).digest("base64url");
+  return `${expires}.${mac}`;
+}
+function verifyAdReceipt(receipt:string,campaignId:string,visitor:string,placement:string):boolean {
+  const pieces=/^(\d{10})\.([A-Za-z0-9_-]{43})$/.exec(receipt);
+  if(!pieces)return false;
+  const expires=Number(pieces[1]);
+  const now=Math.floor(Date.now()/1000);
+  // Limit receipt farming: a campaign can only be reported after the card has
+  // had time to be displayed. This is abuse friction, NOT proof of a human view.
+  if(expires<now||expires>now+598)return false;
+  const payload=`${campaignId}|${placement}|${visitor}|${expires}`;
+  const expected=createHmac("sha256",adVisitorSecret()).update(payload).digest("base64url");
+  const provided=pieces[2];
+  // Compare canonical encoded MACs. Decoding base64url directly can accept
+  // alternate encodings of the same trailing pad bits.
+  return provided.length===expected.length && timingSafeEqual(Buffer.from(expected),Buffer.from(provided));
+}
+
 export const loadHomepageMerchandising = createServerFn({ method:"GET" })
   .validator(z.object({ city:z.string().trim().min(2).max(80).optional() }).optional())
   .handler(async ({data}) => {
-    ensureAdVisitor();
+    const adVisitor=ensureAdVisitor();
     await enforceRateLimit("homepage-merchandising", {windowSeconds:60,maxRequests:120});
     const sql=await getDiscoverySql(); const city=data?.city?.trim() || null;
     const configs=await sql.query<any>(`select section_key,title,eyebrow,priority,max_items,mobile_visible,desktop_visible from homepage_sections where active=true order by priority,section_key`);
@@ -84,7 +108,7 @@ export const loadHomepageMerchandising = createServerFn({ method:"GET" })
         const placement=section.section_key;
         const args:any[]=[placement,section.max_items]; let cityClause='';
         if(city){args.push(city);cityClause=` and (c.target_city is null or lower(c.target_city)=lower($${args.length}))`;}
-        rows=await sql.query<any>(`select c.id ad_id,c.title ad_title,c.subtitle ad_subtitle,c.destination_type,c.destination_id,p.id,p.merchant_id,m.name as merchant_name,m.neighborhood,m.city,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,p.return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text as price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,(select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,(select count(*)::int from reviews r where r.product_id=p.id) as review_count,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,m.address as merchant_address from homepage_ad_campaigns c join products p on p.id=c.product_id join merchants m on m.id=p.merchant_id and m.status='active' and m.verified=true join category_taxonomy ct on ct.category_key=p.category and ct.active=true left join category_subcategories cs on cs.category_key=p.category and cs.subcategory_key=p.subcategory where c.placement=$1 and c.status in ('active','scheduled') and c.starts_at<=now() and c.ends_at>now() and p.status='active' and p.stock>0 and (p.subcategory is null or cs.active=true) and (p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections bc on bc.id=o.connection_id where o.product_id=p.id and o.status='active' and bc.status='active' and o.last_seen_at>=now()-make_interval(secs=>bc.stale_after_seconds))) and m.status='active' and m.verified=true ${cityClause} and (c.max_impressions is null or c.impression_count<c.max_impressions) and (c.target_category is null or lower(c.target_category)=lower(p.category)) and (c.placement <> 'food_spotlight' or p.listing_type='food') order by c.priority,c.created_at desc limit $2`,args);
+        rows=await sql.query<any>(`select c.id ad_id,c.title ad_title,c.subtitle ad_subtitle,c.destination_type,c.destination_id,p.id,p.merchant_id,m.name as merchant_name,m.neighborhood,m.city,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,p.return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text as price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,(select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,(select count(*)::int from reviews r where r.product_id=p.id) as review_count,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) as merchant_address from homepage_ad_campaigns c join products p on p.id=c.product_id join merchants m on m.id=p.merchant_id and m.status='active' and m.verified=true join category_taxonomy ct on ct.category_key=p.category and ct.active=true left join category_subcategories cs on cs.category_key=p.category and cs.subcategory_key=p.subcategory where c.placement=$1 and c.status in ('active','scheduled') and c.starts_at<=now() and c.ends_at>now() and p.status='active' and p.stock>0 and (p.subcategory is null or cs.active=true) and (p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections bc on bc.id=o.connection_id where o.product_id=p.id and o.status='active' and bc.status='active' and o.last_seen_at>=now()-make_interval(secs=>bc.stale_after_seconds))) and m.status='active' and m.verified=true ${cityClause} and (c.max_impressions is null or c.impression_count<c.max_impressions) and (c.target_category is null or lower(c.target_category)=lower(p.category)) and (c.placement <> 'food_spotlight' or p.listing_type='food') order by c.priority,c.created_at desc limit $2`,args);
       } else if (section.section_key==='new_arrivals') {
         rows=await sql.query<any>(`${productSelect} where p.status='active' and p.stock>0 and (p.subcategory is null or cs.active=true) and (p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections bc on bc.id=o.connection_id where o.product_id=p.id and o.status='active' and bc.status='active' and o.last_seen_at>=now()-make_interval(secs=>bc.stale_after_seconds))) order by p.created_at desc limit $1`,[section.max_items]);
       } else if (section.section_key==='top_sellers') {
@@ -94,7 +118,7 @@ export const loadHomepageMerchandising = createServerFn({ method:"GET" })
       } else if (section.section_key==='official_stores') {
         rows=await sql.query<any>(`${productSelect} where p.status='active' and p.stock>0 and (p.subcategory is null or cs.active=true) and (p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections bc on bc.id=o.connection_id where o.product_id=p.id and o.status='active' and bc.status='active' and o.last_seen_at>=now()-make_interval(secs=>bc.stale_after_seconds))) and m.verified=true and m.tier in ('official','enterprise') order by m.tier desc,p.created_at desc limit $1`,[section.max_items]);
       }
-      result.push({key:section.section_key,title:section.title,eyebrow:section.eyebrow,priority:section.priority,maxItems:section.max_items,mobileVisible:section.mobile_visible,desktopVisible:section.desktop_visible,items:rows.map((r:any)=>({...rowToProduct(r),...(r.ad_id?{sponsored:true,adId:r.ad_id,adTitle:r.ad_title,adSubtitle:r.ad_subtitle,destinationType:r.destination_type,destinationId:r.destination_id}:{}),...(r.original_price?{originalPrice:String(r.original_price)}:{}),...(r.sale_ends_at?{saleEndsAt:String(r.sale_ends_at)}:{})}))});
+      result.push({key:section.section_key,title:section.title,eyebrow:section.eyebrow,priority:section.priority,maxItems:section.max_items,mobileVisible:section.mobile_visible,desktopVisible:section.desktop_visible,items:rows.map((r:any)=>({...rowToProduct(r),...(r.ad_id?{sponsored:true,adId:r.ad_id,adReceipt:createAdReceipt(r.ad_id,adVisitor,section.section_key),adTitle:r.ad_title,adSubtitle:r.ad_subtitle,destinationType:r.destination_type,destinationId:r.destination_id}:{}),...(r.original_price?{originalPrice:String(r.original_price)}:{}),...(r.sale_ends_at?{saleEndsAt:String(r.sale_ends_at)}:{})}))});
     }
     return result;
   });
@@ -116,14 +140,19 @@ export const reviewHomepageAdCampaign=createServerFn({method:'POST'}).middleware
   await sql.query(`select record_audit_event($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,['admin.homepage_ad.reviewed','homepage_ad',data.campaignId,adminId,'admin',null,'success',JSON.stringify({action:data.action,reason:data.reason??null})]); return {status:rows[0].status};
 });
 
-export const recordHomepageAdEvent=createServerFn({method:'POST'}).validator(z.object({eventId:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),campaignId:z.string().min(1).max(128),eventType:z.enum(['impression','click'])})).handler(async({data})=>{
+export const recordHomepageAdEvent=createServerFn({method:'POST'}).validator(z.object({eventId:z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),campaignId:z.string().min(1).max(128),eventType:z.enum(['impression','click']),receipt:z.string().min(54).max(80)})).handler(async({data})=>{
   assertSameSiteRequest();
   const visitor=ensureAdVisitor();
+  const sql=await getSql();
+  const campaigns=await sql.query<{placement:string}>(`select placement from homepage_ad_campaigns where id=$1 and status='active' and starts_at<=now() and ends_at>now()`,[data.campaignId]);
+  if(!campaigns[0] || !verifyAdReceipt(data.receipt,data.campaignId,visitor,campaigns[0].placement)) return {recorded:false as const,reason:'unserved_campaign' as const};
   // Layered abuse controls; the database additionally requires a recent impression before counting a click.
   await enforceRateLimit('homepage-ad-event-ip',{windowSeconds:60,maxRequests:30});
-  await enforceRateLimit('homepage-ad-event-campaign',{windowSeconds:60,maxRequests:12,subject:data.campaignId});
-  await enforceRateLimit('homepage-ad-event-visitor',{windowSeconds:60,maxRequests:20,subject:visitor});
-  const sql=await getSql();
+  // A global ceiling is separate from the IP/visitor limits; 12/min globally
+  // would block normal popular campaigns. Raise only via a reviewed configuration.
+  await enforceRateLimit('homepage-ad-event-campaign-global',{identity:'subject',windowSeconds:60,maxRequests:3000,subject:data.campaignId});
+  await enforceRateLimit('homepage-ad-event-visitor',{identity:'subject',windowSeconds:60,maxRequests:20,subject:visitor});
+  await enforceRateLimit('homepage-ad-event-visitor-ip',{windowSeconds:60,maxRequests:12,subject:visitor});
   const rows=await sql.query<{result:any}>(`select record_homepage_ad_event($1,$2,$3,$4) result`,[data.eventId,data.campaignId,data.eventType,visitor]);
   return rows[0]?.result ?? {recorded:false};
 });

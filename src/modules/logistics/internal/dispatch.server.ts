@@ -2,9 +2,11 @@ import { getSql } from "@/lib/db";
 import { isSharedEnvironment } from "@/lib/env.server";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
 import { requireAdminForUserId } from "@/modules/identity/public/auth/authorization.server";
+import { allocateEligibleShipments } from "./shipment-allocation.server";
 
 /** Materialize durable provider-bound work for the partner portal. No carrier transmission. */
 export async function dispatchDeliveries(limit = 25) {
+  const shipmentAllocation=await allocateEligibleShipments(limit);
   const sql = await getSql();
   const token = crypto.randomUUID();
   const rows = await sql.query<{ order_id: string }>(
@@ -21,10 +23,10 @@ export async function dispatchDeliveries(limit = 25) {
         select o.id,q.provider_id from orders o join delivery_quotes q on q.id=o.delivery_quote_id and q.user_id=o.user_id and q.merchant_id=o.merchant_id
         join delivery_providers p on p.id=q.provider_id and p.status='active'
         join delivery_dispatch_outbox d on d.order_id=o.id and d.lease_token=$2 and d.status='processing'
-        where o.id=$1 and o.status in ('paid','confirmed','fulfilling') and (not $3::boolean or p.environment='production') for update of o
+        where o.id=$1 and o.status in ('paid','confirmed','fulfilling') and not exists(select 1 from shipments sh where sh.order_id=o.id) and (not $3::boolean or p.environment='production') for update of o
       ), job as (
         insert into delivery_jobs(id,order_id,provider_id) select 'dj_'||id,id,provider_id from eligible
-        on conflict(order_id) do update set order_id=excluded.order_id returning id,provider_id
+        on conflict(order_id) where shipment_id is null do update set order_id=excluded.order_id returning id,provider_id
       ) select job.id from job join eligible on job.provider_id=eligible.provider_id`,
         [row.order_id, token, isSharedEnvironment()],
       );
@@ -47,7 +49,7 @@ export async function dispatchDeliveries(limit = 25) {
       );
     }
   }
-  return { scanned: rows.length, assigned, attention };
+  return { scanned: rows.length, assigned, attention, shipmentAllocation };
 }
 
 /** Admin retries local assignment; the purchased quote determines the carrier. */

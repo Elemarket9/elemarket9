@@ -12,14 +12,20 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as DeliveryAllocationReviewRouteImport } from './routes/delivery-allocation-review'
+import { Route as DeliveryContactRecoveryRouteImport } from './routes/delivery-contact-recovery'
+import { Route as DeliveryRecoveryReviewRouteImport } from './routes/delivery-recovery-review'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MerchantShipmentReturnsRouteImport } from './routes/merchant-shipment-returns'
 import { Route as OrdersRouteImport } from './routes/orders'
+import { Route as PickupSelectionRouteImport } from './routes/pickup-selection'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReturnsPolicyRouteImport } from './routes/returns-policy'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as ShipmentReturnsRouteImport } from './routes/shipment-returns'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -53,11 +59,17 @@ import { Route as PaymentPreviewRouteImport } from './routes/payment.preview'
 import { Route as PaymentReturnRouteImport } from './routes/payment.return'
 import { Route as ProductsIdRouteImport } from './routes/products.$id'
 import { Route as ProviderIndexRouteImport } from './routes/provider/index'
+import { Route as ProviderAllocationRouteImport } from './routes/provider/allocation'
+import { Route as ProviderCompanyRouteImport } from './routes/provider/company'
 import { Route as ProviderDashboardRouteImport } from './routes/provider/dashboard'
 import { Route as ProviderDeliveryRouteImport } from './routes/provider/delivery'
+import { Route as ProviderExceptionsRouteImport } from './routes/provider/exceptions'
 import { Route as ProviderFinancingRouteImport } from './routes/provider/financing'
 import { Route as ProviderFinancingFormsRouteImport } from './routes/provider/financing-forms'
 import { Route as ProviderLoginRouteImport } from './routes/provider/login'
+import { Route as ProviderPickupRouteImport } from './routes/provider/pickup'
+import { Route as ProviderRiderRouteImport } from './routes/provider/rider'
+import { Route as ProviderRidersRouteImport } from './routes/provider/riders'
 import { Route as ProviderSignupRouteImport } from './routes/provider/signup'
 import { Route as ProviderStaffSignupRouteImport } from './routes/provider/staff-signup'
 import { Route as ProviderStatusRouteImport } from './routes/provider/status'
@@ -67,12 +79,14 @@ import { Route as ApiDeliveryQuoteRouteImport } from './routes/api.delivery.quot
 import { Route as ApiEmailWebhookRouteImport } from './routes/api.email.webhook'
 import { Route as ApiExecutiveFaceRouteImport } from './routes/api.executive.face'
 import { Route as ApiInternalBrandIntegrationWorkerRouteImport } from './routes/api.internal.brand-integration-worker'
+import { Route as ApiInternalCollectionNotificationsRouteImport } from './routes/api.internal.collection-notifications'
 import { Route as ApiInternalDispatchDeliveriesRouteImport } from './routes/api.internal.dispatch-deliveries'
 import { Route as ApiInternalEnterpriseOrderOutboxRouteImport } from './routes/api.internal.enterprise-order-outbox'
 import { Route as ApiInternalEnterpriseWebhookWorkerRouteImport } from './routes/api.internal.enterprise-webhook-worker'
 import { Route as ApiInternalExpirePaymentOrdersRouteImport } from './routes/api.internal.expire-payment-orders'
 import { Route as ApiInternalReconcilePaymentsRouteImport } from './routes/api.internal.reconcile-payments'
 import { Route as ApiInternalRefreshEideRouteImport } from './routes/api.internal.refresh-eide'
+import { Route as ApiInternalRiderInvitationsRouteImport } from './routes/api.internal.rider-invitations'
 import { Route as ApiInternalSyncEnterpriseCatalogsRouteImport } from './routes/api.internal.sync-enterprise-catalogs'
 import { Route as ApiMobileCatalogRouteImport } from './routes/api.mobile.catalog'
 import { Route as ApiMobileCheckoutRouteImport } from './routes/api.mobile.checkout'
@@ -104,6 +118,22 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeliveryAllocationReviewRoute =
+  DeliveryAllocationReviewRouteImport.update({
+    id: '/delivery-allocation-review',
+    path: '/delivery-allocation-review',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DeliveryContactRecoveryRoute = DeliveryContactRecoveryRouteImport.update({
+  id: '/delivery-contact-recovery',
+  path: '/delivery-contact-recovery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeliveryRecoveryReviewRoute = DeliveryRecoveryReviewRouteImport.update({
+  id: '/delivery-recovery-review',
+  path: '/delivery-recovery-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HelpRoute = HelpRouteImport.update({
   id: '/help',
   path: '/help',
@@ -114,9 +144,19 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MerchantShipmentReturnsRoute = MerchantShipmentReturnsRouteImport.update({
+  id: '/merchant-shipment-returns',
+  path: '/merchant-shipment-returns',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PickupSelectionRoute = PickupSelectionRouteImport.update({
+  id: '/pickup-selection',
+  path: '/pickup-selection',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -142,6 +182,11 @@ const ReturnsPolicyRoute = ReturnsPolicyRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShipmentReturnsRoute = ShipmentReturnsRouteImport.update({
+  id: '/shipment-returns',
+  path: '/shipment-returns',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -309,6 +354,16 @@ const ProviderIndexRoute = ProviderIndexRouteImport.update({
   path: '/provider/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProviderAllocationRoute = ProviderAllocationRouteImport.update({
+  id: '/provider/allocation',
+  path: '/provider/allocation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderCompanyRoute = ProviderCompanyRouteImport.update({
+  id: '/provider/company',
+  path: '/provider/company',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProviderDashboardRoute = ProviderDashboardRouteImport.update({
   id: '/provider/dashboard',
   path: '/provider/dashboard',
@@ -317,6 +372,11 @@ const ProviderDashboardRoute = ProviderDashboardRouteImport.update({
 const ProviderDeliveryRoute = ProviderDeliveryRouteImport.update({
   id: '/provider/delivery',
   path: '/provider/delivery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderExceptionsRoute = ProviderExceptionsRouteImport.update({
+  id: '/provider/exceptions',
+  path: '/provider/exceptions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProviderFinancingRoute = ProviderFinancingRouteImport.update({
@@ -332,6 +392,21 @@ const ProviderFinancingFormsRoute = ProviderFinancingFormsRouteImport.update({
 const ProviderLoginRoute = ProviderLoginRouteImport.update({
   id: '/provider/login',
   path: '/provider/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderPickupRoute = ProviderPickupRouteImport.update({
+  id: '/provider/pickup',
+  path: '/provider/pickup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderRiderRoute = ProviderRiderRouteImport.update({
+  id: '/provider/rider',
+  path: '/provider/rider',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProviderRidersRoute = ProviderRidersRouteImport.update({
+  id: '/provider/riders',
+  path: '/provider/riders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProviderSignupRoute = ProviderSignupRouteImport.update({
@@ -380,6 +455,12 @@ const ApiInternalBrandIntegrationWorkerRoute =
     path: '/api/internal/brand-integration-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalCollectionNotificationsRoute =
+  ApiInternalCollectionNotificationsRouteImport.update({
+    id: '/api/internal/collection-notifications',
+    path: '/api/internal/collection-notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalDispatchDeliveriesRoute =
   ApiInternalDispatchDeliveriesRouteImport.update({
     id: '/api/internal/dispatch-deliveries',
@@ -415,6 +496,12 @@ const ApiInternalRefreshEideRoute = ApiInternalRefreshEideRouteImport.update({
   path: '/api/internal/refresh-eide',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInternalRiderInvitationsRoute =
+  ApiInternalRiderInvitationsRouteImport.update({
+    id: '/api/internal/rider-invitations',
+    path: '/api/internal/rider-invitations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalSyncEnterpriseCatalogsRoute =
   ApiInternalSyncEnterpriseCatalogsRouteImport.update({
     id: '/api/internal/sync-enterprise-catalogs',
@@ -501,14 +588,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
+  '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
+  '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/returns-policy': typeof ReturnsPolicyRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/shipment-returns': typeof ShipmentReturnsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -540,11 +633,17 @@ export interface FileRoutesByFullPath {
   '/payment/preview': typeof PaymentPreviewRoute
   '/payment/return': typeof PaymentReturnRoute
   '/products/$id': typeof ProductsIdRoute
+  '/provider/allocation': typeof ProviderAllocationRoute
+  '/provider/company': typeof ProviderCompanyRoute
   '/provider/dashboard': typeof ProviderDashboardRoute
   '/provider/delivery': typeof ProviderDeliveryRoute
+  '/provider/exceptions': typeof ProviderExceptionsRoute
   '/provider/financing': typeof ProviderFinancingRoute
   '/provider/financing-forms': typeof ProviderFinancingFormsRoute
   '/provider/login': typeof ProviderLoginRoute
+  '/provider/pickup': typeof ProviderPickupRoute
+  '/provider/rider': typeof ProviderRiderRoute
+  '/provider/riders': typeof ProviderRidersRoute
   '/provider/signup': typeof ProviderSignupRoute
   '/provider/staff-signup': typeof ProviderStaffSignupRoute
   '/provider/status': typeof ProviderStatusRoute
@@ -556,12 +655,14 @@ export interface FileRoutesByFullPath {
   '/api/email/webhook': typeof ApiEmailWebhookRoute
   '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
+  '/api/internal/collection-notifications': typeof ApiInternalCollectionNotificationsRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
+  '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
@@ -582,14 +683,20 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
+  '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
+  '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/returns-policy': typeof ReturnsPolicyRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/shipment-returns': typeof ShipmentReturnsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -621,11 +728,17 @@ export interface FileRoutesByTo {
   '/payment/preview': typeof PaymentPreviewRoute
   '/payment/return': typeof PaymentReturnRoute
   '/products/$id': typeof ProductsIdRoute
+  '/provider/allocation': typeof ProviderAllocationRoute
+  '/provider/company': typeof ProviderCompanyRoute
   '/provider/dashboard': typeof ProviderDashboardRoute
   '/provider/delivery': typeof ProviderDeliveryRoute
+  '/provider/exceptions': typeof ProviderExceptionsRoute
   '/provider/financing': typeof ProviderFinancingRoute
   '/provider/financing-forms': typeof ProviderFinancingFormsRoute
   '/provider/login': typeof ProviderLoginRoute
+  '/provider/pickup': typeof ProviderPickupRoute
+  '/provider/rider': typeof ProviderRiderRoute
+  '/provider/riders': typeof ProviderRidersRoute
   '/provider/signup': typeof ProviderSignupRoute
   '/provider/staff-signup': typeof ProviderStaffSignupRoute
   '/provider/status': typeof ProviderStatusRoute
@@ -637,12 +750,14 @@ export interface FileRoutesByTo {
   '/api/email/webhook': typeof ApiEmailWebhookRoute
   '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
+  '/api/internal/collection-notifications': typeof ApiInternalCollectionNotificationsRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
+  '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
@@ -664,14 +779,20 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
+  '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
+  '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
+  '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
   '/orders': typeof OrdersRouteWithChildren
+  '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/returns-policy': typeof ReturnsPolicyRoute
   '/robots.txt': typeof RobotsDottxtRoute
+  '/shipment-returns': typeof ShipmentReturnsRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -703,11 +824,17 @@ export interface FileRoutesById {
   '/payment/preview': typeof PaymentPreviewRoute
   '/payment/return': typeof PaymentReturnRoute
   '/products/$id': typeof ProductsIdRoute
+  '/provider/allocation': typeof ProviderAllocationRoute
+  '/provider/company': typeof ProviderCompanyRoute
   '/provider/dashboard': typeof ProviderDashboardRoute
   '/provider/delivery': typeof ProviderDeliveryRoute
+  '/provider/exceptions': typeof ProviderExceptionsRoute
   '/provider/financing': typeof ProviderFinancingRoute
   '/provider/financing-forms': typeof ProviderFinancingFormsRoute
   '/provider/login': typeof ProviderLoginRoute
+  '/provider/pickup': typeof ProviderPickupRoute
+  '/provider/rider': typeof ProviderRiderRoute
+  '/provider/riders': typeof ProviderRidersRoute
   '/provider/signup': typeof ProviderSignupRoute
   '/provider/staff-signup': typeof ProviderStaffSignupRoute
   '/provider/status': typeof ProviderStatusRoute
@@ -719,12 +846,14 @@ export interface FileRoutesById {
   '/api/email/webhook': typeof ApiEmailWebhookRoute
   '/api/executive/face': typeof ApiExecutiveFaceRoute
   '/api/internal/brand-integration-worker': typeof ApiInternalBrandIntegrationWorkerRoute
+  '/api/internal/collection-notifications': typeof ApiInternalCollectionNotificationsRoute
   '/api/internal/dispatch-deliveries': typeof ApiInternalDispatchDeliveriesRoute
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
+  '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
@@ -747,14 +876,20 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/delivery-allocation-review'
+    | '/delivery-contact-recovery'
+    | '/delivery-recovery-review'
     | '/help'
     | '/login'
+    | '/merchant-shipment-returns'
     | '/orders'
+    | '/pickup-selection'
     | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/returns-policy'
     | '/robots.txt'
+    | '/shipment-returns'
     | '/sitemap.xml'
     | '/support'
     | '/terms'
@@ -786,11 +921,17 @@ export interface FileRouteTypes {
     | '/payment/preview'
     | '/payment/return'
     | '/products/$id'
+    | '/provider/allocation'
+    | '/provider/company'
     | '/provider/dashboard'
     | '/provider/delivery'
+    | '/provider/exceptions'
     | '/provider/financing'
     | '/provider/financing-forms'
     | '/provider/login'
+    | '/provider/pickup'
+    | '/provider/rider'
+    | '/provider/riders'
     | '/provider/signup'
     | '/provider/staff-signup'
     | '/provider/status'
@@ -802,12 +943,14 @@ export interface FileRouteTypes {
     | '/api/email/webhook'
     | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
+    | '/api/internal/collection-notifications'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
+    | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
@@ -828,14 +971,20 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/delivery-allocation-review'
+    | '/delivery-contact-recovery'
+    | '/delivery-recovery-review'
     | '/help'
     | '/login'
+    | '/merchant-shipment-returns'
     | '/orders'
+    | '/pickup-selection'
     | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/returns-policy'
     | '/robots.txt'
+    | '/shipment-returns'
     | '/sitemap.xml'
     | '/support'
     | '/terms'
@@ -867,11 +1016,17 @@ export interface FileRouteTypes {
     | '/payment/preview'
     | '/payment/return'
     | '/products/$id'
+    | '/provider/allocation'
+    | '/provider/company'
     | '/provider/dashboard'
     | '/provider/delivery'
+    | '/provider/exceptions'
     | '/provider/financing'
     | '/provider/financing-forms'
     | '/provider/login'
+    | '/provider/pickup'
+    | '/provider/rider'
+    | '/provider/riders'
     | '/provider/signup'
     | '/provider/staff-signup'
     | '/provider/status'
@@ -883,12 +1038,14 @@ export interface FileRouteTypes {
     | '/api/email/webhook'
     | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
+    | '/api/internal/collection-notifications'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
+    | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
@@ -909,14 +1066,20 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/delivery-allocation-review'
+    | '/delivery-contact-recovery'
+    | '/delivery-recovery-review'
     | '/help'
     | '/login'
+    | '/merchant-shipment-returns'
     | '/orders'
+    | '/pickup-selection'
     | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/returns-policy'
     | '/robots.txt'
+    | '/shipment-returns'
     | '/sitemap.xml'
     | '/support'
     | '/terms'
@@ -948,11 +1111,17 @@ export interface FileRouteTypes {
     | '/payment/preview'
     | '/payment/return'
     | '/products/$id'
+    | '/provider/allocation'
+    | '/provider/company'
     | '/provider/dashboard'
     | '/provider/delivery'
+    | '/provider/exceptions'
     | '/provider/financing'
     | '/provider/financing-forms'
     | '/provider/login'
+    | '/provider/pickup'
+    | '/provider/rider'
+    | '/provider/riders'
     | '/provider/signup'
     | '/provider/staff-signup'
     | '/provider/status'
@@ -964,12 +1133,14 @@ export interface FileRouteTypes {
     | '/api/email/webhook'
     | '/api/executive/face'
     | '/api/internal/brand-integration-worker'
+    | '/api/internal/collection-notifications'
     | '/api/internal/dispatch-deliveries'
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
+    | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
@@ -991,14 +1162,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
+  DeliveryAllocationReviewRoute: typeof DeliveryAllocationReviewRoute
+  DeliveryContactRecoveryRoute: typeof DeliveryContactRecoveryRoute
+  DeliveryRecoveryReviewRoute: typeof DeliveryRecoveryReviewRoute
   HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
+  MerchantShipmentReturnsRoute: typeof MerchantShipmentReturnsRoute
   OrdersRoute: typeof OrdersRouteWithChildren
+  PickupSelectionRoute: typeof PickupSelectionRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReturnsPolicyRoute: typeof ReturnsPolicyRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
+  ShipmentReturnsRoute: typeof ShipmentReturnsRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
@@ -1029,11 +1206,17 @@ export interface RootRouteChildren {
   PaymentPreviewRoute: typeof PaymentPreviewRoute
   PaymentReturnRoute: typeof PaymentReturnRoute
   ProductsIdRoute: typeof ProductsIdRoute
+  ProviderAllocationRoute: typeof ProviderAllocationRoute
+  ProviderCompanyRoute: typeof ProviderCompanyRoute
   ProviderDashboardRoute: typeof ProviderDashboardRoute
   ProviderDeliveryRoute: typeof ProviderDeliveryRoute
+  ProviderExceptionsRoute: typeof ProviderExceptionsRoute
   ProviderFinancingRoute: typeof ProviderFinancingRoute
   ProviderFinancingFormsRoute: typeof ProviderFinancingFormsRoute
   ProviderLoginRoute: typeof ProviderLoginRoute
+  ProviderPickupRoute: typeof ProviderPickupRoute
+  ProviderRiderRoute: typeof ProviderRiderRoute
+  ProviderRidersRoute: typeof ProviderRidersRoute
   ProviderSignupRoute: typeof ProviderSignupRoute
   ProviderStaffSignupRoute: typeof ProviderStaffSignupRoute
   ProviderStatusRoute: typeof ProviderStatusRoute
@@ -1045,12 +1228,14 @@ export interface RootRouteChildren {
   ApiEmailWebhookRoute: typeof ApiEmailWebhookRoute
   ApiExecutiveFaceRoute: typeof ApiExecutiveFaceRoute
   ApiInternalBrandIntegrationWorkerRoute: typeof ApiInternalBrandIntegrationWorkerRoute
+  ApiInternalCollectionNotificationsRoute: typeof ApiInternalCollectionNotificationsRoute
   ApiInternalDispatchDeliveriesRoute: typeof ApiInternalDispatchDeliveriesRoute
   ApiInternalEnterpriseOrderOutboxRoute: typeof ApiInternalEnterpriseOrderOutboxRoute
   ApiInternalEnterpriseWebhookWorkerRoute: typeof ApiInternalEnterpriseWebhookWorkerRoute
   ApiInternalExpirePaymentOrdersRoute: typeof ApiInternalExpirePaymentOrdersRoute
   ApiInternalReconcilePaymentsRoute: typeof ApiInternalReconcilePaymentsRoute
   ApiInternalRefreshEideRoute: typeof ApiInternalRefreshEideRoute
+  ApiInternalRiderInvitationsRoute: typeof ApiInternalRiderInvitationsRoute
   ApiInternalSyncEnterpriseCatalogsRoute: typeof ApiInternalSyncEnterpriseCatalogsRoute
   ApiMobileCatalogRoute: typeof ApiMobileCatalogRoute
   ApiMobileCheckoutRoute: typeof ApiMobileCheckoutRoute
@@ -1091,6 +1276,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/delivery-allocation-review': {
+      id: '/delivery-allocation-review'
+      path: '/delivery-allocation-review'
+      fullPath: '/delivery-allocation-review'
+      preLoaderRoute: typeof DeliveryAllocationReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery-contact-recovery': {
+      id: '/delivery-contact-recovery'
+      path: '/delivery-contact-recovery'
+      fullPath: '/delivery-contact-recovery'
+      preLoaderRoute: typeof DeliveryContactRecoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/delivery-recovery-review': {
+      id: '/delivery-recovery-review'
+      path: '/delivery-recovery-review'
+      fullPath: '/delivery-recovery-review'
+      preLoaderRoute: typeof DeliveryRecoveryReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/help': {
       id: '/help'
       path: '/help'
@@ -1105,11 +1311,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/merchant-shipment-returns': {
+      id: '/merchant-shipment-returns'
+      path: '/merchant-shipment-returns'
+      fullPath: '/merchant-shipment-returns'
+      preLoaderRoute: typeof MerchantShipmentReturnsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders': {
       id: '/orders'
       path: '/orders'
       fullPath: '/orders'
       preLoaderRoute: typeof OrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pickup-selection': {
+      id: '/pickup-selection'
+      path: '/pickup-selection'
+      fullPath: '/pickup-selection'
+      preLoaderRoute: typeof PickupSelectionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -1145,6 +1365,13 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipment-returns': {
+      id: '/shipment-returns'
+      path: '/shipment-returns'
+      fullPath: '/shipment-returns'
+      preLoaderRoute: typeof ShipmentReturnsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sitemap.xml': {
@@ -1378,6 +1605,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProviderIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/provider/allocation': {
+      id: '/provider/allocation'
+      path: '/provider/allocation'
+      fullPath: '/provider/allocation'
+      preLoaderRoute: typeof ProviderAllocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider/company': {
+      id: '/provider/company'
+      path: '/provider/company'
+      fullPath: '/provider/company'
+      preLoaderRoute: typeof ProviderCompanyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/provider/dashboard': {
       id: '/provider/dashboard'
       path: '/provider/dashboard'
@@ -1390,6 +1631,13 @@ declare module '@tanstack/react-router' {
       path: '/provider/delivery'
       fullPath: '/provider/delivery'
       preLoaderRoute: typeof ProviderDeliveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider/exceptions': {
+      id: '/provider/exceptions'
+      path: '/provider/exceptions'
+      fullPath: '/provider/exceptions'
+      preLoaderRoute: typeof ProviderExceptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/provider/financing': {
@@ -1411,6 +1659,27 @@ declare module '@tanstack/react-router' {
       path: '/provider/login'
       fullPath: '/provider/login'
       preLoaderRoute: typeof ProviderLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider/pickup': {
+      id: '/provider/pickup'
+      path: '/provider/pickup'
+      fullPath: '/provider/pickup'
+      preLoaderRoute: typeof ProviderPickupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider/rider': {
+      id: '/provider/rider'
+      path: '/provider/rider'
+      fullPath: '/provider/rider'
+      preLoaderRoute: typeof ProviderRiderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/provider/riders': {
+      id: '/provider/riders'
+      path: '/provider/riders'
+      fullPath: '/provider/riders'
+      preLoaderRoute: typeof ProviderRidersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/provider/signup': {
@@ -1476,6 +1745,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalBrandIntegrationWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/collection-notifications': {
+      id: '/api/internal/collection-notifications'
+      path: '/api/internal/collection-notifications'
+      fullPath: '/api/internal/collection-notifications'
+      preLoaderRoute: typeof ApiInternalCollectionNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/internal/dispatch-deliveries': {
       id: '/api/internal/dispatch-deliveries'
       path: '/api/internal/dispatch-deliveries'
@@ -1516,6 +1792,13 @@ declare module '@tanstack/react-router' {
       path: '/api/internal/refresh-eide'
       fullPath: '/api/internal/refresh-eide'
       preLoaderRoute: typeof ApiInternalRefreshEideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/internal/rider-invitations': {
+      id: '/api/internal/rider-invitations'
+      path: '/api/internal/rider-invitations'
+      fullPath: '/api/internal/rider-invitations'
+      preLoaderRoute: typeof ApiInternalRiderInvitationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/internal/sync-enterprise-catalogs': {
@@ -1641,14 +1924,20 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
+  DeliveryAllocationReviewRoute: DeliveryAllocationReviewRoute,
+  DeliveryContactRecoveryRoute: DeliveryContactRecoveryRoute,
+  DeliveryRecoveryReviewRoute: DeliveryRecoveryReviewRoute,
   HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
+  MerchantShipmentReturnsRoute: MerchantShipmentReturnsRoute,
   OrdersRoute: OrdersRouteWithChildren,
+  PickupSelectionRoute: PickupSelectionRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReturnsPolicyRoute: ReturnsPolicyRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
+  ShipmentReturnsRoute: ShipmentReturnsRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,
@@ -1679,11 +1968,17 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentPreviewRoute: PaymentPreviewRoute,
   PaymentReturnRoute: PaymentReturnRoute,
   ProductsIdRoute: ProductsIdRoute,
+  ProviderAllocationRoute: ProviderAllocationRoute,
+  ProviderCompanyRoute: ProviderCompanyRoute,
   ProviderDashboardRoute: ProviderDashboardRoute,
   ProviderDeliveryRoute: ProviderDeliveryRoute,
+  ProviderExceptionsRoute: ProviderExceptionsRoute,
   ProviderFinancingRoute: ProviderFinancingRoute,
   ProviderFinancingFormsRoute: ProviderFinancingFormsRoute,
   ProviderLoginRoute: ProviderLoginRoute,
+  ProviderPickupRoute: ProviderPickupRoute,
+  ProviderRiderRoute: ProviderRiderRoute,
+  ProviderRidersRoute: ProviderRidersRoute,
   ProviderSignupRoute: ProviderSignupRoute,
   ProviderStaffSignupRoute: ProviderStaffSignupRoute,
   ProviderStatusRoute: ProviderStatusRoute,
@@ -1696,6 +1991,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExecutiveFaceRoute: ApiExecutiveFaceRoute,
   ApiInternalBrandIntegrationWorkerRoute:
     ApiInternalBrandIntegrationWorkerRoute,
+  ApiInternalCollectionNotificationsRoute:
+    ApiInternalCollectionNotificationsRoute,
   ApiInternalDispatchDeliveriesRoute: ApiInternalDispatchDeliveriesRoute,
   ApiInternalEnterpriseOrderOutboxRoute: ApiInternalEnterpriseOrderOutboxRoute,
   ApiInternalEnterpriseWebhookWorkerRoute:
@@ -1703,6 +2000,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalExpirePaymentOrdersRoute: ApiInternalExpirePaymentOrdersRoute,
   ApiInternalReconcilePaymentsRoute: ApiInternalReconcilePaymentsRoute,
   ApiInternalRefreshEideRoute: ApiInternalRefreshEideRoute,
+  ApiInternalRiderInvitationsRoute: ApiInternalRiderInvitationsRoute,
   ApiInternalSyncEnterpriseCatalogsRoute:
     ApiInternalSyncEnterpriseCatalogsRoute,
   ApiMobileCatalogRoute: ApiMobileCatalogRoute,

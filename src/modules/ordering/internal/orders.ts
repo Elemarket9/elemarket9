@@ -42,7 +42,7 @@ export const listCustomerOrders = createServerFn({ method: "GET" })
       created_at:string; updated_at:string; delivered_at:string|null; dispute_status:string|null; dispute_created_at:string|null;
     }>(`select o.id,o.status,o.currency,o.product_total::text,o.delivery_total::text,o.grand_total::text,
               o.created_at::text,o.updated_at::text,
-              (select max(h.created_at)::text from merchant_order_status_history h where h.order_id=o.id and h.to_status='delivered') as delivered_at,
+              elemarket_order_delivered_at(o.id)::text as delivered_at,
               d.status as dispute_status,d.created_at::text as dispute_created_at
          from orders o
          left join lateral (select status,created_at from customer_order_disputes where order_id=o.id order by created_at desc limit 1) d on true
@@ -165,6 +165,7 @@ export const cancelCustomerOrder = createServerFn({ method: "POST" })
     await requireCustomerForUserId(context.userId);
     const userId = getAuthenticatedUserId(context);
     await enforceRateLimit("customer-order-cancel", { windowSeconds: 300, maxRequests: 5, subject: userId });
+    await enforceRateLimit("customer-order-cancel-account", {identity:"subject", windowSeconds:300, maxRequests:8, subject:userId });
     await requireFreshSession();
     await requireCustomerOrder(data.orderId, userId);
     const sql = await getSql();
@@ -204,6 +205,7 @@ export const openCustomerOrderDispute = createServerFn({ method: "POST" })
     const userId = getAuthenticatedUserId(context);
     await requireCustomerForUserId(userId);
     await enforceRateLimit("customer-order-dispute", { windowSeconds: 3600, maxRequests: 10, subject: userId });
+    await enforceRateLimit("customer-order-dispute-account", {identity:"subject", windowSeconds:3600, maxRequests:16, subject:userId });
     await enforceRateLimit("customer-order-dispute-order", { windowSeconds: 3600, maxRequests: 2, subject: `${userId}:${data.orderId}` });
     const sql = await getSql();
     const rows = await sql.query<{ result: JsonObject }>(

@@ -10,8 +10,8 @@ adapters. Configure providers independently; unavailable capabilities fail close
 Executive facial login remains unavailable in shared environments; Better Auth
 + TOTP remains operational.
 
-See [release assessment](docs/release-assessment.md),
-[verification commands and limitations](docs/verification.md) and
+See [delivery verification playbook](docs/delivery-otp-staging-playbook.md),
+[delivery state contract](docs/delivery-state-contract.md) and
 [deployment/recovery procedures](docs/deployment.md). Historical
 test counts and claims from earlier README revisions are not release evidence.
 Authentication always uses real sessions. Preview commerce requires an explicit
@@ -31,6 +31,9 @@ npm run lint
 npm test
 npm run build
 ```
+
+The clean source distribution excludes test suites. Restore the separate developer
+test package before running test commands; missing suites must fail verification.
 
 For configured shared environments, `npm run build:production` validates runtime
 and client configuration before building. `npm start` verifies the migration

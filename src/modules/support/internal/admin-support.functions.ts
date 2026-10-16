@@ -69,3 +69,32 @@ export const searchProductsForAssistedOrder=createServerFn({method:"GET"}).middl
   const adminId=getAuthenticatedUserId(context); await requireAdminForUserId(adminId, "admin.support"); await enforceRateLimit("admin-support-assisted-product-search",{windowSeconds:60,maxRequests:60,subject:adminId}); const sql=await getSql();
   return sql.query<AssistedProductRow>(`select p.id,p.name,p.price::text as price,p.stock,p.merchant_id as "merchantId",m.name as "merchantName",coalesce((select jsonb_agg(jsonb_build_object('id',pv.id,'name',coalesce(pv.name,pv.sku),'price',pv.price::text,'stock',pv.stock) order by pv.id) from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0),'[]'::jsonb) as variants from products p join merchants m on m.id=p.merchant_id where m.status='active' and m.verified=true and p.status='active' and p.stock>0 and (p.name ilike '%'||$1||'%' escape '\\' or coalesce(p.sku,'') ilike '%'||$1||'%' escape '\\') order by p.name limit 20`,[data.q.replace(/[%_\\]/g,"\\$&")]);
 });
+
+/** Support hold is a shipment STOP, never an address-change bypass. The agent
+ * must independently authenticate the requester before authorizing release. */
+export const manageOrderDeliveryHold = createServerFn({ method:"POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({orderId:z.string().trim().min(1).max(128),action:z.enum(["hold","release"]),reason:z.string().trim().min(12).max(1000)}))
+  .handler(async({data,context})=>{
+    const actor=getAuthenticatedUserId(context);
+    await requireAdminForUserId(actor,"admin.support");
+    if(data.action==="release") { const {requireFreshSession}=await import("@/modules/identity/public/auth/verify.server"); if(await requireFreshSession() !== actor) throw new Error("Fresh administrator authentication required"); }
+    await enforceRateLimit("support-delivery-hold",{windowSeconds:300,maxRequests:20,subject:actor});
+    const {withTransaction}=await import("@/lib/db");
+    return withTransaction(async tx=>{
+      const orders=await tx.query<{id:string;status:string}>(`select id,status from orders where id=$1 for update`,[data.orderId]);
+      if(!orders[0]) throw new Error("Order not found");
+      if(data.action==="hold"){
+        if(!["paid","confirmed","fulfilling","shipped"].includes(orders[0].status)) throw new Error("Shipment is not eligible for a delivery hold");
+        await tx.query(`insert into order_delivery_holds(order_id,reason,placed_by,active)
+          values($1,$2,$3,true) on conflict(order_id) do update set active=true,reason=excluded.reason,placed_by=excluded.placed_by,placed_at=now(),released_at=null,released_by=null,release_reason=null,updated_at=now()`,[data.orderId,data.reason,actor]);
+      } else {
+        const changed=await tx.query<{order_id:string}>(`update order_delivery_holds set active=false,released_by=$2,released_at=now(),release_reason=$3,updated_at=now()
+          where order_id=$1 and active=true returning order_id`,[data.orderId,actor,data.reason]);
+        if(!changed[0]) throw new Error("No active delivery hold");
+      }
+      await tx.query(`select record_audit_event($1,'order',$2,$3,'admin',null,'success',$4::jsonb)`,
+        [`support.delivery.${data.action}`,data.orderId,actor,JSON.stringify({reason:data.reason})]);
+      return {action:data.action,orderId:data.orderId};
+    });
+  });

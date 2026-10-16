@@ -65,7 +65,7 @@ export class ArkeselOtpAdapter implements OtpProviderAdapter {
       expiry: input.expiryMinutes,
       length: input.length,
       medium: "sms",
-      message: optionalEnv("ARKESEL_OTP_MESSAGE") || input.message,
+      message: input.purpose === "delivery_handover" ? input.message : (optionalEnv("ARKESEL_OTP_MESSAGE") || input.message),
       number: input.number.replace(/^\+/, ""),
       sender_id: optionalEnv("ARKESEL_OTP_SENDER_ID") || input.senderId || "ELEMARKET",
       type: "numeric",

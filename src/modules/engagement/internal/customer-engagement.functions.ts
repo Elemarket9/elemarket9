@@ -194,23 +194,14 @@ export const personalizedRecommendations = createServerFn({ method: "GET" })
         order by coalesce(i.weight,0) desc,p.created_at desc,p.id asc limit $2`, [userId, data.limit]);
   });
 
+/** Public client-provided cart/view events are intentionally not accepted for ranking.
+ * Authenticated purchase/cart actions and signed discovery observations are the
+ * authoritative EIDE sources. Do not re-introduce arbitrary eventId ingestion. */
 export const recordProductEvent = createServerFn({ method: "POST" })
-  .validator(z.object({ eventId: z.string().trim().min(16).max(128), productId: id, eventType: z.enum(["view","add_to_cart"]) }))
-  .handler(async ({ data }) => {
+  .validator(z.object({ eventId: z.string().trim().min(16).max(128), productId: id, eventType: z.enum(["view", "add_to_cart"]) }))
+  .handler(async () => {
     await enforceRateLimit("product-funnel-event", { windowSeconds: 60, maxRequests: 60 });
-    if ((data.eventType === "view" && !data.eventId.startsWith("view_")) || (data.eventType === "add_to_cart" && !data.eventId.startsWith("cart_"))) throw new Error("invalid event id");
-    const sql = await getDiscoverySql();
-    await sql.query(
-      `with recorded as (
-         insert into marketplace_product_events(id,product_id,merchant_id,event_type)
-         select $1,p.id,p.merchant_id,$3 from products p join merchants m on m.id=p.merchant_id
-          where p.id=$2 and p.status='active' and m.status='active' and m.verified=true
-         on conflict(id) do nothing returning product_id,event_type
-       )
-       insert into eide_ranking_events(event_type,product_id,model_version)
-       select case when event_type='view' then 'view' else 'add_to_cart' end,product_id,'eide-v11.3' from recorded`,
-      [data.eventId, data.productId, data.eventType]).catch(() => undefined);
-    return { recorded: true as const };
+    return { recorded: false as const, reason: "unverified_client_event" as const };
   });
 
 /** Exact account/product state, independent of the paginated profile read model. */

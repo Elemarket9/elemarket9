@@ -2,8 +2,8 @@ import {createHash} from 'node:crypto';
 import {getDiscoverySql} from '@/lib/db';
 import {env} from '@/lib/env.server';
 import {verifyExposure} from './attribution.server';
-export async function recordDiscoveryObservation(receipt:string,eventType:'impression'|'click'|'view'|'add_to_cart'|'wishlist'|'checkout') {
-  if(!['impression','click','view','add_to_cart','wishlist','checkout'].includes(eventType))return false;
+export async function recordDiscoveryObservation(receipt:string,eventType:'impression'|'click'|'view') {
+  if(!['impression','click','view'].includes(eventType))return false;
   const signing=env('SEARCH_CURSOR_SECRET')||env('BETTER_AUTH_SECRET')||(process.env.NODE_ENV==='production'?'':'development-search-cursor-secret-change-me');
   if(!signing)return false;
   const exposure=verifyExposure(receipt,createHash('sha256').update(signing).digest('hex'));

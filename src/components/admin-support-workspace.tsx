@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addSupportInternalNote,
+  manageOrderDeliveryHold,
   getSupportThread,
   listSupportInbox,
   replySupportThread,
@@ -37,6 +38,7 @@ function SupportWorkspace({ compact }: { compact: boolean }) {
   const [loadedThread, setThread] = useState<SupportThread | null>(null);
   const [reply, setReply] = useState("");
   const [note, setNote] = useState("");
+  const [holdReason,setHoldReason]=useState("");
   const [busy, setBusy] = useState(false);
   const [inboxLoading, setInboxLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +114,17 @@ function SupportWorkspace({ compact }: { compact: boolean }) {
   }, [refreshThread, selected]);
 
   const waitingCount = useMemo(() => inbox.filter(row => row.status === "waiting_support" || row.status === "open").length, [inbox]);
+
+  async function applyDeliveryHold(action:"hold"|"release") {
+    if(!thread?.conversation.orderId || !canManage || holdReason.trim().length<12 || actionPending.current) return;
+    actionPending.current=true;setBusy(true);setError(null);
+    try{
+      await withSupportRequestTimeout(manageOrderDeliveryHold({data:{orderId:thread.conversation.orderId,action,reason:holdReason.trim()}}));
+      setHoldReason("");
+      await refreshThread(thread.conversation.id);
+    }catch{setError("Delivery hold update was not confirmed. Verify shipment status before retrying.")}
+    finally{actionPending.current=false;setBusy(false)}
+  }
 
   async function sendReply() {
     if (!thread || !canManage || thread.conversation.status === "closed" || !reply.trim() || actionPending.current) return;
@@ -192,6 +205,7 @@ function SupportWorkspace({ compact }: { compact: boolean }) {
               <div className="space-y-2">{thread.messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words text-xs leading-5 [overflow-wrap:anywhere] ${message.senderType === "support" ? "ml-auto bg-market-green text-white" : "bg-white shadow-sm"}`}>{message.body}</div>)}</div>
               {thread.notes.length > 0 ? <div className="mt-4 border-t border-dashed border-amber-300 pt-3"><p className="mb-2 text-[10px] font-black uppercase tracking-wider text-amber-800">Internal notes — never customer visible</p>{thread.notes.map((item) => <div key={item.id} className="mb-2 rounded-xl bg-amber-50 p-2.5 text-[11px] text-amber-950"><b>{item.adminName || "Admin"}</b> · {new Date(item.createdAt).toLocaleString()}<p className="mt-1 whitespace-pre-wrap">{item.body}</p></div>)}</div> : null}
             </div>
+            {thread.conversation.orderId ? <div className="border-t border-market-line bg-amber-50 p-3"><p className="text-xs font-black">Parcel hold — authorized support only</p><p className="text-[11px] text-market-muted">Verify the caller independently. A hold pauses handover, NOT changes the locked order address or number. Release only after investigation.</p><input value={holdReason} onChange={e=>setHoldReason(e.target.value)} maxLength={1000} placeholder="Reason (min. 12 characters)" className="my-2 w-full rounded-lg border p-2 text-xs"/><div className="flex flex-wrap gap-2"><button type="button" disabled={busy||!canManage||holdReason.trim().length<12} onClick={()=>void applyDeliveryHold("hold")} className="rounded-lg bg-amber-800 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Place shipment on hold</button><button type="button" disabled={busy||!canManage||holdReason.trim().length<12} onClick={()=>void applyDeliveryHold("release")} className="rounded-lg border border-red-400 px-3 py-2 text-xs font-bold text-red-800 disabled:opacity-50">Release hold (verified)</button></div></div>:null}
             <AssistedOrderComposer key={thread.conversation.id} conversationId={thread.conversation.id} disabled={busy || !canManage || thread.conversation.status === "closed"} />
             <div className="grid gap-2 border-t border-market-line p-3 sm:grid-cols-2">
               <div><textarea aria-label="Reply to customer" disabled={busy || !canManage || thread.conversation.status === "closed"} value={reply} onChange={(event) => setReply(event.target.value.slice(0, 4000))} rows={2} maxLength={4000} placeholder="Reply to customer…" className="w-full resize-none rounded-xl border border-market-line p-2.5 text-xs outline-none focus:border-market-green"/><button disabled={busy || !canManage || !reply.trim() || thread.conversation.status === "closed"} onClick={() => void sendReply()} className="mt-1.5 rounded-lg bg-market-orange px-3 py-2 text-[10px] font-black text-white disabled:opacity-40">Send reply</button></div>

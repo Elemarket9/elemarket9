@@ -13,6 +13,8 @@ const SCHEDULED_GET_PATHS = new Set([
   "/api/internal/reconcile-payments",
   "/api/internal/refresh-eide",
   "/api/internal/dispatch-deliveries",
+  "/api/internal/rider-invitations",
+  "/api/internal/collection-notifications",
 ]);
 
 function constantTimeTextEqual(a: string, b: string): boolean {
@@ -29,7 +31,6 @@ function constantTimeTextEqual(a: string, b: string): boolean {
 export async function authorizeScheduledJobRequest(
   request: Request,
   hmacSecret: string | undefined,
-  fallbackSecret?: string,
 ): Promise<boolean> {
   const cronSecret = process.env.CRON_SECRET?.trim();
   if (
@@ -40,7 +41,7 @@ export async function authorizeScheduledJobRequest(
   ) {
     return true;
   }
-  return authorizeInternalHmacRequest(request, hmacSecret, fallbackSecret);
+  return authorizeInternalHmacRequest(request, hmacSecret);
 }
 
 /**
@@ -53,9 +54,8 @@ export async function authorizeScheduledJobRequest(
 export async function authorizeInternalHmacRequest(
   request: Request,
   secret: string | undefined,
-  fallbackSecret?: string,
 ): Promise<boolean> {
-  const configured = secret?.trim() || fallbackSecret?.trim();
+  const configured = secret?.trim();
   if (!configured) return false;
   const timestamp = request.headers.get("x-elemarket-sync-timestamp")?.trim() ?? "";
   const signature = request.headers.get("x-elemarket-sync-signature")?.trim().toLowerCase() ?? "";

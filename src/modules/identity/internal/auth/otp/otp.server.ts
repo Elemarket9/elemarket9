@@ -12,7 +12,7 @@ const MAX_ATTEMPTS = 5;
 import { normalizeGhanaPhone as normalizeNumber } from "../phone";
 
 function normalizePurpose(value: string): OtpPurpose {
-  if (["signup", "login", "phone_verification", "password_reset", "transactional"].includes(value)) {
+  if (["signup", "login", "phone_verification", "password_reset", "transactional", "delivery_handover"].includes(value)) {
     return value as OtpPurpose;
   }
   throw new Error("Invalid OTP purpose");
@@ -23,6 +23,7 @@ export type RequestOtpInput = {
   purpose: string;
   expiryMinutes?: number;
   userId?: string;
+  message?: string;
 };
 
 export type VerifyOtpInput = {
@@ -87,8 +88,9 @@ export async function requestOtp(
     const result = await adapter.send({
       number,
       expiryMinutes,
+      purpose,
       length: OTP_LENGTH,
-      message: "Your ELEMARKET verification code is %otp_code%. It expires in %expiry% minutes.",
+      message: input.message ?? "Your ELEMARKET verification code is %otp_code%. It expires in %expiry% minutes.",
     });
 
     if (result.code !== "accepted") {

@@ -1,10 +1,8 @@
 {
-  "decision": "Public-release source candidate; deployment verification required",
-  "baseline": "71abe2491b1aa1d320a8f383d86ea7c91b74aa61",
-  "source": "corrected uncommitted working tree",
-  "package": "source",
-  "version": "2.11.3",
-  "files": 750,
-  "exclusions": "Dependencies, generated builds, private files and test files are excluded from release source archives; CI remains in the update package for the existing developer repository.",
-  "limitations": "See docs/release-assessment.md for real-provider and deployment verification requirements."
+  "package": "ELEMARKET_EIDE_FINAL_CLEAN_SOURCE",
+  "date": "2026-10-16",
+  "variant": "CLEAN_SOURCE",
+  "node": "22.x",
+  "deployment_migrations": 209,
+  "tracked_source_files": 815
 }
