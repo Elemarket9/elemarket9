@@ -108,11 +108,28 @@ export async function createExternalPaymentIntent(input: {
   );
   const customerEmail = customerRows[0]?.email?.trim();
   if (!customerEmail) throw new Error("Customer email is required for payment");
-  const subaccountRows = await sql.query<{ provider_account_ref: string }>(
-    `select provider_account_ref from merchant_payment_accounts where merchant_id=(select merchant_id from orders where id=$1) and provider_key=$2 and status='active' limit 1`,
-    [payment.order_id, normalizedProviderKey],
+  // platform_wallet merchants are paid out by the merchant wallet, so their
+  // charge must stay in the platform's provider account. Splitting it to the
+  // merchant here as well would pay the merchant twice.
+  // The choice is fixed on the payment the first time it is initialized, so
+  // retries use the same settlement even if the merchant's mode changes later.
+  const settlementRows = await sql.query<{ settlement_model: string }>(
+    `update payments p
+        set settlement_model = coalesce(p.settlement_model,
+              case when m.settlement_model = 'platform_wallet' then 'platform_wallet' else 'provider_split' end)
+       from orders o join merchants m on m.id = o.merchant_id
+      where p.id = $1 and o.id = p.order_id
+      returning p.settlement_model`,
+    [payment.payment_id],
   );
-  if (provider[0].requires_merchant_account && !subaccountRows[0]?.provider_account_ref)
+  const walletSettled = settlementRows[0]?.settlement_model === "platform_wallet";
+  const subaccountRows = walletSettled
+    ? []
+    : await sql.query<{ provider_account_ref: string }>(
+        `select provider_account_ref from merchant_payment_accounts where merchant_id=(select merchant_id from orders where id=$1) and provider_key=$2 and status='active' limit 1`,
+        [payment.order_id, normalizedProviderKey],
+      );
+  if (!walletSettled && provider[0].requires_merchant_account && !subaccountRows[0]?.provider_account_ref)
     throw new Error("Merchant provider account is not configured");
 
   const attemptRows = await sql.query<{

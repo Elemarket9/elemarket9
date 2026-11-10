@@ -30,6 +30,7 @@
     "test": "node scripts/test.mjs",
     "test:integration:concurrency": "node --test tests/integration.test.mjs",
     "test:payment:simulation": "node --test tests/payment-simulation.integration.mjs",
+    "test:wallet:simulation": "node --test tests/wallet-simulation.integration.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
     "test:frontend": "node tests/frontend.e2e.mjs",
     "check:module-contracts": "node scripts/check-module-contracts.mjs",

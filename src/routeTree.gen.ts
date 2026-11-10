@@ -52,6 +52,7 @@ import { Route as MerchantDashboardRouteImport } from './routes/merchant/dashboa
 import { Route as MerchantLoginRouteImport } from './routes/merchant/login'
 import { Route as MerchantRegisterRouteImport } from './routes/merchant/register'
 import { Route as MerchantStatusRouteImport } from './routes/merchant/status'
+import { Route as MerchantWalletRouteImport } from './routes/merchant/wallet'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as PartnerDeliveryRouteImport } from './routes/partner.delivery'
 import { Route as PartnerFinancingRouteImport } from './routes/partner.financing'
@@ -89,6 +90,7 @@ import { Route as ApiInternalReconcilePaymentsRouteImport } from './routes/api.i
 import { Route as ApiInternalRefreshEideRouteImport } from './routes/api.internal.refresh-eide'
 import { Route as ApiInternalRiderInvitationsRouteImport } from './routes/api.internal.rider-invitations'
 import { Route as ApiInternalSyncEnterpriseCatalogsRouteImport } from './routes/api.internal.sync-enterprise-catalogs'
+import { Route as ApiInternalWalletSettlementRouteImport } from './routes/api.internal.wallet-settlement'
 import { Route as ApiMobileCatalogRouteImport } from './routes/api.mobile.catalog'
 import { Route as ApiMobileCheckoutRouteImport } from './routes/api.mobile.checkout'
 import { Route as ApiMobileDeliveryQuoteRouteImport } from './routes/api.mobile.delivery-quote'
@@ -97,6 +99,7 @@ import { Route as ApiMobilePaymentIntentRouteImport } from './routes/api.mobile.
 import { Route as ApiMobilePaymentStatusRouteImport } from './routes/api.mobile.payment-status'
 import { Route as ApiMobileProfileRouteImport } from './routes/api.mobile.profile'
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api.payments.webhook'
+import { Route as ApiPayoutsWebhookRouteImport } from './routes/api.payouts.webhook'
 import { Route as ApiProductMediaMediaIdRouteImport } from './routes/api.product-media.$mediaId'
 import { Route as SitemapsProductsChar123pageChar125DotxmlRouteImport } from './routes/sitemaps.products.{$page}[.]xml'
 import { Route as ApiBrandIntegrationWebhookRouteImport } from './routes/api.brand.integration.webhook'
@@ -320,6 +323,11 @@ const MerchantStatusRoute = MerchantStatusRouteImport.update({
   path: '/merchant/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MerchantWalletRoute = MerchantWalletRouteImport.update({
+  id: '/merchant/wallet',
+  path: '/merchant/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -515,6 +523,12 @@ const ApiInternalSyncEnterpriseCatalogsRoute =
     path: '/api/internal/sync-enterprise-catalogs',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalWalletSettlementRoute =
+  ApiInternalWalletSettlementRouteImport.update({
+    id: '/api/internal/wallet-settlement',
+    path: '/api/internal/wallet-settlement',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMobileCatalogRoute = ApiMobileCatalogRouteImport.update({
   id: '/api/mobile/catalog',
   path: '/api/mobile/catalog',
@@ -553,6 +567,11 @@ const ApiMobileProfileRoute = ApiMobileProfileRouteImport.update({
 const ApiPaymentsWebhookRoute = ApiPaymentsWebhookRouteImport.update({
   id: '/api/payments/webhook',
   path: '/api/payments/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPayoutsWebhookRoute = ApiPayoutsWebhookRouteImport.update({
+  id: '/api/payouts/webhook',
+  path: '/api/payouts/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProductMediaMediaIdRoute = ApiProductMediaMediaIdRouteImport.update({
@@ -634,6 +653,7 @@ export interface FileRoutesByFullPath {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -672,6 +692,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -680,6 +701,7 @@ export interface FileRoutesByFullPath {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -730,6 +752,7 @@ export interface FileRoutesByTo {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -768,6 +791,7 @@ export interface FileRoutesByTo {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -776,6 +800,7 @@ export interface FileRoutesByTo {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -827,6 +852,7 @@ export interface FileRoutesById {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -865,6 +891,7 @@ export interface FileRoutesById {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -873,6 +900,7 @@ export interface FileRoutesById {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -925,6 +953,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -963,6 +992,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -971,6 +1001,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -1021,6 +1052,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -1059,6 +1091,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -1067,6 +1100,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -1117,6 +1151,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -1155,6 +1190,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -1163,6 +1199,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -1214,6 +1251,7 @@ export interface RootRouteChildren {
   MerchantLoginRoute: typeof MerchantLoginRoute
   MerchantRegisterRoute: typeof MerchantRegisterRoute
   MerchantStatusRoute: typeof MerchantStatusRoute
+  MerchantWalletRoute: typeof MerchantWalletRoute
   PartnerDeliveryRoute: typeof PartnerDeliveryRoute
   PartnerFinancingRoute: typeof PartnerFinancingRoute
   PaymentPreviewRoute: typeof PaymentPreviewRoute
@@ -1251,6 +1289,7 @@ export interface RootRouteChildren {
   ApiInternalRefreshEideRoute: typeof ApiInternalRefreshEideRoute
   ApiInternalRiderInvitationsRoute: typeof ApiInternalRiderInvitationsRoute
   ApiInternalSyncEnterpriseCatalogsRoute: typeof ApiInternalSyncEnterpriseCatalogsRoute
+  ApiInternalWalletSettlementRoute: typeof ApiInternalWalletSettlementRoute
   ApiMobileCatalogRoute: typeof ApiMobileCatalogRoute
   ApiMobileCheckoutRoute: typeof ApiMobileCheckoutRoute
   ApiMobileDeliveryQuoteRoute: typeof ApiMobileDeliveryQuoteRoute
@@ -1259,6 +1298,7 @@ export interface RootRouteChildren {
   ApiMobilePaymentStatusRoute: typeof ApiMobilePaymentStatusRoute
   ApiMobileProfileRoute: typeof ApiMobileProfileRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
+  ApiPayoutsWebhookRoute: typeof ApiPayoutsWebhookRoute
   ApiProductMediaMediaIdRoute: typeof ApiProductMediaMediaIdRoute
   SitemapsProductsChar123pageChar125DotxmlRoute: typeof SitemapsProductsChar123pageChar125DotxmlRoute
   ApiBrandIntegrationWebhookRoute: typeof ApiBrandIntegrationWebhookRoute
@@ -1570,6 +1610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MerchantStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/merchant/wallet': {
+      id: '/merchant/wallet'
+      path: '/merchant/wallet'
+      fullPath: '/merchant/wallet'
+      preLoaderRoute: typeof MerchantWalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders/$id': {
       id: '/orders/$id'
       path: '/$id'
@@ -1829,6 +1876,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalSyncEnterpriseCatalogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/wallet-settlement': {
+      id: '/api/internal/wallet-settlement'
+      path: '/api/internal/wallet-settlement'
+      fullPath: '/api/internal/wallet-settlement'
+      preLoaderRoute: typeof ApiInternalWalletSettlementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/mobile/catalog': {
       id: '/api/mobile/catalog'
       path: '/api/mobile/catalog'
@@ -1883,6 +1937,13 @@ declare module '@tanstack/react-router' {
       path: '/api/payments/webhook'
       fullPath: '/api/payments/webhook'
       preLoaderRoute: typeof ApiPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payouts/webhook': {
+      id: '/api/payouts/webhook'
+      path: '/api/payouts/webhook'
+      fullPath: '/api/payouts/webhook'
+      preLoaderRoute: typeof ApiPayoutsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/product-media/$mediaId': {
@@ -1984,6 +2045,7 @@ const rootRouteChildren: RootRouteChildren = {
   MerchantLoginRoute: MerchantLoginRoute,
   MerchantRegisterRoute: MerchantRegisterRoute,
   MerchantStatusRoute: MerchantStatusRoute,
+  MerchantWalletRoute: MerchantWalletRoute,
   PartnerDeliveryRoute: PartnerDeliveryRoute,
   PartnerFinancingRoute: PartnerFinancingRoute,
   PaymentPreviewRoute: PaymentPreviewRoute,
@@ -2025,6 +2087,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalRiderInvitationsRoute: ApiInternalRiderInvitationsRoute,
   ApiInternalSyncEnterpriseCatalogsRoute:
     ApiInternalSyncEnterpriseCatalogsRoute,
+  ApiInternalWalletSettlementRoute: ApiInternalWalletSettlementRoute,
   ApiMobileCatalogRoute: ApiMobileCatalogRoute,
   ApiMobileCheckoutRoute: ApiMobileCheckoutRoute,
   ApiMobileDeliveryQuoteRoute: ApiMobileDeliveryQuoteRoute,
@@ -2033,6 +2096,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMobilePaymentStatusRoute: ApiMobilePaymentStatusRoute,
   ApiMobileProfileRoute: ApiMobileProfileRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
+  ApiPayoutsWebhookRoute: ApiPayoutsWebhookRoute,
   ApiProductMediaMediaIdRoute: ApiProductMediaMediaIdRoute,
   SitemapsProductsChar123pageChar125DotxmlRoute:
     SitemapsProductsChar123pageChar125DotxmlRoute,

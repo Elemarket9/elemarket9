@@ -16,6 +16,7 @@ const SCHEDULED_GET_PATHS = new Set([
   "/api/internal/rider-invitations",
   "/api/internal/collection-notifications",
   "/api/internal/purge-retention",
+  "/api/internal/wallet-settlement",
 ]);
 
 function constantTimeTextEqual(a: string, b: string): boolean {

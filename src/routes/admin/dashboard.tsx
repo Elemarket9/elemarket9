@@ -5,6 +5,7 @@ import { getAdminAccessState } from "../../modules/administration/public/transpo
 import { reviewMerchantApplication } from "../../modules/merchants/public/transport/admin/merchant-review.functions";
 import { loadAdminModeration, moderateCustomer, moderateMerchant, moderateProduct, setMerchantEnterpriseMode, type AdminModerationData } from "../../modules/administration/public/transport/admin/moderation.functions";
 import { loadCommissionPolicy, removeCommissionOverride, setCommissionRule, setGlobalCommissionRule, type AdminCommissionData } from "../../modules/administration/public/transport/admin/fee.functions";
+import { enableMerchantWallet } from "../../modules/wallet/public/transport/merchant/wallet.functions";
 import { AdminSupportWorkspace } from "@/components/admin-support-workspace";
 import { AdminWorkspaceNav } from "@/components/admin-workspace-nav";
 
@@ -99,6 +100,13 @@ function Dashboard() {
     finally { setModerationBusy(null); }
   }
 
+  async function moveMerchantToWallet(merchantId: string) {
+    if (!window.confirm("Move this merchant to the ELEMARKET wallet? New sales will stay in the platform's provider account and be paid out from the wallet instead of being split at checkout.")) return;
+    setModerationBusy(`merchant-wallet:${merchantId}`); setMessage(null);
+    try { await enableMerchantWallet({ data: { merchantId } }); window.location.reload(); }
+    catch (error) { setMessage(error instanceof Error && /unpaid checkouts/i.test(error.message) ? "This merchant has unpaid checkouts. Try again once they complete or expire." : "Wallet change failed."); }
+    finally { setModerationBusy(null); }
+  }
   async function moderateMerchantAccount(merchantId: string, action: "suspend" | "reinstate") {
     const reason = moderationReason[`merchant:${merchantId}`]?.trim();
     if (!reason || reason.length < 10) { setMessage("A moderation reason of at least 10 characters is required."); return; }
@@ -442,6 +450,7 @@ function Dashboard() {
               <div key={merchant.id} className="rounded-xl border border-market-line p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-black">{merchant.name}</p><p className="text-xs text-market-muted">{merchant.ownerEmail ?? "No owner email"} · {merchant.id}</p></div><span className="rounded-full border px-2 py-1 text-xs font-bold">{merchant.status}</span></div>
                 <p className="mt-2 text-xs text-market-muted">Tier: {merchant.tier} · Settlement: {merchant.settlementModel} · Catalog: {merchant.catalogSource}</p>
+                {merchant.settlementModel === "provider_direct" ? <button disabled={moderationBusy===`merchant-wallet:${merchant.id}`} onClick={()=>void moveMerchantToWallet(merchant.id)} className="mt-2 rounded-xl border border-market-line px-3 py-2 text-xs font-bold">Move to wallet payouts</button> : null}
                 <input value={moderationReason[`merchant:${merchant.id}`] ?? ""} onChange={e=>setModerationReason(v=>({...v,[`merchant:${merchant.id}`]:e.target.value}))} maxLength={2000} placeholder="Reason (optional)" className="mt-3 w-full rounded-xl border border-market-line px-3 py-2 text-sm" />
                 <input value={moderationReason[`merchant-enterprise:${merchant.id}`] ?? ""} onChange={e=>setModerationReason(v=>({...v,[`merchant-enterprise:${merchant.id}`]:e.target.value}))} maxLength={2000} placeholder="Enterprise-mode reason (required)" className="mt-2 w-full rounded-xl border border-market-line px-3 py-2 text-sm" />
                 <div className="mt-3 flex flex-wrap gap-2">{merchant.status === "suspended" ? <button disabled={moderationBusy===`merchant:${merchant.id}`} onClick={()=>void moderateMerchantAccount(merchant.id,"reinstate")} className="rounded-xl bg-market-green px-3 py-2 text-xs font-bold text-white">Reinstate</button> : <button disabled={moderationBusy===`merchant:${merchant.id}`} onClick={()=>void moderateMerchantAccount(merchant.id,"suspend")} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white">Suspend merchant</button>} {merchant.settlementModel === "enterprise_direct" ? <button disabled={moderationBusy===`merchant-enterprise:${merchant.id}`} onClick={()=>void setEnterpriseMode(merchant.id,false)} className="rounded-xl border border-market-line px-3 py-2 text-xs font-bold">Disable enterprise mode</button> : <button disabled={moderationBusy===`merchant-enterprise:${merchant.id}`} onClick={()=>void setEnterpriseMode(merchant.id,true)} className="rounded-xl bg-black px-3 py-2 text-xs font-bold text-white">Enable enterprise API mode</button>}</div>

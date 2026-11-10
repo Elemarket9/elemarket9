@@ -102,6 +102,10 @@ only behind ingress that overwrites client-supplied forwarded headers.
 
 ELEMARKET does not custody customer funds. Provider-managed settlement/refunds
 are available only when their configured adapters and authorization allow them.
+Merchants moved to `platform_wallet` settlement are paid from the merchant
+wallet: an append-only ledger of withheld, available, processing and paid-out
+earnings that sends payout commands to a provider-neutral payout driver, while
+the funds stay at the provider. See [merchant wallet](docs/merchant-wallet.md).
 The bundled payment adapter does not assert safe checkout-initialization replay
 or uncertain-refund reconciliation. Do not enable live checkout on the basis of
 compilation or simulated provider tests.
