@@ -16,7 +16,7 @@ services:
     env: node
     buildCommand: npm ci
     startCommand: node scripts/scheduler.mjs
-    autoDeploy: true
+    autoDeploy: false
     envVars:
       - key: NODE_VERSION
         value: 22
