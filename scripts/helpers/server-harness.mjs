@@ -22,7 +22,9 @@ export function configureSimulationEnv(extra = {}) {
     BETTER_AUTH_URL: "https://marketplace.example.com",
     ...extra,
   });
-  delete process.env.DATABASE_URL;
+  // A DATABASE_URL passed in `extra` selects real PostgreSQL; otherwise the
+  // isolated in-memory PGlite fallback is used.
+  if (!extra.DATABASE_URL) delete process.env.DATABASE_URL;
   delete process.env.REDIS_URL;
 }
 
@@ -85,7 +87,21 @@ export async function startHarness() {
      values('pp_paystack','paystack','Paystack (simulated)','mobile_money','active','paystack')
      on conflict (provider_key) do update set status='active', driver_key='paystack'`,
   );
-  return { vite, sql, load, close: () => vite.close() };
+  const close = async () => {
+    // End the app's PostgreSQL pool (if any) before the test database is dropped.
+    for (const key of ["__pgPoolPromise__", "__elemarketDiscoveryPool", "__elemarketMaintenancePool"]) {
+      const poolPromise = globalThis[key];
+      globalThis[key] = undefined;
+      if (poolPromise) {
+        const p = await poolPromise.catch(() => null);
+        p?.on?.("error", () => undefined);
+        await p?.end?.().catch(() => undefined);
+      }
+    }
+    globalThis.__pgSqlPromise__ = undefined;
+    await vite.close();
+  };
+  return { vite, sql, load, close };
 }
 
 /** Seed a verified customer, active merchant and one pending fixture order. */

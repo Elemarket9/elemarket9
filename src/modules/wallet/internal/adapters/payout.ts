@@ -46,22 +46,75 @@ export type PayoutState = {
   failureReason?: string;
 };
 
-export type PayoutWebhookNotice = { payoutId: string; providerReference: string | null };
+export type PayoutWebhookNotice = {
+  payoutId: string;
+  providerReference: string | null;
+  /** Used only when the provider has no status lookup; otherwise re-read. */
+  status?: "processing" | "paid" | "failed";
+  amount?: string;
+};
+
+/** A transfer as listed by the provider, for reconciliation. */
+export type ProviderPayoutRecord = {
+  payoutId: string | null;
+  providerReference: string;
+  status: "processing" | "paid" | "failed";
+  amount: string;
+  currency: string;
+};
+
+/**
+ * What a provider can actually guarantee. The wallet derives every retry and
+ * recovery decision from these flags; an undeclared capability is unsupported.
+ */
+export type PayoutCapabilities = {
+  /** Repeating createPayout with the same idempotencyKey never sends twice. */
+  idempotentInitiation: boolean;
+  /** getPayout returns the authoritative state of a payout by its payoutId. */
+  statusLookup: boolean;
+  /** Authenticated status notifications. */
+  webhooks: boolean;
+  /** listPayouts returns the provider's own record of transfers. */
+  reconciliationListing: boolean;
+  /** registerDestination confirms the account exists with the provider. */
+  destinationValidation: boolean;
+  /** quoteFee asks the provider; otherwise configured fees are used. */
+  feeQuote: boolean;
+};
+
+export const NO_CAPABILITIES: PayoutCapabilities = Object.freeze({
+  idempotentInitiation: false, statusLookup: false, webhooks: false,
+  reconciliationListing: false, destinationValidation: false, feeQuote: false,
+});
+
+/** Normalise a driver's declaration: anything missing or not exactly true is unsupported. */
+export function declaredCapabilities(driver: { capabilities?: Partial<Record<keyof PayoutCapabilities, unknown>> }): PayoutCapabilities {
+  const declared = driver.capabilities ?? {};
+  return Object.fromEntries(
+    (Object.keys(NO_CAPABILITIES) as Array<keyof PayoutCapabilities>).map((k) => [k, declared[k] === true]),
+  ) as PayoutCapabilities;
+}
 
 export interface PayoutDriver {
   readonly key: string;
-  /** Must be true: the provider de-duplicates on idempotencyKey. */
-  readonly supportsIdempotentPayouts: boolean;
+  readonly capabilities: PayoutCapabilities;
   readonly webhookSignatureHeaders?: readonly string[];
   /** Transfer fee in GHS for this amount and rail. The merchant pays it. */
   quoteFee(input: { amount: string; currency: "GHS"; rail: PayoutRail }): Promise<string>;
   registerDestination(input: PayoutDestinationInput): Promise<RegisteredPayoutDestination>;
   createPayout(command: PayoutCommand): Promise<PayoutState>;
-  /** Authoritative read-back. null means the provider has no such payout. */
-  getPayout(payoutId: string, providerReference: string | null): Promise<PayoutState | null>;
+  /** Authoritative read-back (capability statusLookup). null: provider has no such payout. */
+  getPayout?(payoutId: string, providerReference: string | null): Promise<PayoutState | null>;
+  /** Provider's transfers created since the given time (capability reconciliationListing). */
+  listPayouts?(since: Date): Promise<ProviderPayoutRecord[]>;
   verifyWebhook?(rawBody: string, signature: string | null): Promise<boolean>;
-  /** Identify which payout a notification concerns. Status is re-read via getPayout. */
   parseWebhook?(rawBody: string): Promise<PayoutWebhookNotice | null>;
+}
+
+/** True when the provider definitely did NOT accept the transfer. Works across module copies. */
+export function isDefinitiveRejection(error: unknown): boolean {
+  return Boolean(error) && typeof error === "object" && (error as { name?: unknown }).name === "PayoutProviderError"
+    && (error as { rejected?: unknown }).rejected === true;
 }
 
 export class PayoutProviderError extends Error {

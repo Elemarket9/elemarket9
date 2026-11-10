@@ -5,7 +5,9 @@ import {
   type PayoutDestinationInput,
   type PayoutDriver,
   type PayoutRail,
+  type PayoutCapabilities,
   type PayoutState,
+  type ProviderPayoutRecord,
   type RegisteredPayoutDestination,
 } from "./payout";
 
@@ -15,13 +17,16 @@ import {
  * Destinations whose account number ends in 0000 always fail, for testing.
  * The registry refuses this driver outside an isolated development opt-in.
  */
-type SandboxRecord = PayoutState & { reads: number };
+type SandboxRecord = PayoutState & { reads: number; payoutId: string };
 const store = ((globalThis as { __elemarketPayoutSandbox__?: Map<string, SandboxRecord> }).__elemarketPayoutSandbox__ ??=
   new Map<string, SandboxRecord>());
 
 export class SandboxPayoutDriver implements PayoutDriver {
   readonly key = "sandbox";
-  readonly supportsIdempotentPayouts = true;
+  readonly capabilities: PayoutCapabilities = Object.freeze({
+    idempotentInitiation: true, statusLookup: true, webhooks: false,
+    reconciliationListing: true, destinationValidation: true, feeQuote: false,
+  });
   async quoteFee(input: { amount: string; currency: "GHS"; rail: PayoutRail }): Promise<string> {
     return configuredPayoutFee(input.amount);
   }
@@ -42,6 +47,7 @@ export class SandboxPayoutDriver implements PayoutDriver {
       amount: command.amount,
       currency: command.currency,
       reads: 0,
+      payoutId: command.payoutId,
       failureReason: command.destinationRef.startsWith("sandbox_fail") ? "Sandbox: destination rejected the transfer" : undefined,
     };
     store.set(command.idempotencyKey, record);
@@ -52,7 +58,13 @@ export class SandboxPayoutDriver implements PayoutDriver {
     if (!record) return null;
     record.reads += 1;
     if (record.status === "processing") record.status = record.failureReason ? "failed" : "paid";
-    const { reads: _reads, ...state } = record;
+    const { reads: _reads, payoutId: _payoutId, ...state } = record;
     return state;
+  }
+  async listPayouts(): Promise<ProviderPayoutRecord[]> {
+    return [...store.values()].map((r) => ({
+      payoutId: r.payoutId, providerReference: r.providerReference, status: r.status,
+      amount: r.amount ?? "0.00", currency: r.currency ?? "GHS",
+    }));
   }
 }

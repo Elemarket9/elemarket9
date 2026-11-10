@@ -1,5 +1,5 @@
 import { isWorkspacePreview } from "@/lib/env.server";
-import type { PayoutDriver } from "./payout";
+import { declaredCapabilities, type PayoutDriver } from "./payout";
 import { loadBundledPayoutDriver } from "./providers/registry";
 
 /**
@@ -50,6 +50,7 @@ async function loadDriver(key: string): Promise<PayoutDriver> {
     ]);
     return new SignedHttpPayoutDriver(key, endpoint, secret, (url, init) => fetchPinnedPublicHttps(url, init), {
       quoteFeesRemotely: process.env.ELEMARKET_PAYOUT_HTTP_REMOTE_FEES === "1",
+      listing: process.env.ELEMARKET_PAYOUT_HTTP_LISTING === "1",
     });
   }
   const specifier = process.env[`ELEMARKET_PAYOUT_DRIVER_${key.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}_MODULE`]?.trim();
@@ -64,8 +65,18 @@ async function loadDriver(key: string): Promise<PayoutDriver> {
   if (typeof loaded.createPayoutDriver !== "function")
     throw new Error(`Payout driver '${key}' does not export createPayoutDriver`);
   const driver = loaded.createPayoutDriver({ key });
-  if (driver.supportsIdempotentPayouts !== true)
-    throw new Error(`Payout driver '${key}' must guarantee idempotent payouts`);
+  if (!driver || typeof driver.createPayout !== "function" || typeof driver.registerDestination !== "function"
+      || typeof driver.quoteFee !== "function" || driver.key !== key)
+    throw new Error(`Payout driver '${key}' does not implement the payout contract`);
+  // Capabilities are what the wallet's safety decisions rest on: every one
+  // that is not declared exactly true is treated as unsupported.
+  const caps = declaredCapabilities(driver);
+  if (caps.statusLookup && typeof driver.getPayout !== "function")
+    throw new Error(`Payout driver '${key}' declares status lookup without getPayout`);
+  if (caps.reconciliationListing && typeof driver.listPayouts !== "function")
+    throw new Error(`Payout driver '${key}' declares listing without listPayouts`);
+  if (caps.webhooks && (typeof driver.verifyWebhook !== "function" || typeof driver.parseWebhook !== "function"))
+    throw new Error(`Payout driver '${key}' declares webhooks without verification`);
   return driver;
 }
 
