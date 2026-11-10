@@ -46,6 +46,7 @@ jobs:
       - run: npm run security:ci
       - run: npm run check:architecture
       - run: npm run validate:deployment-package
+      - run: npm test
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
