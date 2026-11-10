@@ -6,8 +6,10 @@ import {
   type PayoutDestinationInput,
   type PayoutDriver,
   type PayoutRail,
+  type PayoutCapabilities,
   type PayoutState,
   type PayoutWebhookNotice,
+  type ProviderPayoutRecord,
   type RegisteredPayoutDestination,
 } from "./payout";
 
@@ -51,17 +53,26 @@ function timingSafeHexEqual(a: string, b: string): boolean {
 }
 
 export class SignedHttpPayoutDriver implements PayoutDriver {
-  readonly supportsIdempotentPayouts = true;
   readonly webhookSignatureHeaders = ["x-elemarket-signature"] as const;
+  readonly capabilities: PayoutCapabilities;
   private readonly base: URL;
   constructor(
     readonly key: string,
     endpoint: string,
     private readonly secret: string,
     private readonly transport: HttpTransport,
-    private readonly options: { quoteFeesRemotely?: boolean; env?: Record<string, string | undefined> } = {},
+    private readonly options: { quoteFeesRemotely?: boolean; listing?: boolean; env?: Record<string, string | undefined> } = {},
   ) {
     if (secret.length < 32) throw new Error("Payout driver secret must be at least 32 characters");
+    // The documented contract requires idempotent POST /payouts and GET /payouts/{id}.
+    this.capabilities = Object.freeze({
+      idempotentInitiation: true,
+      statusLookup: true,
+      webhooks: true,
+      reconciliationListing: options.listing === true,
+      destinationValidation: true,
+      feeQuote: options.quoteFeesRemotely === true,
+    });
     this.base = new URL(endpoint.endsWith("/") ? endpoint : `${endpoint}/`);
     if (this.base.protocol !== "https:") throw new Error("Payout endpoint must use HTTPS");
   }
@@ -142,6 +153,21 @@ export class SignedHttpPayoutDriver implements PayoutDriver {
     if (!response.ok) throw new PayoutProviderError("Payout status lookup failed", false, response.status);
     const parsed = stateSchema.safeParse(await this.json(response));
     if (!parsed.success) throw new PayoutProviderError("Invalid payout status response");
+    return parsed.data;
+  }
+
+  async listPayouts(since: Date): Promise<ProviderPayoutRecord[]> {
+    if (!this.capabilities.reconciliationListing) throw new PayoutProviderError("Payout listing is not enabled for this provider");
+    const response = await this.call("GET", `payouts?since=${encodeURIComponent(since.toISOString())}`);
+    if (!response.ok) throw new PayoutProviderError("Payout listing failed", false, response.status);
+    const parsed = z.array(z.object({
+      payoutId: z.string().max(256).nullable(),
+      providerReference: z.string().min(1).max(256),
+      status: z.enum(["processing", "paid", "failed"]),
+      amount: z.string().regex(/^\d{1,9}\.\d{2}$/),
+      currency: z.string().regex(/^[A-Z]{3}$/),
+    })).max(10_000).safeParse(await this.json(response));
+    if (!parsed.success) throw new PayoutProviderError("Invalid payout listing response");
     return parsed.data;
   }
 

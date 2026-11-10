@@ -213,5 +213,6 @@
   "0213_delivery_quote_and_hold_integrity.sql": "88ad478a595053e50cdb6e27034f552d2d59f0b9bc17ae3ca94c20bd06d31864",
   "0214_logic_checkout_inventory_and_money.sql": "5c91e90a61297a341f97ddbafa2e492d2846011282537cf82ee589260eda7bf0",
   "0215_checkout_empty_order_guard.sql": "dd0e3f6c64bc795b085b5d5e835404114f146eae61bc8543d8db8c42431f5941",
-  "0216_merchant_wallet.sql": "82d9d67901be6f090ab03336de3dc6fcb7e24256b806ec8e3da37c2dd4d9a518"
+  "0216_merchant_wallet.sql": "82d9d67901be6f090ab03336de3dc6fcb7e24256b806ec8e3da37c2dd4d9a518",
+  "0217_wallet_payout_safety.sql": "f90c9e356cdbf32c987ec1c0fff2932bd72b7ba5b081459b4c3f49dab4d2a034"
 }

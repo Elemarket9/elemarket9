@@ -3,6 +3,7 @@ import { useState, type ButtonHTMLAttributes, type FormEvent, type ReactNode } f
 import { z } from "zod";
 import {
   addMerchantPayoutDestination,
+  cancelMerchantWithdrawal,
   listWalletMerchants,
   loadMerchantWallet,
   previewMerchantWithdrawal,
@@ -31,14 +32,17 @@ export const Route = createFileRoute("/merchant/wallet")({
 });
 
 const BUCKET_LABEL: Record<string, string> = {
-  withheld: "Withheld", available: "Available", processing: "Being paid out", paid_out: "Paid out", fees: "Transfer fees",
+  withheld: "Withheld", available: "Available", processing: "Reserved / being paid", paid_out: "Paid out", fees: "Transfer fees",
+  recovery: "Owed from refunds",
 };
 const TYPE_LABEL: Record<string, string> = {
   sale: "Sale", release: "Released", refund: "Refund", payout_requested: "Withdrawal requested",
   payout_paid: "Withdrawal paid", payout_fee: "Transfer fee", payout_returned: "Withdrawal returned",
+  payout_cancelled: "Withdrawal cancelled", late_payout_paid: "Withdrawal confirmed late by provider", reclassification: "Balance correction",
 };
 const STATUS_LABEL: Record<string, string> = {
-  requested: "Sending", processing: "Processing", paid: "Paid", failed: "Failed (returned to available)", needs_attention: "Under review",
+  reserved: "Reserved", processing: "Processing", under_review: "Under review by ELEMARKET", completed: "Completed",
+  failed: "Failed (returned to available)", cancelled: "Cancelled",
 };
 
 const ghs = (v: string) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -55,6 +59,11 @@ function safeError(error: unknown) {
     [/payouts are not configured/i, "Withdrawals are not switched on yet. Contact ELEMARKET support."],
     [/previous payout provider/i, "This payout account was set up with a previous provider. Add it again."],
     [/only the merchant/i, "Only the merchant owner can move wallet funds."],
+    [/cooling period/i, "New payout accounts can be used 24 hours after they are added, for your security."],
+    [/below the minimum/i, "That is below the minimum withdrawal."],
+    [/above the maximum/i, "That is above the maximum single withdrawal."],
+    [/daily withdrawal/i, "You have reached today's withdrawal limit."],
+    [/can no longer be cancelled/i, "This withdrawal has already been sent and can't be cancelled."],
     [/too many|rate/i, "Too many attempts. Try again in a few minutes."],
   ];
   return known.find(([re]) => re.test(message))?.[1] ?? "That did not work. Please try again.";
@@ -114,29 +123,37 @@ function Balances({ wallet }: { wallet: Snapshot }) {
   const b = wallet.balances;
   const tiles: Array<[string, string, string]> = [
     ["Available to withdraw", b.available, "Released earnings you can withdraw now."],
-    ["Withheld", b.withheld, "Held until delivery is confirmed and the return window closes."],
-    ["Being paid out", b.processing, "Withdrawals the provider is sending."],
+    ["Pending", b.pending, "Paid orders waiting for delivery confirmation."],
+    ["On hold", b.onHold, "Delivered; held until the return window closes and nothing is disputed."],
+    ["Withdrawals in progress", (Number(b.reserved) + Number(b.processing)).toFixed(2), "Reserved or being sent to your account."],
     ["Paid out", b.paidOut, "Sent to your account, after transfer fees."],
   ];
   return (
-    <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Wallet balances">
+    <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Wallet balances">
       {tiles.map(([label, value, hint], i) => (
         <div key={label} className={`rounded-2xl border border-market-line p-4 shadow-market ${i === 0 ? "bg-market-mint" : "bg-white"}`}>
           <p className="text-xs font-black uppercase tracking-wide text-market-muted">{label}</p>
-          <p className={`mt-2 text-2xl font-black ${Number(value) < 0 ? "text-market-orange" : ""}`}>{ghs(value)}</p>
+          <p className="mt-2 text-2xl font-black">{ghs(value)}</p>
           <p className="mt-1 text-xs text-market-muted">{hint}</p>
         </div>
       ))}
-      <p className="text-xs text-market-muted sm:col-span-2 lg:col-span-4">
-        Total sales {ghs(b.totalSales)} · Refunded {ghs(b.refunded)} · Transfer fees paid {ghs(b.payoutFees)}. Sales are your share after ELEMARKET commission; delivery fees are not included.
+      <p className="text-xs text-market-muted sm:col-span-2 lg:col-span-5">
+        Total earnings {ghs(b.totalSales)} · Refunded {ghs(b.refunded)} · Failed withdrawals {ghs(b.failedWithdrawals)} · Transfer fees paid {ghs(b.payoutFees)}.
+        Earnings are your share after ELEMARKET commission; delivery fees are not included.
       </p>
+      {Number(b.owedFromRefunds) > 0 ? (
+        <p className="rounded-xl border border-market-line bg-market-soft p-3 text-sm sm:col-span-2 lg:col-span-5">
+          {ghs(b.owedFromRefunds)} from customer refunds will be taken from your next released earnings.
+        </p>
+      ) : null}
     </section>
   );
 }
 
 function Withdraw({ wallet }: { wallet: Snapshot }) {
-  const verified = wallet.destinations.filter((d) => d.status === "verified");
-  const active = wallet.payouts.find((p) => ["requested", "processing", "needs_attention"].includes(p.status));
+  const now = Date.now();
+  const verified = wallet.destinations.filter((d) => d.status === "verified" && new Date(d.usableFrom).getTime() <= now);
+  const active = wallet.payouts.find((p) => ["reserved", "processing", "under_review"].includes(p.status));
   const [amount, setAmount] = useState("");
   const [destinationId, setDestinationId] = useState(verified[0]?.id ?? "");
   const [quote, setQuote] = useState<{ amount: string; fee: string; netAmount: string } | null>(null);
@@ -162,7 +179,17 @@ function Withdraw({ wallet }: { wallet: Snapshot }) {
 
   return (
     <Card title="Withdraw">
-      {active ? <p className="mt-3 text-sm">A withdrawal of {ghs(active.netAmount)} is {STATUS_LABEL[active.status]?.toLowerCase()}.</p> : null}
+      {active ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <span>A withdrawal of {ghs(active.netAmount)} is {STATUS_LABEL[active.status]?.toLowerCase()}.</span>
+          {active.cancellable ? <Button type="button" disabled={busy} className="border border-market-line bg-white" onClick={async () => {
+            setBusy(true); setMessage(null);
+            try { await cancelMerchantWithdrawal({ data: { merchantId: wallet.merchantId, payoutId: active.id } }); window.location.reload(); }
+            catch (err) { setMessage(safeError(err)); setBusy(false); }
+          }}>Cancel</Button> : null}
+        </div>
+      ) : null}
+      <p className="mt-2 text-xs text-market-muted">Withdraw between {ghs(wallet.limits.minAmount)} and {ghs(wallet.limits.maxAmount)}, up to {wallet.limits.dailyCount} times a day.</p>
       {!wallet.payoutsConfigured ? <p className="mt-3 text-sm text-market-muted">Withdrawals are not switched on yet.</p> : null}
       {wallet.payoutsConfigured && !verified.length ? <p className="mt-3 text-sm text-market-muted">Add a payout account first.</p> : null}
       <form onSubmit={review} className="mt-4 grid gap-3">
@@ -212,7 +239,9 @@ function Destinations({ wallet }: { wallet: Snapshot }) {
         {wallet.destinations.length ? wallet.destinations.map((d) => (
           <li key={d.id} className="flex items-center justify-between rounded-xl border border-market-line px-3 py-2">
             <span>{d.rail === "bank" ? "Bank" : "Mobile money"} {d.displayHint} · {d.accountName}</span>
-            <span className={`text-xs font-black ${d.status === "verified" ? "text-market-green" : "text-market-muted"}`}>{d.status === "verified" ? "Verified" : "Pending"}</span>
+            <span className={`text-xs font-black ${d.status === "verified" ? "text-market-green" : "text-market-muted"}`}>
+              {d.status !== "verified" ? "Pending" : new Date(d.usableFrom).getTime() > Date.now() ? `Usable from ${when(d.usableFrom)}` : "Verified"}
+            </span>
           </li>
         )) : <li className="text-market-muted">No payout account yet.</li>}
       </ul>

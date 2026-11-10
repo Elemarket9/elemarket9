@@ -21,7 +21,13 @@ export const Route = createFileRoute("/api/internal/wallet-settlement")({
           payoutsConfigured = false;
         }
         const result = await runWalletSettlement();
-        return Response.json({ ok: true, payoutsConfigured, ...result }, { headers: { "cache-control": "no-store" } });
+        // Full provider reconciliation every 15 minutes.
+        let reconciliation: unknown = null;
+        if (new Date().getUTCMinutes() % 15 === 0) {
+          const { runWalletReconciliation } = await import("@/modules/wallet/public/wallet.server");
+          reconciliation = await runWalletReconciliation();
+        }
+        return Response.json({ ok: true, payoutsConfigured, ...result, reconciliation }, { headers: { "cache-control": "no-store" } });
       },
     },
   },

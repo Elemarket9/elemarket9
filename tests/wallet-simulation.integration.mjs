@@ -17,6 +17,10 @@ configureSimulationEnv({
   ELEMARKET_ENABLE_PAYOUT_SANDBOX: "1",
   ELEMARKET_PAYOUT_FEE_FLAT: "1.00",
   ELEMARKET_PAYOUT_FEE_BPS: "0",
+  // This suite adds a payout account and withdraws at once; the cooling period
+  // and limits are covered by the PostgreSQL adversarial suite.
+  ELEMARKET_WALLET_DESTINATION_COOLDOWN_HOURS: "0",
+  ELEMARKET_WALLET_MIN_WITHDRAWAL: "1",
 });
 const provider = installPaymentProviderMock();
 // Fresh request id per withdrawal attempt (what the UI generates per form).
