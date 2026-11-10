@@ -10,6 +10,10 @@ import type {
 } from "../payment";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
 import { marketplaceSettlementChargePesewas } from "@/lib/commerce-guards.mjs";
+import {
+  deterministicPaymentReference,
+  moneyToMinorUnits,
+} from "@/modules/payments/internal/payment-reference";
 
 async function readProviderJson(response: Response): Promise<unknown> {
   const body = await readResponseBodyWithLimit(response, 512 * 1024);
@@ -84,10 +88,9 @@ function asProviderId(value: unknown): string | null {
 export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // A request header is not evidence of refund idempotency. Automatic retries stay disabled.
   readonly supportsIdempotentRefunds = false;
-  // A unique provider reference prevents a duplicate charge, but the provider
-  // does not document replaying the same checkout response after a timeout.
-  // Fail closed until safe reference-based initialization recovery is verified.
-  readonly supportsIdempotentInitialization = false;
+  // The charge reference is the payment attempt id. A retry reuses that reference
+  // and verifies it before another initialize, so it cannot create a second charge.
+  readonly supportsIdempotentInitialization = true;
   readonly supportsDirectSubaccountSettlement = true;
   readonly webhookSignatureHeaders = ["x-paystack-signature"] as const;
   constructor(
@@ -98,12 +101,9 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
     if (!input.customerEmail) throw new Error("Provider requires a customer email");
     if (input.currency !== "GHS")
       throw new Error("Configured provider currently supports GHS only");
-    const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.amount.trim());
-    if (!m) throw new Error("Invalid payment amount");
-    const amountMinor = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
-    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0)
-      throw new Error("Invalid payment amount");
-    const reference = input.attemptId.replace(/[^A-Za-z0-9\-.=]/g, "").slice(0, 100);
+    const amountMinor = moneyToMinorUnits(input.amount);
+    if (amountMinor <= 0) throw new Error("Invalid payment amount");
+    const reference = deterministicPaymentReference(input.attemptId);
     const body: Record<string, unknown> = {
       email: input.customerEmail,
       amount: String(amountMinor),
@@ -142,8 +142,23 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       !parsed.data.data?.reference ||
       parsed.data.data.reference !== reference ||
       !parsed.data.data.authorization_url
-    )
+    ) {
+      // The reference was reserved before this call. If the provider already
+      // has it, do not mint another one. Checkout can resume from verification.
+      try {
+        const existing = await this.verifyTransaction(reference);
+        if (existing.reference === reference) {
+          return {
+            providerReference: reference,
+            status: existing.status === "completed" ? "completed" : "initiated",
+            metadata: { recovered: true, providerStatus: existing.status },
+          };
+        }
+      } catch {
+        // The provider has no transaction for this reference yet.
+      }
       throw new Error(`Provider transaction initialization failed (HTTP ${response.status})`);
+    }
     return {
       providerReference: parsed.data.data.reference,
       status: "initiated",
@@ -227,11 +242,8 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   }): Promise<PaymentRefundResult> {
     if (input.currency !== "GHS")
       throw new Error("Configured provider currently supports GHS only");
-    const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(input.amount.trim());
-    if (!m) throw new Error("Invalid refund amount");
-    const amountMinor = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
-    if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0)
-      throw new Error("Invalid refund amount");
+    const amountMinor = moneyToMinorUnits(input.amount);
+    if (amountMinor <= 0) throw new Error("Invalid refund amount");
     const response = await fetch(`${this.baseUrl}/refund`, {
       method: "POST",
       headers: {

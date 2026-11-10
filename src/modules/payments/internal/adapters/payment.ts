@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
+import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
 export type PaymentAdapterInput = {
   paymentId: string;
   attemptId: string;
@@ -189,6 +190,7 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
     return parsed.data;
   }
   async createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult> {
+    const { platformFee: _platformFee, ...providerBody } = input;
     const response = await fetchPinnedPublicHttps(this.endpoint, {
       method: "POST",
       headers: {
@@ -196,7 +198,7 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
         authorization: `Bearer ${this.secret}`,
         ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify(providerBody),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Payment provider returned HTTP ${response.status}`);
@@ -218,7 +220,7 @@ export class PreviewPaymentAdapter implements PaymentProviderAdapter {
   async createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult> {
     const financingDeposit = input.customerReference?.startsWith("financing_deposit:");
     return {
-      providerReference: input.attemptId,
+      providerReference: deterministicPaymentReference(input.attemptId),
       status: "initiated",
       checkoutUrl: financingDeposit
         ? `/financing/deposit-preview?depositPaymentId=${encodeURIComponent(input.paymentId)}`

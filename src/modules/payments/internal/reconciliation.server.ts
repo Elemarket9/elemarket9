@@ -189,9 +189,12 @@ export async function reconcileStalePayments(limit = 50): Promise<Reconciliation
       // Only terminal provider states are applied; everything else stays
       // in-flight for the next sweep.
       const appliedStatus =
-        verified.status === "completed"
+        verified.status === "completed" || verified.status === "success"
           ? "completed"
-          : verified.status === "failed"
+          : verified.status === "failed" ||
+              verified.status === "abandoned" ||
+              verified.status === "reversed" ||
+              verified.status === "cancelled"
             ? "failed"
             : null;
       if (!appliedStatus) continue;
