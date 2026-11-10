@@ -1,3 +1,4 @@
+import { nonRelevanceCursorPredicate } from "./search-cursor";
 import {EIDE_VERSION} from './eide/version';
 import { discoverySigningSecret } from './eide/signing-secret';
 import { exposureRequest, signExposure } from './eide/attribution.server';
@@ -140,7 +141,7 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
   let after='';
   if(cursor){const lane=add(cursor.lane,'integer'),keyParam=add(cursor.key,'double precision'),score=add(cursor.score,'double precision'),id=add(cursor.id);
     if(sort==='relevance')after=`where (_lane<${lane} or (_lane=${lane} and (_score<${score} or (_score=${score} and id>${id})))) and ${keyParam} is not null`;
-    else {const op=sort==='price_asc'?'>':'<';after=`where (_key${op}${keyParam} or (_key=${keyParam} and (_lane<${lane} or (_lane=${lane} and (_score<${score} or (_score=${score} and id>${id})))))`;}
+    else {const pageSort=sort==='price_asc'||sort==='newest'?sort:'price_desc';after=nonRelevanceCursorPredicate(pageSort,lane,keyParam,score,id);}
   }
   const limit=add(data.limit+1,'integer');
   const order=sort==='relevance'?'_lane desc,_score desc,id asc':`_key ${sort==='price_asc'?'asc':'desc'},_lane desc,_score desc,id asc`;

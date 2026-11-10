@@ -7,6 +7,7 @@ import { requireCustomerOrder, requireMerchantOrder } from "@/modules/ordering/i
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import type { JsonObject } from "@/lib/db-types";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
+import { formatOrderCursor, parseOrderCursor } from "@/modules/ordering/internal/order-cursor";
 
 const orderIdSchema = z.object({ orderId: z.string().min(1).max(128) });
 const merchantOrderSchema = z.object({ orderId: z.string().min(1).max(128), merchantId: z.string().min(1).max(128) });
@@ -37,6 +38,7 @@ export const listCustomerOrders = createServerFn({ method: "GET" })
     const userId = getAuthenticatedUserId(context);
     const sql = await getSql();
     const limit = Math.min(data.limit, 50);
+    const cursor = parseOrderCursor(data.cursor);
     const rows = await sql.query<{
       id:string; status:string; currency:string; product_total:string; delivery_total:string; grand_total:string;
       created_at:string; updated_at:string; delivered_at:string|null; dispute_status:string|null; dispute_created_at:string|null;
@@ -46,14 +48,16 @@ export const listCustomerOrders = createServerFn({ method: "GET" })
               d.status as dispute_status,d.created_at::text as dispute_created_at
          from orders o
          left join lateral (select status,created_at from customer_order_disputes where order_id=o.id order by created_at desc limit 1) d on true
-        where o.user_id=$1 and ($2::timestamptz is null or o.created_at < $2::timestamptz)
-        order by o.created_at desc
-        limit $3`, [userId, data.cursor ?? null, limit + 1]);
+        where o.user_id=$1
+          and ($2::timestamptz is null or o.created_at < $2::timestamptz or (o.created_at = $2::timestamptz and $3::text is not null and o.id < $3))
+        order by o.created_at desc, o.id desc
+        limit $4`, [userId, cursor.at, cursor.id, limit + 1]);
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
+    const last = page[page.length - 1];
     return {
       orders: page.map(r => ({ id:r.id,status:r.status,currency:r.currency,productTotal:r.product_total,deliveryTotal:r.delivery_total,grandTotal:r.grand_total,createdAt:r.created_at,updatedAt:r.updated_at,deliveredAt:r.delivered_at,disputeStatus:r.dispute_status,disputeCreatedAt:r.dispute_created_at })),
-      nextCursor: hasMore ? page[page.length-1]?.created_at ?? null : null,
+      nextCursor: hasMore && last ? formatOrderCursor(last.created_at, last.id) : null,
     };
   });
 
