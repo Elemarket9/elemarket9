@@ -11,6 +11,7 @@ export const JOBS = Object.freeze([
   { path: '/api/internal/enterprise-webhook-worker', everyMinutes: 1 },
   { path: '/api/internal/sync-enterprise-catalogs', everyMinutes: 5 },
   { path: '/api/internal/refresh-eide', everyMinutes: 5 },
+  { path: '/api/internal/purge-retention', everyMinutes: 5 },
 ]);
 export function signedHeaders({ secret, path, timestamp = Date.now(), nonce = randomBytes(24).toString('hex') }) {
   if (typeof secret !== 'string' || secret.length < 32) throw new Error('Scheduler signing secret must be at least 32 characters');
@@ -26,4 +27,11 @@ export function signedHeaders({ secret, path, timestamp = Date.now(), nonce = ra
 }
 export function dueJobs(minute) {
   return JOBS.filter(job => minute % job.everyMinutes === 0);
+}
+/** Replay at most the first missed minute, then the current one. Do not stampede. */
+export function minutesToRun(previousMinute, minute) {
+  if (!Number.isInteger(previousMinute) || previousMinute < 0 || !Number.isInteger(minute) || minute <= previousMinute) return [minute];
+  const missed = minute - previousMinute - 1;
+  if (missed <= 0) return [minute];
+  return [previousMinute + 1, minute];
 }

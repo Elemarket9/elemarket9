@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, createHash } from 'node:crypto';
-import { JOBS, signedHeaders, dueJobs } from '../scripts/scheduler-core.mjs';
+import { JOBS, signedHeaders, dueJobs, minutesToRun } from '../scripts/scheduler-core.mjs';
 import { nextHeartbeat, heartbeatHealthy } from '../scripts/scheduler-heartbeat.mjs';
 test('every scheduled job has unique approved internal path and cadence', () => {
   assert.ok(JOBS.length > 0);
@@ -16,6 +16,12 @@ test('scheduler signatures bind timestamp nonce method path and empty-body hash'
   assert.equal(h['x-elemarket-sync-signature'],createHmac('sha256',secret).update(`${timestamp}.${nonce}.GET.${path}.${hash}`).digest('hex'));
   assert.throws(()=>signedHeaders({secret,path:'/api/admin/delete'}),/not registered/);
   assert.throws(()=>signedHeaders({secret:'too-short',path}),/at least 32/);
+});
+test('a missed scheduler minute replays only the first gap', () => {
+  assert.deepEqual(minutesToRun(-1, 10), [10]);
+  assert.deepEqual(minutesToRun(9, 10), [10]);
+  assert.deepEqual(minutesToRun(8, 10), [9, 10]);
+  assert.deepEqual(minutesToRun(4, 10), [5, 10]);
 });
 test('due jobs use their configured interval',()=>{
   assert.equal(dueJobs(10).length,JOBS.length);

@@ -3,7 +3,7 @@
  * Put it behind the private Docker network; never expose its signed secrets.
  */
 import { writeFile } from 'node:fs/promises';
-import { JOBS, dueJobs } from './scheduler-core.mjs';
+import { JOBS, dueJobs, minutesToRun } from './scheduler-core.mjs';
 import { nextHeartbeat } from './scheduler-heartbeat.mjs';
 import { runScheduledJob } from './scheduler-request.mjs';
 const baseUrl = process.env.ELEMARKET_SCHEDULER_BASE_URL || 'http://app:8080';
@@ -27,21 +27,25 @@ async function runOne(job) {
 async function tick() {
   const minute = Math.floor(Date.now() / 60000);
   if (minute === lastMinute || executing || stopping) return;
-  if (lastMinute >= 0 && minute > lastMinute + 1) {
-    console.error(`[scheduler] missed ${minute - lastMinute - 1} minute(s); investigate capacity. No backlog replay.`);
-  }
+  const missed = lastMinute >= 0 ? minute - lastMinute - 1 : 0;
+  if (missed > 0) console.error(`[scheduler] missed ${missed} minute(s); replaying the first missed minute only.`);
+  const minutes = minutesToRun(lastMinute, minute);
   lastMinute = minute;
   executing = true;
-  const jobs = dueJobs(minute);
   let failures = 0;
+  let jobsRun = 0;
   try {
-    await Promise.all(jobs.map(async (job) => {
-      try { await runOne(job); console.log(`[scheduler] job ok: ${job.path}`); }
-      catch (error) { failures++; console.error(`[scheduler] job failed: ${job.path}:`, error?.message ?? error); }
-    }));
+    for (const slot of minutes) {
+      const jobs = dueJobs(slot);
+      jobsRun += jobs.length;
+      await Promise.all(jobs.map(async (job) => {
+        try { await runOne(job); console.log(`[scheduler] job ok: ${job.path}`); }
+        catch (error) { failures++; console.error(`[scheduler] job failed: ${job.path}:`, error?.message ?? error); }
+      }));
+    }
     // Missed/failed tasks remain observable; health check goes unhealthy when
     // there is a failure, rather than silently declaring the scheduler healthy.
-    heartbeat = nextHeartbeat(heartbeat, { jobs: jobs.length, failures });
+    heartbeat = nextHeartbeat(heartbeat, { jobs: jobsRun, failures });
     await writeFile(heartbeatPath, JSON.stringify(heartbeat));
   } finally { executing=false; }
 }
