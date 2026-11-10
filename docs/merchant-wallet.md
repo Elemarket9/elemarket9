@@ -6,11 +6,11 @@ and it sends payout commands to whichever payout provider ELEMARKET connects.
 
 ## Custody boundary
 
-Customer money stays in ELEMARKET's account **at the connected payment
-provider**. ELEMARKET never holds funds itself: the wallet is a ledger of what
-each merchant is owed, plus the instructions it sends the provider to pay them.
-Have this arrangement reviewed against Bank of Ghana rules (Payment Systems and
-Services Act, 2019, Act 987) before going live.
+Customer money is held by the connected payment provider, and payouts are
+made by the connected payout provider. ELEMARKET is neither a custodian nor a
+disbursement institution: it never holds or moves funds itself. The wallet is
+a ledger of what each merchant is owed, plus the instructions it sends the
+provider to pay them.
 
 ## Who uses it
 

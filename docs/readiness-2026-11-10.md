@@ -53,18 +53,17 @@ These are required before taking real orders:
 1. **Payment provider.** Activate at least one payment provider with test keys first, then live keys.
    - Until then the payment webhook answers 503. The smoke test flags this as a warning.
    - Run a sandbox charge, refund and payout end to end.
-2. **Payout provider.** Configure a payout driver for merchant withdrawals. Until then `wallet-settlement` reports `payoutsConfigured: false`.
-3. **Licensing.** Confirm the Bank of Ghana position for holding and paying out merchant funds. The provider holds the funds, but this still needs confirming.
-4. **Infrastructure.** VPS, DNS for the five hosts, and real TLS certificates. After deploy, run:
+2. **Payout provider.** Configure a payout driver for merchant withdrawals. The provider holds and disburses the funds; ELEMARKET only keeps the ledger and sends instructions. Until then `wallet-settlement` reports `payoutsConfigured: false`.
+3. **Infrastructure.** VPS, DNS for the five hosts, and real TLS certificates. After deploy, run:
    ```
    ELEMARKET_DOMAIN=… ELEMARKET_SELLER_HOST=… ELEMARKET_STAFF_HOST=… \
    ELEMARKET_EXECUTIVE_HOST=… ELEMARKET_PROVIDER_HOST=… CRON_SECRET=… \
    node scripts/smoke-deployment.mjs
    ```
-5. **Single-vendor exposure.** SMS/OTP (arkesel), email (resend) and storage (r2) each have one registered provider. Register a second for SMS/OTP at least, since login depends on it.
-6. **Mobile.**
+4. **Single-vendor exposure.** SMS/OTP (arkesel), email (resend) and storage (r2) each have one registered provider. Register a second for SMS/OTP at least, since login depends on it.
+5. **Mobile.**
    - Sign the release APK and test on real devices.
    - The Expo SDK 55→58 upgrade needs device testing.
    - 7 low `deepmerge` advisories are waiting on an upstream fix.
-7. **Executive-face add-on.** Still on Node 22. Move it to 26 when you next touch it.
-8. **Backups in production.** Schedule `pg_dump` with off-site copies. Run the restore drill (`tests/database-operations.postgres.mjs`) against a copy each quarter.
+6. **Executive-face add-on.** Still on Node 22. Move it to 26 when you next touch it.
+7. **Backups in production.** Schedule `pg_dump` with off-site copies. Run the restore drill (`tests/database-operations.postgres.mjs`) against a copy each quarter.

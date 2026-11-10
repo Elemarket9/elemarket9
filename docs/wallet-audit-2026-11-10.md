@@ -121,9 +121,6 @@ capabilities from the adapter's declaration. The neutrality guard
 
 ## H. Remaining external requirements (cannot be verified locally)
 
-- **Licensing:** whether holding merchant earnings in the platform's provider
-  account and releasing them later is permitted for ELEMARKET under Bank of
-  Ghana rules (Act 987) and the chosen provider's contract.
 - **Provider guarantees:** that the real provider honours idempotency keys on
   transfers, offers authoritative status lookup, signs webhooks, and lists
   transfers. The adapter must declare only what is contractually guaranteed.
