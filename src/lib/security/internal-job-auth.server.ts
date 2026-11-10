@@ -43,7 +43,16 @@ export async function authorizeScheduledJobRequest(
   ) {
     return true;
   }
-  return authorizeInternalHmacRequest(request, hmacSecret);
+  // The portable scheduler (scripts/scheduler.mjs) holds only CRON_SECRET and signs
+  // every scheduled GET with it. Routes whose manual/POST callers use a separate
+  // HMAC secret (the enterprise workers) must still accept that scheduler proof,
+  // or they never run. This grants nothing beyond the bearer credential above for
+  // the same paths, and the HMAC proof is additionally replay-protected.
+  const scheduledProof =
+    cronSecret && request.method === "GET" && SCHEDULED_GET_PATHS.has(new URL(request.url).pathname)
+      ? [cronSecret]
+      : [];
+  return authorizeInternalHmacRequest(request, [hmacSecret, ...scheduledProof]);
 }
 
 /**
@@ -55,10 +64,10 @@ export async function authorizeScheduledJobRequest(
  */
 export async function authorizeInternalHmacRequest(
   request: Request,
-  secret: string | undefined,
+  secret: string | undefined | ReadonlyArray<string | undefined>,
 ): Promise<boolean> {
-  const configured = secret?.trim();
-  if (!configured) return false;
+  const configured = [...new Set((Array.isArray(secret) ? secret : [secret]).map((value) => value?.trim()).filter((value): value is string => Boolean(value)))];
+  if (!configured.length) return false;
   const timestamp = request.headers.get("x-elemarket-sync-timestamp")?.trim() ?? "";
   const signature = request.headers.get("x-elemarket-sync-signature")?.trim().toLowerCase() ?? "";
   const nonce = request.headers.get("x-elemarket-sync-nonce")?.trim() ?? "";
@@ -84,8 +93,13 @@ export async function authorizeInternalHmacRequest(
   if (suppliedBodyHash && !constantTimeTextEqual(bodyHash, suppliedBodyHash)) return false;
   const pathname = new URL(request.url).pathname;
   const message = `${timestamp}.${nonce}.${request.method.toUpperCase()}.${pathname}.${bodyHash}`;
-  const expected = createHmac("sha256", configured).update(message, "utf8").digest("hex");
-  if (!constantTimeTextEqual(expected, signature)) return false;
+  // Check every accepted key (no early exit) before the single nonce is consumed.
+  let matched = false;
+  for (const key of configured) {
+    const expected = createHmac("sha256", key).update(message, "utf8").digest("hex");
+    if (constantTimeTextEqual(expected, signature)) matched = true;
+  }
+  if (!matched) return false;
 
   const sql = await getSql();
   await sql.query(`delete from internal_job_nonces where expires_at < now()`);

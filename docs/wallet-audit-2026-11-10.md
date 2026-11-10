@@ -92,7 +92,7 @@ out 113 + fees 7. **0 invariant violations.** One open exception
 |---|---|
 | `npm test` | 43 / 43 pass (includes the payout driver contract) |
 | `npm run check:architecture` (boundaries, contracts, provider neutrality) | pass |
-| `npm run validate:deployment-package` (217 migrations, checksums) | pass |
+| `npm run validate:deployment-package` (216 migration files, 0001–0217 with 0034 never used; checksums) | pass |
 | `npm run typecheck`, `npm run lint`, `npm run build` | pass |
 | `npm run test:payment:simulation` | 6 / 6 pass |
 | `npm run test:wallet:simulation` (in-memory) | 11 / 11 pass |
