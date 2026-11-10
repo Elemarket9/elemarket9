@@ -176,6 +176,7 @@ export const assignHandoverRider = createServerFn({ method: "POST" })
          join "user" verified_rider on verified_rider.id=pu.user_id and verified_rider."emailVerified"=true
          where j.id=$1 and p.id=j.provider_id and p.partner_organization_id=$2
            and p.status='active' and (not $4::boolean or p.environment='production')
+           and j.handover_kind='delivery'
            and j.status in ('assigned','accepted','picked_up','in_transit')
            -- Initial assignment may not replace an existing rider or active handover.
            and j.handover_rider_user_id is null
