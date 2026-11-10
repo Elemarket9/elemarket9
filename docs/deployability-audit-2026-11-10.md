@@ -38,6 +38,16 @@ docker compose --env-file .env.production build app scheduler
 
 Then run the restored full PostgreSQL integration/authorization/fulfillment tests on a disposable `*_test` database; verify migrations and repeat migrations, Redis degradation, HTTP domain isolation, OTP binding and expiry, real-provider sandbox callback signatures and replay, provider settlement/refund reconciliation, device UI and a complete simulated purchase/return. Test a backup **restore**, not just backup archive validity. Do not publish ingress until TLS, owner TOTP recovery, secrets and provider adapters have been verified.
 
+
+## Actual GitHub Actions evidence on this branch
+
+- Source and build checks: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, and the separate Docker image build **passed** on PR #16, commit `321ba084`. These checks are source/build evidence, not a running deployment.
+- Root `npm audit --audit-level=high` **failed**: 12 reported vulnerabilities (one critical, two high, eight moderate, one low), including current advisories affecting Better Auth, Vite, Zod and transitive packages. Security gate remains blocking.
+- Mobile `npm audit --audit-level=high` **failed**: 13 reported vulnerabilities (three high, nine moderate, one low); transitive findings include Expo tooling and Zod. Mobile TypeScript and Android export **passed**, but this export is **not** a signed/tested native APK.
+- CI now collects build/test evidence after a failed audit and then fails the job explicitly. No audit suppression or unsafe broad dependency downgrade was introduced.
+
+Evidence: [Source/build workflow run](https://github.com/Elemarket9/elemarket9/actions/runs/42802422468); [Docker image workflow run](https://github.com/Elemarket9/elemarket9/actions/runs/42802422370).
+
 ## Verdict
 
 **Deployable framework present; production use not yet verified.** The PR improves release checks and operational storage limits but does not claim to repair all unknown defects. It should pass GitHub CI and the missing full suites/real integration tests must be restored before any confident release verdict. No live money, VPS deployment, or production release was attempted.
