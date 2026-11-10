@@ -139,7 +139,9 @@ async function isolatedSql(lane: "discovery" | "maintenance"): Promise<Sql> {
   const key = lane === "discovery" ? "__elemarketDiscoveryPool" : "__elemarketMaintenancePool";
   intelligencePools[key] ??= import("pg").then(({Pool}) => observePostgresPool(new Pool({
     connectionString: databaseUrl,
-    max: lane === "discovery" ? 4 : 2,
+    // Homepage reads several sections at once. Keep headroom above that cap
+    // (see HOMEPAGE_SECTION_CONCURRENCY) so one page cannot take every connection.
+    max: lane === "discovery" ? 8 : 2,
     connectionTimeoutMillis: 2000,
     idleTimeoutMillis: 30000,
     allowExitOnIdle: false,
