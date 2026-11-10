@@ -40,7 +40,8 @@ export const verifyOtpCode = createServerFn({ method: "POST" })
     const requiresAuthenticatedUser = data.purpose === "phone_verification" || data.purpose === "transactional";
     const userId = requiresAuthenticatedUser ? await requireUserId() : undefined;
     const { verifyOtp } = await import("./otp/otp.server");
-    return verifyOtp({ ...data, expectedPurpose: data.purpose, ...(userId ? { userId } : {}) });
+    const result = await verifyOtp({ ...data, expectedPurpose: data.purpose, ...(userId ? { userId } : {}) });
+    return { verified: result.verified };
   });
 
 
@@ -65,10 +66,11 @@ export const verifyEmailOtpCode = createServerFn({ method: "POST" })
     const requiresAuthenticatedUser = data.purpose === "transactional";
     const userId = requiresAuthenticatedUser ? await requireUserId() : undefined;
     const { verifyEmailOtp } = await import("./email/email-otp.server");
-    return verifyEmailOtp({
+    const result = await verifyEmailOtp({
       challengeId: data.challengeId,
       code: data.code,
       expectedPurpose: data.purpose,
       ...(userId ? { userId } : {}),
     });
+    return { verified: result.verified };
   });

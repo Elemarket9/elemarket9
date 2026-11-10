@@ -2,7 +2,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
 
-export type DeliveryQuoteInput = { merchantId: string; address: string; lat?: number; lon?: number; tier?: "same_day" | "next_day" | "three_day" };
+export type DeliveryQuoteInput = {
+  merchantId: string;
+  address: string;
+  lat?: number;
+  lon?: number;
+  tier?: "same_day" | "next_day" | "three_day";
+  items: Array<{ productId: string; variantId?: string | null; quantity: number }>;
+};
 export type DeliveryQuoteResult = { quoteId: string; price: string; currency: "GHS"; etaMinutes: number; expiresAt: string; tier: "same_day" | "next_day" | "three_day"; providerReference?: string };
 
 const quoteRequestSchema = z.object({
@@ -11,6 +18,11 @@ const quoteRequestSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
   tier: z.enum(["same_day", "next_day", "three_day"]).optional(),
+  items: z.array(z.object({
+    productId: z.string().trim().min(1).max(64),
+    variantId: z.string().trim().min(1).max(64).nullable().optional(),
+    quantity: z.number().int().min(1).max(20),
+  })).min(1).max(40),
 });
 
 export const requestDeliveryQuote = createServerFn({ method: "POST" })

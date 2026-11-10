@@ -5,6 +5,7 @@ import { createPendingCheckoutServer } from "@/modules/ordering/public/checkout"
 import { readBodyWithLimit } from "@/lib/security/body.server";
 import { rateLimitResponse } from "@/lib/security/rate-limit.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
+import { logServerError } from "@/lib/observability/safe-error.mjs";
 
 const schema = z.object({
   idempotencyKey: z.string().min(16).max(128),
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/api/mobile/checkout")({
     } catch (error) {
       const limited = rateLimitResponse(error);
       if (limited) return limited;
-      console.error("[mobile-checkout] failed", error);
+      logServerError("[mobile-checkout] failed", error);
       return Response.json({ error: "Checkout could not be created" }, { status: 400, headers: { "cache-control": "no-store" } });
     }
   } } },

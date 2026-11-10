@@ -1,4 +1,6 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
+import { verifyBrandWebhook } from "./brand-webhook-signature";
+export { signBrandWebhook, signBrandWebhookV2, verifyBrandWebhook } from "./brand-webhook-signature";
 import { getSql } from "@/lib/db";
 import { decryptMerchantSensitiveData, encryptMerchantSensitiveData } from "@/lib/security/merchant-sensitive.server";
 import { assertPublicHttpsEndpoint } from "@/lib/security/ssrf.server";
@@ -431,27 +433,6 @@ export async function fetchAndSyncBrandConnection(input: { connectionId: string;
   }
 }
 
-export function signBrandWebhook(secret: string, rawBody: string): string {
-  return createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
-}
-
-export function signBrandWebhookV2(secret: string, timestamp: string, rawBody: string): string {
-  return createHmac("sha256", secret).update(`${timestamp}.${rawBody}`, "utf8").digest("hex");
-}
-
-export function verifyBrandWebhook(secret: string, rawBody: string, signature: string | null, timestamp: string | null = null): boolean {
-  if (!signature) return false;
-  if (timestamp) {
-    const millis = Number(timestamp);
-    if (!Number.isSafeInteger(millis) || Math.abs(Date.now() - millis) > 5 * 60 * 1000) return false;
-  }
-  const digest = timestamp ? signBrandWebhookV2(secret, timestamp, rawBody) : signBrandWebhook(secret, rawBody);
-  const expected = Buffer.from(digest, "hex");
-  const suppliedText = signature.trim().replace(/^sha256=/, "");
-  if (!/^[a-f0-9]{64}$/i.test(suppliedText)) return false;
-  const supplied = Buffer.from(suppliedText, "hex");
-  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
-}
 
 export type BrandIntegrationHealthConnection = {
   id: string;
@@ -488,11 +469,9 @@ export async function getBrandIntegrationHealth(input: { merchantId: string }): 
 async function pinnedPost(url: URL, headers: Headers, body: string): Promise<{ status: number; response: string }> {
   const { lookup } = await import("node:dns/promises");
   const { request } = await import("node:https");
-  const { isPrivateOrReservedIp } = await import("@/lib/security/ssrf.server");
+  const { requireUniformPublicAddress } = await import("@/lib/security/ssrf.server");
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  const publicAddresses = addresses.map((a) => a.address).filter((a) => !isPrivateOrReservedIp(a));
-  if (!publicAddresses.length) throw new Error("Integration endpoint no longer resolves to a public address");
-  const address = publicAddresses[0];
+  const address = requireUniformPublicAddress(addresses);
   return new Promise((resolve, reject) => {
     const req = request({
       protocol: "https:", hostname: address, port: 443, path: `${url.pathname}${url.search}`, method: "POST",

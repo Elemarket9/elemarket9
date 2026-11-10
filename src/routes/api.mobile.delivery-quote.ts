@@ -6,6 +6,7 @@ import { readBodyWithLimit } from "@/lib/security/body.server";
 import { requireCustomerForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
 import { rateLimitResponse } from "@/lib/security/rate-limit.server";
+import { logServerError } from "@/lib/observability/safe-error.mjs";
 
 const schema = z.object({
   merchantId: z.string().trim().min(1).max(128),
@@ -13,6 +14,11 @@ const schema = z.object({
   lat: z.number().finite().min(-90).max(90).optional(),
   lon: z.number().finite().min(-180).max(180).optional(),
   tier: z.enum(["same_day", "next_day", "three_day"]).optional(),
+  items: z.array(z.object({
+    productId: z.string().trim().min(1).max(64),
+    variantId: z.string().trim().min(1).max(64).nullable().optional(),
+    quantity: z.number().int().min(1).max(20),
+  })).min(1).max(40),
 });
 
 export const Route = createFileRoute("/api/mobile/delivery-quote")({
@@ -32,7 +38,7 @@ export const Route = createFileRoute("/api/mobile/delivery-quote")({
     } catch (error) {
       const limited = rateLimitResponse(error);
       if (limited) return limited;
-      console.error("[mobile-delivery-quote] failed", error);
+      logServerError("[mobile-delivery-quote] failed", error);
       return Response.json({ error: "Quote failed" }, { status: 400, headers: { "cache-control": "no-store" } });
     }
   } } },

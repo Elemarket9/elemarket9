@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getDiscoverySql as getSql } from "@/lib/db";
+import { structuredLog } from "@/lib/observability/logger.server";
+import { safeErrorFields } from "@/lib/observability/safe-error.mjs";
 
-const SHARD_SIZE=45000;
+const SHARD_SIZE=5000;
 function xml(value:string){return value.replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]??c));}
 function siteOrigin(){const raw=process.env.BETTER_AUTH_URL?.trim();if(!raw)throw new Error("BETTER_AUTH_URL is required");return new URL(raw).origin;}
 export const Route=createFileRoute("/sitemaps/products/{$page}.xml")({server:{handlers:{GET:async({params})=>{
@@ -12,5 +14,5 @@ export const Route=createFileRoute("/sitemaps/products/{$page}.xml")({server:{ha
     if(page>1&&rows.length===0)return new Response("Not found",{status:404}); const base=siteOrigin();
     const urls=rows.map(r=>`<url><loc>${xml(`${base}/products/${encodeURIComponent(r.id)}`)}</loc><lastmod>${xml(new Date(r.updated_at).toISOString())}</lastmod></url>`).join("");
     return new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${xml(base+"/")}</loc></url>${urls}</urlset>`,{headers:{"content-type":"application/xml; charset=utf-8","cache-control":"public, max-age=900, stale-while-revalidate=3600"}});
-  }catch{return new Response("Sitemap unavailable",{status:503,headers:{"cache-control":"no-store"}});}
+  }catch(error){structuredLog("error","sitemap.page_failed",{metadata:safeErrorFields(error)});return new Response("Sitemap unavailable",{status:503,headers:{"cache-control":"no-store"}});}
 }}}});

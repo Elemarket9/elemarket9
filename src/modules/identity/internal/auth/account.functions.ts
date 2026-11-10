@@ -6,6 +6,7 @@ import { enforceRateLimit } from "../../../../lib/security/rate-limit.server";
 import { CATEGORY_KEYS } from "../../../shared/public/categories";
 
 import { ghanaPhoneSchema as phoneSchema, normalizeGhanaPhone as normalizePhone } from "./phone";
+import { isPhoneUniqueViolation, PHONE_SAVE_REJECTED } from "./phone-conflict";
 
 export const getMerchantRegistrationContext = createServerFn({ method: "GET" })
   .handler(async () => {
@@ -75,17 +76,22 @@ export const saveSignupProfile = createServerFn({ method: "POST" })
       `select user_id from profiles where phone = $1 and user_id <> $2 limit 1`,
       [phone, userId],
     );
-    if (existing[0]) throw new Error("That phone number is already registered");
+    if (existing[0]) throw new Error(PHONE_SAVE_REJECTED);
 
-    await sql.query(
-      `insert into profiles (user_id, name, phone, phone_verified_at) values ($1,$2,$3,null)
-       on conflict (user_id) do update set
-         name=$2,
-         phone=$3,
-         phone_verified_at=case when profiles.phone is distinct from excluded.phone then null else profiles.phone_verified_at end,
-         updated_at=now()`,
-      [userId, data.name, phone],
-    );
+    try {
+      await sql.query(
+        `insert into profiles (user_id, name, phone, phone_verified_at) values ($1,$2,$3,null)
+         on conflict (user_id) do update set
+           name=$2,
+           phone=$3,
+           phone_verified_at=case when profiles.phone is distinct from excluded.phone then null else profiles.phone_verified_at end,
+           updated_at=now()`,
+        [userId, data.name, phone],
+      );
+    } catch (error) {
+      if (isPhoneUniqueViolation(error)) throw new Error(PHONE_SAVE_REJECTED);
+      throw error;
+    }
 
     return { phone };
   });
@@ -273,7 +279,7 @@ export const updateCustomerProfile = createServerFn({ method: "POST" })
         `select user_id from profiles where phone=$1 and user_id<>$2 limit 1`,
         [phone, userId],
       );
-      if (existing[0]) throw new Error("That phone number is already registered");
+      if (existing[0]) throw new Error(PHONE_SAVE_REJECTED);
     }
     const address = data.address?.trim() || null;
     // Do not replace an established contact number through a profile write.
@@ -302,18 +308,23 @@ export const updateCustomerProfile = createServerFn({ method: "POST" })
     // Customer coordinates are server-authoritative delivery data. Never accept
     // browser-supplied lat/lon. Clear the cached point whenever the customer
     // changes the address; checkout/quote flow geocodes the authoritative address.
-    await sql.query(
-      `insert into profiles (user_id,name,phone,address,lat,lon,phone_verified_at) values ($1,$2,$3,$4,null,null,null)
-       on conflict (user_id) do update set
-         name=$2,
-         phone=$3,
-         phone_verified_at=case when profiles.phone is distinct from excluded.phone then null else profiles.phone_verified_at end,
-         address=$4,
-         lat=null,
-         lon=null,
-         updated_at=now()`,
-      [userId, data.name, savedPhone, address],
-    );
+    try {
+      await sql.query(
+        `insert into profiles (user_id,name,phone,address,lat,lon,phone_verified_at) values ($1,$2,$3,$4,null,null,null)
+         on conflict (user_id) do update set
+           name=$2,
+           phone=$3,
+           phone_verified_at=case when profiles.phone is distinct from excluded.phone then null else profiles.phone_verified_at end,
+           address=$4,
+           lat=null,
+           lon=null,
+           updated_at=now()`,
+        [userId, data.name, savedPhone, address],
+      );
+    } catch (error) {
+      if (isPhoneUniqueViolation(error)) throw new Error(PHONE_SAVE_REJECTED);
+      throw error;
+    }
     return { saved: true as const, phoneChangePending };
   });
 

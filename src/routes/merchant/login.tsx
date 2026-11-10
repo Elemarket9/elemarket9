@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { authClient, authEnabled } from "@/modules/identity/public/auth/client";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 import { getMerchantLoginContext } from "@/modules/identity/public/auth/merchant-context.functions";
 
 export const Route = createFileRoute("/merchant/login")({ component: MerchantLogin });
@@ -46,7 +47,7 @@ function MerchantLogin() {
         password,
       });
       if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
-      if (result.error) throw new Error(result.error.message ?? "Invalid merchant credentials");
+      if (result.error) throw new Error(publicAuthError("sign-in"));
 
       const context = await getMerchantLoginContext();
       if (!context.authorized && context.reason === "not_found") {

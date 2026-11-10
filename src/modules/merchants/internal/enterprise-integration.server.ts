@@ -4,7 +4,7 @@ import { request as httpsRequest } from "node:https";
 import { getSql } from "@/lib/db";
 import { decryptMerchantSensitiveData } from "@/lib/security/merchant-sensitive.server";
 import { pinnedGet, syncEnterpriseCatalog } from "@/modules/merchants/internal/enterprise-catalog.server";
-import { assertPublicHttpsEndpoint, isPrivateOrReservedIp } from "@/lib/security/ssrf.server";
+import { assertPublicHttpsEndpoint, requireUniformPublicAddress } from "@/lib/security/ssrf.server";
 import type { JsonObject } from "@/lib/db-types";
 
 export async function testEnterpriseConnection(input: { merchantId: string }) {
@@ -161,9 +161,7 @@ export async function claimEnterpriseOrderOutbox(limit = 50) {
 
 async function pinnedPost(url: URL, headers: Headers, body: string): Promise<{ status: number; response: string }> {
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  const publicAddresses = addresses.map(a => a.address).filter(a => !isPrivateOrReservedIp(a));
-  if (!publicAddresses.length) throw new Error("Enterprise order endpoint does not resolve to a public address");
-  const address = publicAddresses[0];
+  const address = requireUniformPublicAddress(addresses);
   return await new Promise((resolve, reject) => {
     const req = httpsRequest({
       protocol: "https:", hostname: address, port: 443, path: `${url.pathname}${url.search}`, method: "POST",

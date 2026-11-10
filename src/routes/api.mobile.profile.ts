@@ -7,6 +7,7 @@ import { readBodyWithLimit } from "@/lib/security/body.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
 
 import { ghanaPhoneSchema } from "@/modules/identity/public/auth/phone";
+import { isPhoneUniqueViolation, PHONE_SAVE_REJECTED } from "@/modules/identity/public/auth/phone-conflict";
 
 const MAX_PROFILE_BODY_BYTES = 8 * 1024;
 
@@ -90,10 +91,10 @@ export const Route = createFileRoute("/api/mobile/profile")({
           const code = typeof error === "object" && error !== null && "code" in error
             ? String((error as { code?: unknown }).code ?? "")
             : "";
-          if (code === "23505") {
+          if (code === "23505" || isPhoneUniqueViolation(error)) {
             return Response.json(
-              { error: "Phone number already registered" },
-              { status: 409, headers: { "cache-control": "no-store" } },
+              { error: PHONE_SAVE_REJECTED },
+              { status: 400, headers: { "cache-control": "no-store" } },
             );
           }
           throw error;

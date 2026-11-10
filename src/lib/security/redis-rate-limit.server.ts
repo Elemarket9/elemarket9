@@ -181,7 +181,7 @@ function roundTrip(state: State, args: (string | number)[]): Promise<Reply> {
  * never throw, so the rate limiter can always fall back to PostgreSQL.
  */
 export async function redisCommand(rawUrl: string, args: (string | number)[], timeoutMs = 800): Promise<Reply> {
-  if (queuedCommands >= 64) return new Error("Redis command queue saturated");
+  if (queuedCommands >= 256) return new Error("Redis command queue saturated");
   queuedCommands++;
   try {
     const config = parseRedisUrl(rawUrl);

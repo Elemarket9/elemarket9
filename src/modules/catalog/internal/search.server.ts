@@ -1,9 +1,10 @@
+import { nonRelevanceCursorPredicate } from "./search-cursor";
 import {EIDE_VERSION} from './eide/version';
+import { discoverySigningSecret } from './eide/signing-secret';
 import { exposureRequest, signExposure } from './eide/attribution.server';
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getDiscoverySql as getSql } from "@/lib/db";
 import { z } from "zod";
-import { env } from "@/lib/env.server";
 import { normalizeDiscoveryQuery, meaningfulTokens } from "./eide/intelligence";
 import { buildQueryPlan } from "./eide/query-plan";
 import { loadDiscoveryMetadata } from "./eide/metadata.server";
@@ -33,7 +34,7 @@ export type SearchHit={id:string;name:string;merchantName:string;merchantId?:str
 export type SearchFacet={value:string;count:number};
 export type SearchResponse={source:"postgres"|"typesense";searchVersion:string;query:string;interpretedQuery:{identifier?:string;tokens:string[];effectiveQuery?:string;expandedTerms?:string[][];attributes?:{key:string;value:string;hard:boolean}[];degraded?:boolean};interpretedFilters?:Record<string,string|number|boolean|null>;hits:SearchHit[];total:number;totalExact?:boolean;facetsSampled?:boolean;nextCursor:string|null;facets:Record<string,SearchFacet[]>;appliedFilters:Record<string,string|number|boolean|null>};
 type Cursor={catalogRevision:string;featureRevision:number|null;seen:number;v:string;fingerprint:string;sort:string;lane:number;key:number;score:number;id:string;exp:number;rankedAt:number;mode:"features"|"neutral"};
-function secret(){const s=env("SEARCH_CURSOR_SECRET")||env("BETTER_AUTH_SECRET");if(s){if(process.env.NODE_ENV==="production"&&s.length<32)throw new Error("Search signing secret must contain at least 32 characters");return s;}if(process.env.NODE_ENV==="production")throw new Error("Search signing secret required");return "development-search-cursor-secret-change-me";}
+function secret(){return discoverySigningSecret();}
 function sign(cursor:Cursor){const body=Buffer.from(JSON.stringify(cursor)).toString("base64url");return body+"."+createHmac("sha256",secret()).update(body).digest("base64url");}
 function parse(value:string|undefined):Cursor|null{
   if(!value)return null;
@@ -53,7 +54,7 @@ function parse(value:string|undefined):Cursor|null{
 function identifier(q:string){const raw=q.normalize('NFKC').trim().toLowerCase();const compact=raw.replace(/[\s-]/g,'');if(/^(?:\d{8}|\d{10}|\d{12,15})$/.test(compact))return compact;
   return /^[a-z0-9][a-z0-9._/-]{2,79}$/i.test(raw)&&/\d/.test(raw)&&/[a-z]/i.test(raw)?raw:undefined;}
 
-export async function searchProducts(input:string|z.input<typeof searchInputSchema>,legacyLimit=40,options:{includeDiagnostics?:boolean}={}):Promise<SearchResponse>{
+export async function searchProducts(input:string|z.input<typeof searchInputSchema>,legacyLimit=40,options:{includeDiagnostics?:boolean;includeAggregates?:boolean}={}):Promise<SearchResponse>{
   const data=searchInputSchema.parse(typeof input==='string'?{q:input,limit:legacyLimit}:input);
   if((data.lat==null)!==(data.lon==null))throw new Error("invalid location: both lat and lon are required");
   if(data.minPrice!=null&&data.maxPrice!=null&&data.minPrice>data.maxPrice)throw new Error('invalid price range');
@@ -140,7 +141,7 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
   let after='';
   if(cursor){const lane=add(cursor.lane,'integer'),keyParam=add(cursor.key,'double precision'),score=add(cursor.score,'double precision'),id=add(cursor.id);
     if(sort==='relevance')after=`where (_lane<${lane} or (_lane=${lane} and (_score<${score} or (_score=${score} and id>${id})))) and ${keyParam} is not null`;
-    else {const op=sort==='price_asc'?'>':'<';after=`where (_key${op}${keyParam} or (_key=${keyParam} and (_lane<${lane} or (_lane=${lane} and (_score<${score} or (_score=${score} and id>${id})))))`;}
+    else {const pageSort=sort==='price_asc'||sort==='newest'?sort:'price_desc';after=nonRelevanceCursorPredicate(pageSort,lane,keyParam,score,id);}
   }
   const limit=add(data.limit+1,'integer');
   const order=sort==='relevance'?'_lane desc,_score desc,id asc':`_key ${sort==='price_asc'?'asc':'desc'},_lane desc,_score desc,id asc`;
@@ -190,10 +191,11 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
     if(options.includeDiagnostics){hit.relevanceScore=Number(row._lane);hit.intelligenceScore=Number(row._score);hit.rankingSignals={merchantConfidence:Number(row._merchant),conversionQuality:Number(row._conversion),trustedCommerce:Number(row._commerce),popularity:Number(row._popularity),trendMomentum:Number(row._trend),freshness:Number(row._freshness),inventoryHealth:Number(row._inventory),explorationBonus:Number(row._exploration)};}
     return hit;
   });
+  let aggregates:FacetAggregate={counts:[],facetRows:[]};
+  if(options.includeAggregates!==false){
   const cacheKey=`${catalogRevision??'unversioned'}:${fingerprint}`;
   const nowMs=Date.now();
   const cached=facetCache.get(cacheKey);
-  let aggregates:FacetAggregate;
   if(cached&&cached.expires>nowMs){
     aggregates=cached.value;
   }else{
@@ -212,10 +214,11 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
       facetCache.set(cacheKey,{expires:nowMs+FACET_CACHE_TTL_MS,value:aggregates});
     }
   }
+  }
   const {counts,facetRows}=aggregates;
   const total=Number(counts[0]?.total??hits.length);const facets:Record<string,SearchFacet[]>={};for(const row of facetRows)(facets[row.facet]??=[]).push({value:row.value,count:Number(row.count)});
   const interpretedFilters={category:plan.category,subcategory:plan.subcategory,brand:plan.brand,minPrice:plan.hardFloor,maxPrice:plan.hardCeiling,budgetCeiling:plan.softBudget,availability:plan.availability,newest:plan.effectiveSort==='newest',effectiveSort:plan.effectiveSort};
-  if(!cursor&&data.q)await sql.query(`insert into marketplace_search_events(query_hash,result_count,zero_result,filter_fingerprint,search_version) values($1,$2,$3,$4,$5)`,[createHmac('sha256',secret()).update(normalizeDiscoveryQuery(data.q)).digest('hex'),total,total===0,fingerprint,SEARCH_VERSION]).catch(()=>undefined);
+  if(!cursor&&data.q&&options.includeAggregates!==false)await sql.query(`insert into marketplace_search_events(query_hash,result_count,zero_result,filter_fingerprint,search_version) values($1,$2,$3,$4,$5)`,[createHmac('sha256',secret()).update(normalizeDiscoveryQuery(data.q)).digest('hex'),total,total===0,fingerprint,SEARCH_VERSION]).catch(()=>undefined);
   return {source:'postgres',searchVersion:SEARCH_VERSION,query:data.q,interpretedQuery:{identifier:identity,tokens:meaningfulTokens(plan.lexical),effectiveQuery:plan.lexical,expandedTerms:plan.groups,attributes:plan.attributes.map(({key,value,hard})=>({key,value,hard})),degraded:metadata.degraded||mode==='neutral'},interpretedFilters,hits,total,totalExact:counts.length>0&&total<=5000,facetsSampled:counts.length===0||total>5000,nextCursor,facets,appliedFilters:{category:data.category??null,subcategory:data.subcategory??null,brand:data.brand??null,model:data.model??null,merchantId:data.merchantId??null,listingType:data.listingType??null,condition:data.condition??null,minPrice:data.minPrice??null,maxPrice:data.maxPrice??null,inStock:data.inStock,sort:data.sort}};
 }
 export { searchInputSchema };

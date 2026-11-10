@@ -1,3 +1,5 @@
+import { fromPesewas, toPesewas } from "@/modules/shared/public/money";
+
 export type CartLine = {
   productId: string;
   variantId: string | null;
@@ -66,6 +68,6 @@ export function cartCount(lines: CartLine[]) {
   return normalizeCart(lines).reduce((sum, line) => sum + line.quantity, 0);
 }
 
-export function cartTotal(lines: CartLine[]) {
-  return normalizeCart(lines).reduce((sum, line) => sum + Math.round(Number(line.price) * 100) * line.quantity, 0) / 100;
+export function cartTotal(lines: CartLine[]): string {
+  return fromPesewas(normalizeCart(lines).reduce((sum, line) => sum + toPesewas(line.price) * line.quantity, 0));
 }

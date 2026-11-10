@@ -72,7 +72,12 @@ export async function requestEmailOtp(
 
   const userRows = await sql.query<{ id: string; emailVerified: boolean }>(`select "id" as id, "emailVerified" from "user" where lower("email") = $1 limit 1`, [email]);
   if (input.purpose === "signup" && !input.userId && userRows[0]?.emailVerified) {
-    throw new Error("An account already exists for this email; use sign in or password reset");
+    // Same response shape as a real challenge, with no stored code and no email.
+    return {
+      challengeId: `otp_${crypto.randomUUID().replaceAll("-", "")}`,
+      expiresInSeconds: expiryMinutes * 60,
+      cooldownSeconds: OTP_COOLDOWN_SECONDS,
+    };
   }
   const resolvedUserId = input.userId ?? userRows[0]?.id ?? null;
 

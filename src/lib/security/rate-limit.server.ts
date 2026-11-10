@@ -54,7 +54,12 @@ export async function enforceRateLimit(
   options: { windowSeconds: number; maxRequests: number; subject?: string; identity?: "ip" | "subject" },
 ): Promise<{ remaining: number; resetAt: number }> {
   const request = getRequest();
-  if (!request) return { remaining: options.maxRequests, resetAt: 0 };
+  if (!request) {
+    if (process.env.ELEMARKET_ENV === "production" || process.env.ELEMARKET_ENV === "staging") {
+      throw new Error("Rate limit requires a request context");
+    }
+    return { remaining: options.maxRequests, resetAt: 0 };
+  }
   const key = bucketKey(scope, request, options.subject, options.identity);
   let result: { allowed: boolean; remaining: number; resetAt: number } | undefined;
 
@@ -101,13 +106,18 @@ export async function enforceRateLimit(
     }
   }
 
-  if (!result) {
-    const sql = await getSql();
-    const rows = await sql.query<{ result: { allowed: boolean; remaining: number; resetAt: number } }>(
-      `select consume_api_rate_limit($1,$2,$3) as result`,
-      [key, options.windowSeconds, options.maxRequests],
-    );
-    result = rows[0]?.result;
+  // Postgres is the durable counter. Redis may only reject sooner; an outage must not open a fresh window.
+  const sql = await getSql();
+  const rows = await sql.query<{ result: { allowed: boolean; remaining: number; resetAt: number } }>(
+    `select consume_api_rate_limit($1,$2,$3) as result`,
+    [key, options.windowSeconds, options.maxRequests],
+  );
+  const durable = rows[0]?.result;
+  if (!durable) throw new Error("Rate limit store is unavailable");
+  if (result && !result.allowed) {
+    result = { allowed: false, remaining: Math.min(result.remaining, durable.remaining), resetAt: Math.max(result.resetAt, durable.resetAt) };
+  } else {
+    result = durable;
   }
   if (!result?.allowed) {
     const retryAfter = Math.max(1, Math.ceil(Number(result?.resetAt ?? 0) - Date.now() / 1000));

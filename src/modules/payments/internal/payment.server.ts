@@ -10,10 +10,12 @@ import { emitSecurityAlert } from "@/lib/observability/security-alert.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { normalizeProviderKey } from "@/modules/payments/internal/provider-policy.server";
 import { env, getElemarketEnvironment } from "@/lib/env.server";
+import { safeRelativeCheckoutPath } from "@/lib/security/checkout-url";
 import {
   PaymentProviderError,
   PaymentWebhookError,
 } from "@/modules/payments/internal/payment-errors";
+import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
 
 export type PaymentStatus = "initiated" | "authorized" | "completed" | "failed" | "refunded";
 
@@ -24,8 +26,10 @@ function validateProviderCheckoutUrl(
   if (!value) return undefined;
   try {
     if (value.startsWith("/")) {
+      const path = safeRelativeCheckoutPath(value);
+      if (!path) throw new Error("Unsafe provider checkout URL");
       if (getElemarketEnvironment() === "development" || getElemarketEnvironment() === "preview")
-        return value;
+        return path;
       throw new Error("Provider checkout URL must be absolute HTTPS in shared environments");
     }
     const url = new URL(value);
@@ -138,38 +142,77 @@ export async function createExternalPaymentIntent(input: {
     };
   }
   const claimToken = crypto.randomUUID();
+  const resumeBoundAttempt = Boolean(result.providerReference);
   const claimed = await sql.query<{ id: string }>(
-    `update payment_attempts
-        set initiation_token=$2, initiation_expires_at=now()+interval '2 minutes', updated_at=now()
-      where id=$1 and provider_reference is null
-        and (initiation_token is null or initiation_expires_at < now())
-      returning id`,
+    resumeBoundAttempt
+      ? `update payment_attempts
+            set initiation_token=$2, initiation_expires_at=now()+interval '2 minutes', updated_at=now()
+          where id=$1 and provider_reference is not null and checkout_url is null
+            and (initiation_token is null or initiation_expires_at < now())
+          returning id`
+      : `update payment_attempts
+            set initiation_token=$2, initiation_expires_at=now()+interval '2 minutes', updated_at=now()
+          where id=$1 and provider_reference is null
+            and (initiation_token is null or initiation_expires_at < now())
+          returning id`,
     [result.attemptId, claimToken],
   );
   if (!claimed[0]) {
     return { ...result, status: "pending", initializing: true, checkoutUrl: null };
   }
-  // An attempt can exist briefly without a provider reference while the external
-  // provider call is in flight. Reuse the same attempt/idempotency key instead of
-  // creating another charge. This also closes the pay-then-cancel race window.
+  const reference = deterministicPaymentReference(result.attemptId);
+  if (!resumeBoundAttempt) {
+    // Bind the reference before the provider call so a crash, webhook, or
+    // reconciliation can still find this attempt. The reference is the attempt
+    // id, so a retry cannot create a second charge.
+    const boundReference = await sql.query<{ id: string }>(
+      `update payment_attempts
+          set provider_reference=$1, updated_at=now()
+        where id=$2 and initiation_token=$3 and provider_reference is null
+        returning id`,
+      [reference, result.attemptId, claimToken],
+    );
+    if (!boundReference[0]) throw new Error("Payment attempt reference could not be reserved");
+    await sql.query(
+      `update payments set provider_reference=coalesce(provider_reference,$1), updated_at=now() where id=$2 and status='initiated'`,
+      [reference, payment.payment_id],
+    );
+  }
   const publicUrl = getPaymentCallbackOrigin();
   const callbackUrl = publicUrl
     ? `${publicUrl.replace(/\/$/, "")}/payment/return?paymentId=${encodeURIComponent(result.paymentId)}`
     : undefined;
-  const external = await adapter.createPayment({
-    paymentId: result.paymentId,
-    attemptId: result.attemptId,
-    amount: String(payment.amount),
-    currency: payment.currency,
-    method: payment.method,
-    customerEmail,
-    merchantSubaccount: subaccountRows[0]?.provider_account_ref,
-    idempotencyKey: result.attemptId,
-    callbackUrl,
-  });
-  const safeCheckoutUrl = validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
+  let external;
+  let safeCheckoutUrl: string | undefined;
+  try {
+    external = await adapter.createPayment({
+      paymentId: result.paymentId,
+      attemptId: result.attemptId,
+      amount: String(payment.amount),
+      currency: payment.currency,
+      method: payment.method,
+      customerEmail,
+      merchantSubaccount: subaccountRows[0]?.provider_account_ref,
+      idempotencyKey: result.attemptId,
+      callbackUrl,
+      platformFee: owned.platform_fee,
+    });
+    if (external.providerReference !== reference) {
+      throw new Error("Payment provider reference did not match the reserved attempt");
+    }
+    safeCheckoutUrl = validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
+  } catch (error) {
+    await sql.query(
+      `update payment_attempts
+          set initiation_token=null, initiation_expires_at=null, updated_at=now()
+        where id=$1 and initiation_token=$2 and checkout_url is null`,
+      [result.attemptId, claimToken],
+    );
+    throw error;
+  }
   // Initialization is not proof of authorization or settlement.
   const initializedStatus = external.status === "failed" ? "failed" : "pending";
+  const recovered = external.metadata?.recovered === true;
   const bound = await sql.query(
     `update payment_attempts set provider_reference=$1, checkout_url=$2, status=$3, metadata=$4::jsonb, initiation_token=null, initiation_expires_at=null, updated_at=now() where id=$5 and initiation_token=$6 returning id`,
     [
@@ -198,9 +241,10 @@ export async function createExternalPaymentIntent(input: {
   });
   return {
     ...result,
-    status: initializedStatus,
+    status: external.status === "completed" ? "completed" as const : initializedStatus,
     providerReference: external.providerReference,
     checkoutUrl: safeCheckoutUrl,
+    recovered,
   };
 }
 

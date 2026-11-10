@@ -1,5 +1,6 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 import { getElemarketEnvironment } from "./env.server";
+import { parsePgInt8 } from "./pg-int8.mjs";
 import {observePostgresPool} from "./postgres-pool.server";
 
 /** Which database backend is active. */
@@ -101,10 +102,20 @@ function createPostgresSql(): Promise<Sql> {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with any standard PostgreSQL
     // connection string. One pool per process; warm serverless instances reuse it.
     const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
+    types.setTypeParser(OID_INT8, parsePgInt8);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    globalRef.__pgPoolPromise__ ??= Promise.resolve(observePostgresPool(new Pool({ connectionString: databaseUrl, max: 10, connectionTimeoutMillis: 2000, idleTimeoutMillis: 30000, allowExitOnIdle: true })));
+    globalRef.__pgPoolPromise__ ??= Promise.resolve(observePostgresPool(new Pool({
+      connectionString: databaseUrl,
+      max: 10,
+      connectionTimeoutMillis: 2000,
+      idleTimeoutMillis: 30000,
+      allowExitOnIdle: false,
+      statement_timeout: 8000,
+      lock_timeout: 2000,
+      idle_in_transaction_session_timeout: 10000,
+      application_name: "elemarket-app",
+    })));
     const pool = await globalRef.__pgPoolPromise__;
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
@@ -128,11 +139,14 @@ async function isolatedSql(lane: "discovery" | "maintenance"): Promise<Sql> {
   const key = lane === "discovery" ? "__elemarketDiscoveryPool" : "__elemarketMaintenancePool";
   intelligencePools[key] ??= import("pg").then(({Pool}) => observePostgresPool(new Pool({
     connectionString: databaseUrl,
-    max: lane === "discovery" ? 2 : 1,
-    connectionTimeoutMillis: 1000,
+    max: lane === "discovery" ? 4 : 2,
+    connectionTimeoutMillis: 2000,
     idleTimeoutMillis: 30000,
-    allowExitOnIdle: true,
-    options: `-c statement_timeout=${lane === "discovery" ? 1500 : 4000} -c lock_timeout=250`,
+    allowExitOnIdle: false,
+    application_name: lane === "discovery" ? "elemarket-discovery" : "elemarket-maintenance",
+    statement_timeout: lane === "discovery" ? 3000 : 20000,
+    lock_timeout: lane === "discovery" ? 750 : 2000,
+    idle_in_transaction_session_timeout: lane === "discovery" ? 5000 : 20000,
   })));
   const pool = await intelligencePools[key];
   return toSql(async <T>(text: string, params: unknown[]) => {
@@ -152,7 +166,7 @@ async function createPgliteSql(): Promise<Sql> {
     const pg = new PGlite({
       extensions: { pgcrypto },
       parsers: {
-        [OID_INT8]: Number,
+        [OID_INT8]: parsePgInt8,
         [OID_DATE]: identity,
         [OID_INTERVAL]: identity,
       },

@@ -6,12 +6,15 @@ import {
 } from "@/modules/payments/public/adapters/registry";
 import { normalizeProviderKey } from "@/modules/payments/public/provider-policy.server";
 import { env, getElemarketEnvironment } from "@/lib/env.server";
+import { safeRelativeCheckoutPath } from "@/lib/security/checkout-url";
 
 function validateCheckoutUrl(value: string | undefined, providerKey: string): string | undefined {
   if (!value) return undefined;
   if (value.startsWith("/")) {
+    const path = safeRelativeCheckoutPath(value);
+    if (!path) throw new Error("Unsafe payment provider checkout URL");
     if (getElemarketEnvironment() === "development" || getElemarketEnvironment() === "preview")
-      return value;
+      return path;
     throw new Error("Payment provider checkout URL must be absolute HTTPS");
   }
   const url = new URL(value);

@@ -25,7 +25,7 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/migrations.sha256.json ./migrations.sha256.json
 COPY --from=builder /app/config ./config
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/src/lib/security/portal-policy.mjs ./src/lib/security/portal-policy.mjs
 USER node
 EXPOSE 8080
 CMD ["node", "scripts/start.mjs"]

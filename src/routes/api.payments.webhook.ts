@@ -3,6 +3,7 @@ import { handlePaymentWebhook } from "@/application/payment-webhook.server";
 import { rateLimitResponse } from "@/lib/security/rate-limit.server";
 import { readBodyWithLimit } from "@/lib/security/body.server";
 import { PaymentWebhookError } from "@/modules/payments/public/payment-errors";
+import { logServerError } from "@/lib/observability/safe-error.mjs";
 
 export const Route = createFileRoute("/api/payments/webhook")({
   server: {
@@ -41,7 +42,7 @@ export const Route = createFileRoute("/api/payments/webhook")({
           if (/^(08|40P01|40001|53300|57P01)/.test(code)) {
             return new Response("Webhook temporarily unavailable", { status: 503, headers: { "cache-control": "no-store" } });
           }
-          console.error("[payment-webhook] unhandled processing error", error);
+          logServerError("[payment-webhook] unhandled processing error", error);
           return new Response("Webhook processing failed", { status: 500, headers: { "cache-control": "no-store" } });
         }
       },

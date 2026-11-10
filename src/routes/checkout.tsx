@@ -9,7 +9,7 @@ import { fingerprintCheckout } from "@/modules/ordering/public/checkout-fingerpr
 import { createPaymentIntent } from "@/modules/payments/public/payment";
 import { requestDeliveryQuote } from "@/modules/logistics/public/adapters/delivery";
 import { resolveProductMerchants } from "@/modules/catalog/public/catalog";
-import { formatGhs } from "@/modules/shared/public/money";
+import { formatGhs, fromPesewas, lineTotal, sumMoney, toPesewas } from "@/modules/shared/public/money";
 import { previewCustomerFinancing, type FinancingProvider } from "@/modules/financing/public/financing";
 import { FinancingProviderApplicationForm } from "@/components/financing-provider-application-form";
 import { ContactSupportWidget } from "@/components/contact-support-widget";
@@ -26,7 +26,7 @@ function Checkout() {
   );
 }
 
-type PreparedMerchantOrder = {orderId: string; merchantId: string; paymentId: string; grandTotal: number; productTotal: number; deliveryTotal: number; promoDiscount: number};
+type PreparedMerchantOrder = {orderId: string; merchantId: string; paymentId: string; grandTotal: string; productTotal: string; deliveryTotal: string; promoDiscount: string};
 function CheckoutForm() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [assistedDraftId, setAssistedDraftId] = useState<string | null>(null);
@@ -51,7 +51,7 @@ function CheckoutForm() {
   const [financingStatus, setFinancingStatus] = useState<string | null>(null);
   const [financingBusy, setFinancingBusy] = useState(false);
   const total = useMemo(() => cartTotal(cart), [cart]);
-  const deliveryTotal = quotes.reduce((sum, q) => sum + Number(q.price || 0), 0);
+  const deliveryTotal = quotes.length ? sumMoney(quotes.map((q) => q.price)) : "0.00";
 
   useEffect(() => {
     let active = true;
@@ -101,7 +101,8 @@ function CheckoutForm() {
       if (!merchantIds.length) throw new Error("Could not resolve merchants for this cart.");
       const next: Array<{ merchantId: string; quoteId: string; price: string; etaMinutes: number }> = [];
       for (const merchantId of merchantIds) {
-        const result = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier } });
+        const items = cart.filter((line) => (line.merchantId || resolved[line.productId]) === merchantId).map((line) => ({ productId: line.productId, variantId: line.variantId ?? null, quantity: line.quantity }));
+        const result = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier, items } });
         if (!result?.id) throw new Error("Delivery provider did not return a quote.");
         next.push({ merchantId, quoteId: result.id, price: result.price, etaMinutes: result.etaMinutes });
       }
@@ -177,9 +178,10 @@ function CheckoutForm() {
       const orders:PreparedMerchantOrder[]=response.orders.map((raw:unknown)=>{
         const o=raw as Record<string,unknown>;
         const monetary=(key:string)=>{
-          const n=Number(o[key]);
-          if(o[key]==null||!Number.isFinite(n)||n<0) throw new Error("Invalid authoritative checkout total.");
-          return n;
+          const raw=o[key];
+          if(typeof raw!=="string" && typeof raw!=="number") throw new Error("Invalid authoritative checkout total.");
+          try { return fromPesewas(toPesewas(raw)); }
+          catch { throw new Error("Invalid authoritative checkout total."); }
         };
         if(typeof o.orderId!=="string"||typeof o.merchantId!=="string"||typeof o.paymentId!=="string") throw new Error("Invalid merchant order.");
         return {orderId:o.orderId,merchantId:o.merchantId,paymentId:o.paymentId,
@@ -205,16 +207,20 @@ function CheckoutForm() {
       // fetched from the authenticated server-side checkout group after return.
       const first=prepared.orders[0];
       const intent=await createPaymentIntent({data:{paymentId:first.paymentId}});
-      if(!intent?.checkoutUrl)throw new Error("The payment provider did not return a secure checkout URL.");
       localStorage.setItem(PAYMENT_QUEUE_KEY,JSON.stringify(prepared.orders.map(({paymentId})=>({paymentId}))));
       writeCart([]);
-      window.location.assign(intent.checkoutUrl);
+      if(intent?.checkoutUrl){window.location.assign(intent.checkoutUrl);return;}
+      if(intent && (intent.status==="completed" || ("recovered" in intent && intent.recovered))){
+        window.location.assign(`/payment/return?paymentId=${encodeURIComponent(first.paymentId)}`);
+        return;
+      }
+      throw new Error("The payment provider did not return a secure checkout URL.");
     }catch {setError("Payment could not be started. Your pending order is saved; please try again or visit your orders.");}
     finally{operation.current=false;setBusy(false);}
   }
 
   if(prepared){
-    const grandTotal=prepared.orders.reduce((sum,o)=>sum+o.grandTotal,0);
+    const grandTotal=sumMoney(prepared.orders.map((order)=>order.grandTotal));
     return <main className="min-h-screen bg-market-bg px-4 py-12"><section className="mx-auto max-w-2xl rounded-3xl border border-market-line bg-white p-7 shadow-market">
       <ShieldCheck className="text-market-green" size={38}/>
       <h1 className="mt-3 text-2xl font-black">Review your final payment amount</h1>
@@ -223,7 +229,7 @@ function CheckoutForm() {
         <div className="flex justify-between font-black"><span>Merchant order {index+1}</span><span>{formatGhs(order.grandTotal)}</span></div>
         <div className="mt-2 flex justify-between text-xs text-market-muted"><span>Products after discounts</span><span>{formatGhs(order.productTotal)}</span></div>
         <div className="mt-1 flex justify-between text-xs text-market-muted"><span>Delivery</span><span>{formatGhs(order.deliveryTotal)}</span></div>
-        {order.promoDiscount>0?<div className="mt-1 flex justify-between text-xs text-market-green"><span>Discount applied</span><span>{formatGhs(order.promoDiscount)}</span></div>:null}
+        {toPesewas(order.promoDiscount)>0?<div className="mt-1 flex justify-between text-xs text-market-green"><span>Discount applied</span><span>{formatGhs(order.promoDiscount)}</span></div>:null}
       </div>)}</div>
       <div className="mt-6 flex items-center justify-between border-t border-market-line pt-5 text-lg font-black"><span>Total to pay</span><span>{formatGhs(grandTotal)}</span></div>
       {error?<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>:null}
@@ -358,7 +364,7 @@ function CheckoutForm() {
               {cart.map((item, i) => (
                 <div key={`${item.productId}:${item.variantId}:${i}`} className="flex justify-between gap-3 text-sm">
                   <span className="font-semibold">{item.name || "Product"} × {item.quantity}</span>
-                  <span className="font-black">{formatGhs(Number(item.price || 0) * item.quantity)}</span>
+                  <span className="font-black">{formatGhs(lineTotal(item.price, item.quantity))}</span>
                 </div>
               ))}
             </div>

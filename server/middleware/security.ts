@@ -7,7 +7,8 @@ export default async function securityMiddleware(
   const result = await next();
   if (!(result instanceof Response)) return result;
   const headers = new Headers(result.headers);
-  for (const [key, value] of Object.entries(securityHeaders({ production: true }))) {
+  const shared = process.env.ELEMARKET_ENV === "production" || process.env.ELEMARKET_ENV === "staging";
+  for (const [key, value] of Object.entries(securityHeaders({ production: shared }))) {
     // TanStack Start sets the request-specific CSP nonce before SSR. Preserve it
     // instead of replacing it after the rendered response is produced.
     if (key === "Content-Security-Policy" && headers.has(key)) continue;

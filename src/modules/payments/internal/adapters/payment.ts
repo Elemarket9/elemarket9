@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
+import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
 export type PaymentAdapterInput = {
   paymentId: string;
   attemptId: string;
@@ -12,6 +13,8 @@ export type PaymentAdapterInput = {
   merchantSubaccount?: string;
   idempotencyKey?: string;
   callbackUrl?: string;
+  /** Merchandise commission retained by the platform account, in major units. */
+  platformFee?: string;
 };
 
 export type PaymentRefundResult = {
@@ -153,14 +156,26 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
     return parsed.data;
   }
   async verifyTransaction(reference: string): Promise<VerifiedPayment> {
-    const response = await fetchPinnedPublicHttps(
-      `${this.endpoint.replace(/\/$/, "")}/verify/${encodeURIComponent(reference)}`,
-      { headers: { authorization: `Bearer ${this.secret}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!response.ok)
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetchPinnedPublicHttps(
+          `${this.endpoint.replace(/\/$/, "")}/verify/${encodeURIComponent(reference)}`,
+          { headers: { authorization: `Bearer ${this.secret}` }, signal: AbortSignal.timeout(10_000) },
+        );
+      } catch (error) {
+        if (attempt === 1) throw error;
+        continue;
+      }
+      if (response.ok) break;
+      const failure = new PaymentProviderError("Payment provider transaction verification failed", response.status);
+      if (!failure.retryable || attempt === 1) throw failure;
+      await response.body?.cancel().catch(() => undefined);
+    }
+    if (!response?.ok)
       throw new PaymentProviderError(
         "Payment provider transaction verification failed",
-        response.status,
+        response?.status ?? 503,
       );
     const parsed = z
       .object({
@@ -175,6 +190,7 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
     return parsed.data;
   }
   async createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult> {
+    const { platformFee: _platformFee, ...providerBody } = input;
     const response = await fetchPinnedPublicHttps(this.endpoint, {
       method: "POST",
       headers: {
@@ -182,7 +198,7 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
         authorization: `Bearer ${this.secret}`,
         ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify(providerBody),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Payment provider returned HTTP ${response.status}`);
@@ -204,7 +220,7 @@ export class PreviewPaymentAdapter implements PaymentProviderAdapter {
   async createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult> {
     const financingDeposit = input.customerReference?.startsWith("financing_deposit:");
     return {
-      providerReference: input.attemptId,
+      providerReference: deterministicPaymentReference(input.attemptId),
       status: "initiated",
       checkoutUrl: financingDeposit
         ? `/financing/deposit-preview?depositPaymentId=${encodeURIComponent(input.paymentId)}`

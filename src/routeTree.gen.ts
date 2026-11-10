@@ -84,6 +84,7 @@ import { Route as ApiInternalDispatchDeliveriesRouteImport } from './routes/api.
 import { Route as ApiInternalEnterpriseOrderOutboxRouteImport } from './routes/api.internal.enterprise-order-outbox'
 import { Route as ApiInternalEnterpriseWebhookWorkerRouteImport } from './routes/api.internal.enterprise-webhook-worker'
 import { Route as ApiInternalExpirePaymentOrdersRouteImport } from './routes/api.internal.expire-payment-orders'
+import { Route as ApiInternalPurgeRetentionRouteImport } from './routes/api.internal.purge-retention'
 import { Route as ApiInternalReconcilePaymentsRouteImport } from './routes/api.internal.reconcile-payments'
 import { Route as ApiInternalRefreshEideRouteImport } from './routes/api.internal.refresh-eide'
 import { Route as ApiInternalRiderInvitationsRouteImport } from './routes/api.internal.rider-invitations'
@@ -485,6 +486,12 @@ const ApiInternalExpirePaymentOrdersRoute =
     path: '/api/internal/expire-payment-orders',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalPurgeRetentionRoute =
+  ApiInternalPurgeRetentionRouteImport.update({
+    id: '/api/internal/purge-retention',
+    path: '/api/internal/purge-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInternalReconcilePaymentsRoute =
   ApiInternalReconcilePaymentsRouteImport.update({
     id: '/api/internal/reconcile-payments',
@@ -660,6 +667,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
+  '/api/internal/purge-retention': typeof ApiInternalPurgeRetentionRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
@@ -755,6 +763,7 @@ export interface FileRoutesByTo {
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
+  '/api/internal/purge-retention': typeof ApiInternalPurgeRetentionRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
@@ -851,6 +860,7 @@ export interface FileRoutesById {
   '/api/internal/enterprise-order-outbox': typeof ApiInternalEnterpriseOrderOutboxRoute
   '/api/internal/enterprise-webhook-worker': typeof ApiInternalEnterpriseWebhookWorkerRoute
   '/api/internal/expire-payment-orders': typeof ApiInternalExpirePaymentOrdersRoute
+  '/api/internal/purge-retention': typeof ApiInternalPurgeRetentionRoute
   '/api/internal/reconcile-payments': typeof ApiInternalReconcilePaymentsRoute
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
@@ -948,6 +958,7 @@ export interface FileRouteTypes {
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
+    | '/api/internal/purge-retention'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
@@ -1043,6 +1054,7 @@ export interface FileRouteTypes {
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
+    | '/api/internal/purge-retention'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
@@ -1138,6 +1150,7 @@ export interface FileRouteTypes {
     | '/api/internal/enterprise-order-outbox'
     | '/api/internal/enterprise-webhook-worker'
     | '/api/internal/expire-payment-orders'
+    | '/api/internal/purge-retention'
     | '/api/internal/reconcile-payments'
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
@@ -1233,6 +1246,7 @@ export interface RootRouteChildren {
   ApiInternalEnterpriseOrderOutboxRoute: typeof ApiInternalEnterpriseOrderOutboxRoute
   ApiInternalEnterpriseWebhookWorkerRoute: typeof ApiInternalEnterpriseWebhookWorkerRoute
   ApiInternalExpirePaymentOrdersRoute: typeof ApiInternalExpirePaymentOrdersRoute
+  ApiInternalPurgeRetentionRoute: typeof ApiInternalPurgeRetentionRoute
   ApiInternalReconcilePaymentsRoute: typeof ApiInternalReconcilePaymentsRoute
   ApiInternalRefreshEideRoute: typeof ApiInternalRefreshEideRoute
   ApiInternalRiderInvitationsRoute: typeof ApiInternalRiderInvitationsRoute
@@ -1780,6 +1794,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalExpirePaymentOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/purge-retention': {
+      id: '/api/internal/purge-retention'
+      path: '/api/internal/purge-retention'
+      fullPath: '/api/internal/purge-retention'
+      preLoaderRoute: typeof ApiInternalPurgeRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/internal/reconcile-payments': {
       id: '/api/internal/reconcile-payments'
       path: '/api/internal/reconcile-payments'
@@ -1998,6 +2019,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalEnterpriseWebhookWorkerRoute:
     ApiInternalEnterpriseWebhookWorkerRoute,
   ApiInternalExpirePaymentOrdersRoute: ApiInternalExpirePaymentOrdersRoute,
+  ApiInternalPurgeRetentionRoute: ApiInternalPurgeRetentionRoute,
   ApiInternalReconcilePaymentsRoute: ApiInternalReconcilePaymentsRoute,
   ApiInternalRefreshEideRoute: ApiInternalRefreshEideRoute,
   ApiInternalRiderInvitationsRoute: ApiInternalRiderInvitationsRoute,

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient, authEnabled } from "@/modules/identity/public/auth/client";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 import { requestEmailOtpCode, verifyEmailOtpCode } from "@/modules/identity/public/auth/otp";
 import { submitProviderApplication } from "../../modules/administration/public/transport/provider/gateway.functions";
 export const Route=createFileRoute("/provider/signup")({component:ProviderSignup});
@@ -12,12 +13,12 @@ function ProviderSignup(){
   if(!authEnabled) throw new Error("Provider applications are unavailable in this environment");
   if(!caps.length) throw new Error("Select at least one provider service");
   const signed=await authClient.signUp.email({email:email.trim(),password,name:name.trim(),callbackURL:"/provider/signup"});
-  if(signed.error) throw new Error(signed.error.message??"Could not create provider account");
+  if(signed.error) throw new Error(publicAuthError("sign-up"));
   const otp=await requestEmailOtpCode({data:{email:email.trim(),purpose:"signup"}});setChallenge(otp.challengeId);setStage("verify");
  }catch(e){setError(e instanceof Error?e.message:"Provider signup failed")}finally{setBusy(false)}}
  async function verify(){if(!challenge)return;setBusy(true);setError(null);try{
   await verifyEmailOtpCode({data:{challengeId:challenge,code,purpose:"signup"}});
-  const signed=await authClient.signIn.email({email:email.trim(),password,});if(signed.error) throw new Error(signed.error.message??"Email verified but sign-in failed");
+  const signed=await authClient.signIn.email({email:email.trim(),password,});if(signed.error) throw new Error(publicAuthError("sign-in"));
   await submitProviderApplication({data:{organizationName:organizationName.trim(),contactPhone:phone.trim()||undefined,websiteUrl:website.trim()||undefined,requestedCapabilities:caps,processingMode:mode,serviceDescription:description.trim()}});
   setStage("done");
  }catch(e){setError(e instanceof Error?e.message:"Verification failed")}finally{setBusy(false)}}

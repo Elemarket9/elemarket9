@@ -3,6 +3,7 @@ import { isSharedEnvironment } from "@/lib/env.server";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
 import { requireAdminForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { allocateEligibleShipments } from "./shipment-allocation.server";
+import { notifyCarrierOfJob } from "./adapters/delivery.server";
 
 /** Materialize durable provider-bound work for the partner portal. No carrier transmission. */
 export async function dispatchDeliveries(limit = 25) {
@@ -32,6 +33,23 @@ export async function dispatchDeliveries(limit = 25) {
       );
       if (!jobs[0])
         throw new Error("Order or purchased quote provider is unavailable; review required");
+      const carrier = await sql.query<{ provider_key: string; provider_reference: string | null }>(
+        `select p.provider_key, q.provider_reference
+           from delivery_jobs j
+           join delivery_providers p on p.id=j.provider_id
+           join orders o on o.id=j.order_id
+           left join delivery_quotes q on q.id=o.delivery_quote_id
+          where j.id=$1`,
+        [jobs[0].id],
+      );
+      if (carrier[0]) {
+        await notifyCarrierOfJob({
+          orderId: row.order_id,
+          jobId: jobs[0].id,
+          providerKey: carrier[0].provider_key,
+          providerReference: carrier[0].provider_reference,
+        });
+      }
       await sql.query(
         `update delivery_dispatch_outbox set status='manual',lease_token=null,lease_until=null,last_error=null,updated_at=now() where order_id=$1 and lease_token=$2 and status='processing'`,
         [row.order_id, token],

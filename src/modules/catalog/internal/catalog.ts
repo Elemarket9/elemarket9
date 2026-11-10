@@ -260,7 +260,7 @@ export const getProduct = createServerFn({ method: "GET" })
     const relatedSearch = await searchProducts({
       q: product.subcategory?"":product.brand??product.name, category: product.category as CategoryKey, subcategory: product.subcategory ?? undefined,
       inStock: true, sort: "relevance", limit: 8,
-    }).catch(()=>null);
+    }, 8, { includeAggregates: false }).catch(()=>null);
     const relatedHits = (relatedSearch?.hits??[]).filter((hit) => hit.id !== product.id).slice(0, 4);
     const related = await hydrateSearchHits(sql, relatedHits, {
       category: product.category as CategoryKey, subcategory: product.subcategory ?? undefined, limit: 8,

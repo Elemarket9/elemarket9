@@ -5,6 +5,7 @@ import { authClient, authEnabled } from "@/modules/identity/public/auth/client";
 import { SignedIn, UserButton } from "@/modules/identity/public/auth/gates";
 import { saveSignupProfile } from "@/modules/identity/public/auth/account.functions";
 import { requestEmailOtpCode, verifyEmailOtpCode } from "@/modules/identity/public/auth/otp";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
@@ -33,7 +34,7 @@ function Login() {
           name: name.trim() || email.split("@")[0] || "Shopper",
           callbackURL: "/",
         });
-        if (err) throw new Error(err.message ?? "Could not create account");
+        if (err) throw new Error(publicAuthError("sign-up"));
         const otp = await requestEmailOtpCode({ data: { email: email.trim(), purpose: "signup" } });
         setEmailChallengeId(otp.challengeId);
         setEmailCode("");
@@ -57,7 +58,7 @@ function Login() {
             setVerificationMode("login");
             return;
           }
-          throw new Error(err.message ?? "Could not sign in");
+          throw new Error(publicAuthError("sign-in"));
         }
       }
       window.location.href = "/";
@@ -79,7 +80,7 @@ function Login() {
         password,
       });
       if (signInResult.data && "twoFactorRedirect" in signInResult.data && signInResult.data.twoFactorRedirect) return;
-      if (signInResult.error) throw new Error(signInResult.error.message ?? "Email verified, but sign-in failed");
+      if (signInResult.error) throw new Error(publicAuthError("sign-in"));
       if (verificationMode === "signup") {
         await saveSignupProfile({ data: { name: name.trim() || email.split("@")[0] || "Shopper", phone: phone.trim() } });
       }

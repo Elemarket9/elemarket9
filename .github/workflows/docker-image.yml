@@ -13,6 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
     - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      run: docker build . --file Dockerfile --tag elemarket:ci --build-arg VITE_ELEMARKET_MARKETPLACE_ORIGIN=https://marketplace.example.com --build-arg VITE_ELEMARKET_SELLER_ORIGIN=https://seller.example.com --build-arg VITE_ELEMARKET_PROVIDER_ORIGIN=https://partners.example.com

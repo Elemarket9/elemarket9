@@ -10,6 +10,8 @@ services:
   postgres:
     logging: *bounded_logs
     image: postgres:16
+    mem_limit: 1g
+    cpus: "1.0"
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
@@ -26,8 +28,10 @@ services:
   redis:
     logging: *bounded_logs
     image: redis:7-alpine
+    mem_limit: 256m
+    cpus: "0.5"
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}"]
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "192mb", "--maxmemory-policy", "volatile-ttl", "--requirepass", "${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}"]
     environment:
       REDISCLI_AUTH: ${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}
     healthcheck:
@@ -46,6 +50,8 @@ services:
         VITE_ELEMARKET_SELLER_ORIGIN: https://${ELEMARKET_SELLER_HOST:?set ELEMARKET_SELLER_HOST}
         VITE_ELEMARKET_PROVIDER_ORIGIN: https://${ELEMARKET_PROVIDER_HOST:?set ELEMARKET_PROVIDER_HOST}
         VITE_ELEMARKET_PUBLIC_MEDIA_ORIGINS: ${VITE_ELEMARKET_PUBLIC_MEDIA_ORIGINS:-}
+    mem_limit: 1536m
+    cpus: "1.5"
     restart: unless-stopped
     depends_on:
       postgres: {condition: service_healthy}
@@ -72,7 +78,7 @@ services:
     healthcheck:
       test: ["CMD", "node", "scripts/app-health.mjs"]
       interval: 10s
-      start_period: 90s
+      start_period: 180s
       timeout: 6s
       retries: 6
   # Optional, private matcher/PAD bridge. DO NOT enable biometric sign-in until
@@ -126,6 +132,8 @@ services:
   scheduler:
     logging: *bounded_logs
     build: .
+    mem_limit: 256m
+    cpus: "0.5"
     restart: unless-stopped
     command: ["node", "scripts/scheduler.mjs"]
     depends_on:
@@ -147,6 +155,8 @@ services:
   proxy:
     logging: *bounded_logs
     image: caddy:2
+    mem_limit: 256m
+    cpus: "0.5"
     restart: unless-stopped
     environment:
       ELEMARKET_DOMAIN: ${ELEMARKET_DOMAIN:?set ELEMARKET_DOMAIN}
@@ -162,11 +172,38 @@ services:
     depends_on:
       app: {condition: service_healthy}
     networks: [private]
+  backup:
+    image: postgres:16
+    mem_limit: 512m
+    cpus: "0.5"
+    logging: *bounded_logs
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      PGPASSWORD: ${ELEMARKET_DB_PASSWORD:?set ELEMARKET_DB_PASSWORD}
+      PGHOST: postgres
+      PGUSER: ${ELEMARKET_DB_USER:?set ELEMARKET_DB_USER}
+      PGDATABASE: ${ELEMARKET_DB_NAME:?set ELEMARKET_DB_NAME}
+    volumes:
+      - backup_data:/backups
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        while true; do
+          stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+          pg_dump -Fc -f "/backups/elemarket-$${stamp}.dump"
+          find /backups -name 'elemarket-*.dump' -mtime +7 -delete || true
+          sleep 86400
+        done
+    networks: [private]
 volumes:
   postgres_data:
   redis_data:
   caddy_data:
   caddy_config:
+  backup_data:
 networks:
   private:
     driver: bridge
