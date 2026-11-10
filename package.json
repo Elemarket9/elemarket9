@@ -5,7 +5,10 @@
   "type": "module",
   "overrides": {
     "nf3": "0.3.17",
-    "jiti": "2.7.0"
+    "jiti": "2.7.0",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.6"
+    }
   },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
@@ -23,7 +26,7 @@
     "validate:firebase": "node scripts/validate-firebase-client-env.mjs",
     "build:production": "npm run validate:startup -- --require-shared && npm run validate:push-client && vite build",
     "security:deps": "npm audit --audit-level=high",
-    "security:signatures": "npm audit signatures",
+    "security:signatures": "node scripts/audit-signatures.mjs",
     "security:ci": "npm run security:deps && npm run security:signatures",
     "release:verify": "npm run check:architecture && npm run validate:startup && npm run validate:deployment-package && npm run security:ci && npm run typecheck && npm run lint && npm run build:production",
     "validate:deployment-package": "node scripts/validate-deployment-package.mjs",
@@ -125,6 +128,6 @@
   },
   "version": "2.11.3",
   "engines": {
-    "node": "22.x"
+    "node": "22.x || 26.x"
   }
 }

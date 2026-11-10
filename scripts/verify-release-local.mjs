@@ -1,7 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import {mkdirSync,writeFileSync} from 'node:fs';
 
-if(!process.versions.node.startsWith('22.'))throw new Error('Run release verification with Node 22');
+if(!/^(22|26)\./.test(process.versions.node))throw new Error('Run release verification with Node 26 (or 22 during the transition)');
 const npmCli=process.env.npm_execpath;
 if(!npmCli)throw new Error('Invoke through npm exec or npm run');
 mkdirSync('verification',{recursive:true});
