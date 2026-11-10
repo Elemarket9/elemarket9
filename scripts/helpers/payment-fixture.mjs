@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { quoteCartCanonical } from '../../src/lib/commerce-guards.mjs';
 export async function createPaymentFixture(query) {
   const execStatements = async statements => { for (const statement of statements) await query(statement.sql, statement.params ?? []); };
   const n = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -12,9 +14,17 @@ export async function createPaymentFixture(query) {
     payment: `it_payment_${n}`,
     idem: `it_idem_${n}`,
     fingerprint: "f".repeat(64),
+    quoteFingerprint: null,
     provider: `it-provider-${n}`,
     event: `it_event_${n}`,
+    phone: '+2332' + String(Math.floor(Math.random()*1e8)).padStart(8,'0'),
   };
+  ids.quoteFingerprint = createHash('sha256').update(quoteCartCanonical({
+    merchantId: ids.merchant, address: '1 Test Street', tier: 'same_day',
+    items: [{ productId: ids.product, variantId: ids.variant, quantity: 1 }],
+  })).digest('hex');
+  // Stock is 0 because the single unit is already held by the reservation below,
+  // matching what create_pending_order leaves behind.
   await execStatements([
     {
       sql: `
@@ -27,6 +37,12 @@ export async function createPaymentFixture(query) {
       `,
       params: [ids.user, `${ids.user}@integration.test`],
     },
+    // Simulated phone OTP: SMS challenge verified, then bound via confirm_phone_verification().
+    { sql: `insert into profiles(user_id, name, phone) values($1, 'Integration Customer', $2)`, params: [ids.user, ids.phone] },
+    { sql: `insert into otp_challenges(id, user_id, destination, purpose, provider, status, expires_at, cooldown_until, verified_at)
+             values($1, $2, $3, 'phone_verification', 'mock-sms', 'verified', now() + interval '10 minutes', now(), now())`,
+      params: [`it_otp_${n}`, ids.user, ids.phone] },
+    { sql: `select confirm_phone_verification($1, $2)`, params: [ids.user, `it_otp_${n}`] },
     {
       sql: `
         insert into merchants(
@@ -47,11 +63,11 @@ export async function createPaymentFixture(query) {
           eta_minutes, distance_km, dest_address, expires_at
         )
         values(
-          $1, $2, $3, 'integration', 'same_day', 0,
+          $1, $2, $3, $4, 'same_day', 15,
           60, 1, '1 Test Street', now() + interval '1 hour'
         )
       `,
-      params: [ids.quote, ids.user, ids.merchant],
+      params: [ids.quote, ids.user, ids.merchant, ids.quoteFingerprint],
     },
     {
       sql: `
@@ -68,7 +84,7 @@ export async function createPaymentFixture(query) {
         )
         values(
           $1, $2, 'Integration SKU', 'electronics', 100,
-          'GHS', 1, 'integration'
+          'GHS', 0, 'integration'
         )
       `,
       params: [ids.product, ids.merchant],
@@ -80,7 +96,7 @@ export async function createPaymentFixture(query) {
         )
         values(
           $1, $2, 'IT-SKU', 'Default', '{}'::jsonb,
-          100, 1, 'active'
+          100, 0, 'active'
         )
       `,
       params: [ids.variant, ids.product],
@@ -104,8 +120,8 @@ export async function createPaymentFixture(query) {
         )
         values(
           $1, $2, $3, $4, 'payment_pending', 'GHS',
-          100, 100, 0, 0, 100,
-          100, 'same_day', $5,
+          100, 100, 15, 0, 100,
+          115, 'same_day', $5,
           '1 Test Street', now() + interval '15 minutes'
         )
       `,
@@ -155,7 +171,7 @@ export async function createPaymentFixture(query) {
           method, status, provider_key
         )
         values(
-          $1, $2, $3, 100, 'GHS',
+          $1, $2, $3, 115, 'GHS',
           'mobile_money', 'initiated', $4
         )
       `,

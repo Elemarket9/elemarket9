@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { toPesewas, fromPesewas, formatGhs, lineTotal, sumMoney, quoteDelivery } from "../src/modules/shared/internal/money.ts";
 import { formatOrderCursor, parseOrderCursor } from "../src/modules/ordering/internal/order-cursor.ts";
 import { nonRelevanceCursorPredicate } from "../src/modules/catalog/internal/search-cursor.ts";
@@ -77,4 +77,21 @@ test("checkout migration keeps the inventory and discount invariants", () => {
     assert.equal(sql.includes(needle), true, needle);
   }
   assert.equal(sql.includes("ceil("), false);
+});
+
+test("checkout empty-order guard uses this merchant's delivery fee", () => {
+  // The newest migration defining create_pending_order is the one in force.
+  const dir = new URL("../migrations/", import.meta.url);
+  const latest = readdirSync(dir)
+    .filter((name) => name.endsWith(".sql"))
+    .sort()
+    .filter((name) => /function\s+public\.create_pending_order\s*\(/i.test(readFileSync(new URL(name, dir), "utf8")))
+    .at(-1);
+  assert.equal(latest, "0215_checkout_empty_order_guard.sql");
+  const sql = readFileSync(new URL(latest, dir), "utf8");
+  const assigned = sql.indexOf("v_delivery:=v_quote.price;");
+  const guard = sql.indexOf("v_product_total + v_delivery <= 0");
+  assert.ok(assigned > 0 && guard > assigned, "v_delivery must be assigned before the empty-order guard");
+  assert.equal(sql.split("v_delivery:=v_quote.price;").length - 1, 1, "single assignment per merchant");
+  assert.match(sql, /v_delivery is null or v_delivery <= 0 then raise exception 'invalid delivery quote price'/);
 });
