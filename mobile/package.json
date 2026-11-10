@@ -43,6 +43,7 @@
     },
     "braces": "$braces",
     "node-forge": "$node-forge",
-    "sprintf-js": "$sprintf-js"
+    "sprintf-js": "$sprintf-js",
+    "zod": "4.6.6"
   }
 }
