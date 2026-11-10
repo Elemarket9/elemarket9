@@ -12,6 +12,7 @@ const deliveryQuoteSchema = z.object({
   lat: z.number().finite().min(-90).max(90).optional(),
   lon: z.number().finite().min(-180).max(180).optional(),
   tier: z.enum(["same_day", "next_day", "three_day"]).optional(),
+  pickupLocationId: z.string().trim().min(1).max(128).optional(),
   items: z.array(z.object({
     productId: z.string().trim().min(1).max(64),
     variantId: z.string().trim().min(1).max(64).nullable().optional(),

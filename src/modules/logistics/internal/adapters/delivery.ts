@@ -8,6 +8,7 @@ export type DeliveryQuoteInput = {
   lat?: number;
   lon?: number;
   tier?: "same_day" | "next_day" | "three_day";
+  pickupLocationId?: string;
   items: Array<{ productId: string; variantId?: string | null; quantity: number }>;
 };
 export type DeliveryQuoteResult = { quoteId: string; price: string; currency: "GHS"; etaMinutes: number; expiresAt: string; tier: "same_day" | "next_day" | "three_day"; providerReference?: string };
@@ -18,6 +19,7 @@ const quoteRequestSchema = z.object({
   lat: z.number().min(-90).max(90).optional(),
   lon: z.number().min(-180).max(180).optional(),
   tier: z.enum(["same_day", "next_day", "three_day"]).optional(),
+  pickupLocationId: z.string().trim().min(1).max(128).optional(),
   items: z.array(z.object({
     productId: z.string().trim().min(1).max(64),
     variantId: z.string().trim().min(1).max(64).nullable().optional(),
@@ -32,4 +34,11 @@ export const requestDeliveryQuote = createServerFn({ method: "POST" })
     const userId = getAuthenticatedUserId(context);
     const { requestDeliveryQuoteServer } = await import("@/modules/logistics/internal/adapters/delivery.server");
     return requestDeliveryQuoteServer({ data, userId: userId });
+  });
+
+export const listCheckoutPickupLocations = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const { listCheckoutPickupLocationsServer } = await import("@/modules/logistics/internal/adapters/delivery.server");
+    return (await listCheckoutPickupLocationsServer()).map(({ id, name, address }) => ({ id, name, address }));
   });

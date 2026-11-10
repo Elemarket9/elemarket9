@@ -21,12 +21,13 @@ export async function dispatchDeliveries(limit = 25) {
     try {
       const jobs = await sql.query<{ id: string }>(
         `with eligible as (
-        select o.id,q.provider_id from orders o join delivery_quotes q on q.id=o.delivery_quote_id and q.user_id=o.user_id and q.merchant_id=o.merchant_id
+        select o.id,q.provider_id,q.pickup_location_id from orders o join delivery_quotes q on q.id=o.delivery_quote_id and q.user_id=o.user_id and q.merchant_id=o.merchant_id
         join delivery_providers p on p.id=q.provider_id and p.status='active'
         join delivery_dispatch_outbox d on d.order_id=o.id and d.lease_token=$2 and d.status='processing'
         where o.id=$1 and o.status in ('paid','confirmed','fulfilling') and not exists(select 1 from shipments sh where sh.order_id=o.id) and (not $3::boolean or p.environment='production') for update of o
       ), job as (
-        insert into delivery_jobs(id,order_id,provider_id) select 'dj_'||id,id,provider_id from eligible
+        insert into delivery_jobs(id,order_id,provider_id,handover_kind,pickup_location_id)
+        select 'dj_'||id,id,provider_id,case when pickup_location_id is null then 'delivery' else 'pickup' end,pickup_location_id from eligible
         on conflict(order_id) where shipment_id is null do update set order_id=excluded.order_id returning id,provider_id
       ) select job.id from job join eligible on job.provider_id=eligible.provider_id`,
         [row.order_id, token, isSharedEnvironment()],
