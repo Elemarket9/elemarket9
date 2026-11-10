@@ -1,34 +1,44 @@
-/** Integer pesewas — never trust IEEE floats for GHS. */
+/** Integer pesewas — never trust IEEE floats for GHS. Amounts are non-negative. */
 export function toPesewas(value: string | number): number {
-  if (typeof value === "number" && (!Number.isFinite(value) || Math.abs(value * 100 - Math.round(value * 100)) > 1e-9)) {
+  if (typeof value === "number" && (!Number.isFinite(value) || value < 0 || Math.abs(value * 100 - Math.round(value * 100)) > 1e-9)) {
     throw new Error("invalid money: at most two decimal places are supported");
   }
   const raw = typeof value === "number" ? String(value) : String(value).trim();
-  if (!/^-?\d+(?:\.\d{1,2})?$/.test(raw)) {
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) {
     throw new Error("invalid money: at most two decimal places are supported");
   }
-  const negative = raw.startsWith("-");
-  const [cedis, frac = ""] = raw.replace("-", "").split(".");
+  const [cedis, frac = ""] = raw.split(".");
   const pesewas = Number(cedis) * 100 + Number(frac.padEnd(2, "0"));
   if (!Number.isSafeInteger(pesewas)) throw new Error("invalid money");
-  return negative ? -pesewas : pesewas;
+  return pesewas;
 }
 
 export function fromPesewas(pesewas: number): string {
-  const sign = pesewas < 0 ? "-" : "";
-  const abs = Math.abs(pesewas);
-  const cedis = Math.floor(abs / 100);
-  const p = String(abs % 100).padStart(2, "0");
-  return `${sign}${cedis}.${p}`;
+  if (!Number.isSafeInteger(pesewas) || pesewas < 0) throw new Error("invalid money");
+  const cedis = Math.floor(pesewas / 100);
+  const p = String(pesewas % 100).padStart(2, "0");
+  return `${cedis}.${p}`;
+}
+
+/** Sum already-valid money amounts without binary floating point. */
+export function sumMoney(values: Array<string | number>): string {
+  return fromPesewas(values.reduce<number>((sum, value) => sum + toPesewas(value), 0));
+}
+
+export function lineTotal(price: string | number, quantity: number): string {
+  if (!Number.isInteger(quantity) || quantity < 0) throw new Error("invalid quantity");
+  return fromPesewas(toPesewas(price) * quantity);
 }
 
 export function formatGhs(value: string | number): string {
-  const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return "GH₵ —";
-  return `GH₵ ${n.toLocaleString("en-GH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  try {
+    const pesewas = toPesewas(value);
+    const cedis = Math.floor(pesewas / 100);
+    const p = String(pesewas % 100).padStart(2, "0");
+    return `GH₵ ${cedis.toLocaleString("en-GH")}.${p}`;
+  } catch {
+    return "GH₵ —";
+  }
 }
 
 export const DELIVERY_TIERS = ["same_day", "next_day", "three_day"] as const;
@@ -76,10 +86,15 @@ export function quoteDelivery(tier: DeliveryTier, distanceKm: number): {
   etaMinutes: number;
   distanceKm: number;
 } {
-  const km = Math.min(100, Math.max(0.5, distanceKm));
+  const bounded = Math.min(100, Math.max(0.5, distanceKm));
+  if (!Number.isFinite(bounded)) throw new Error("invalid delivery distance");
+  // Bias by a millionth of a kilometer so a binary value just under an exact
+  // hundredth still rounds to the hundredth the distance represents.
+  const hundredths = Math.round(bounded * 100 + 1e-6);
+  const km = hundredths / 100;
   const pesewas = Math.min(
     18000,
-    BASE_PESEWAS[tier] + Math.round(PER_KM_PESEWAS[tier] * km),
+    BASE_PESEWAS[tier] + Math.round((PER_KM_PESEWAS[tier] * hundredths) / 100),
   );
   const eta =
     tier === "same_day"
