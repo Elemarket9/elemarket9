@@ -24,7 +24,8 @@ export default function Checkout() {
       const merchantIds = [...new Set(items.map((item) => item.merchantId))];
       const result = [] as typeof quotes;
       for (const merchantId of merchantIds) {
-        const q = await apiJson<{ id: string; price: string; etaMinutes: number }>("/api/mobile/delivery-quote", { method: "POST", body: JSON.stringify({ merchantId, address: address.trim(), tier }) });
+        const quoteItems = items.filter((item) => item.merchantId === merchantId).map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity }));
+        const q = await apiJson<{ id: string; price: string; etaMinutes: number }>("/api/mobile/delivery-quote", { method: "POST", body: JSON.stringify({ merchantId, address: address.trim(), tier, items: quoteItems }) });
         result.push({ merchantId, quoteId: q.id, price: q.price, etaMinutes: q.etaMinutes });
       }
       setQuotes(result);

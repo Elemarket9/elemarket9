@@ -12,6 +12,8 @@ export type PaymentAdapterInput = {
   merchantSubaccount?: string;
   idempotencyKey?: string;
   callbackUrl?: string;
+  /** Merchandise commission retained by the platform account, in major units. */
+  platformFee?: string;
 };
 
 export type PaymentRefundResult = {

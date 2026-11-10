@@ -38,7 +38,7 @@ export const loadDeliveryPartnerDashboard = createServerFn({ method: "GET" })
       [access.organizationId],
     );
     const jobs = await sql.query<JsonObject>(
-      `select j.id,j.order_id as "orderId",j.status,j.handover_rider_user_id as "handoverRiderUserId",j.provider_reference as "providerReference",j.tracking_url as "trackingUrl",j.proof_of_delivery_url as "proofOfDeliveryUrl",j.failure_reason as "failureReason",j.version,j.assigned_at::text as "assignedAt",j.accepted_at::text as "acceptedAt",j.picked_up_at::text as "pickedUpAt",j.in_transit_at::text as "inTransitAt",j.delivered_at::text as "deliveredAt",j.failed_at::text as "failedAt",j.updated_at::text as "updatedAt",o.address,o.delivery_tier as "deliveryTier",o.delivery_total::float8 as "deliveryTotal",o.grand_total::float8 as "grandTotal",o.delivery_contact_snapshot_verified as "contactVerified",
+      `select j.id,j.order_id as "orderId",j.status,j.handover_rider_user_id as "handoverRiderUserId",j.provider_reference as "providerReference",j.tracking_url as "trackingUrl",j.proof_of_delivery_url as "proofOfDeliveryUrl",j.failure_reason as "failureReason",j.version,j.assigned_at::text as "assignedAt",j.accepted_at::text as "acceptedAt",j.picked_up_at::text as "pickedUpAt",j.in_transit_at::text as "inTransitAt",j.delivered_at::text as "deliveredAt",j.failed_at::text as "failedAt",j.updated_at::text as "updatedAt",o.address,o.delivery_tier as "deliveryTier",o.delivery_total::float8 as "deliveryTotal",o.delivery_contact_snapshot_verified as "contactVerified",
       exists(select 1 from order_delivery_holds h where h.order_id=o.id and h.active) as "deliveryOnHold",m.name as "merchantName",p.name as "providerName" from delivery_jobs j join delivery_providers p on p.id=j.provider_id and p.partner_organization_id=$1 join orders o on o.id=j.order_id join merchants m on m.id=o.merchant_id where ($2::boolean=false or j.handover_rider_user_id=$3) order by j.updated_at desc limit 200`,
       [access.organizationId, false, userId],
     );
@@ -129,7 +129,7 @@ export const updateDeliveryJob = createServerFn({ method: "POST" })
           throw new Error("Tracking URL origin has not been approved for this delivery provider");
       }
       const rows = await sql.query<{ id: string }>(
-        `update delivery_jobs j set status=$3,tracking_url=coalesce($4,tracking_url),proof_of_delivery_url=coalesce($5,proof_of_delivery_url),failure_reason=case when $3='failed' then $6 else failure_reason end,picked_up_at=case when $3='picked_up' then coalesce(picked_up_at,now()) else picked_up_at end,updated_at=now() from delivery_providers p where j.id=$1 and p.id=j.provider_id and p.partner_organization_id=$2 and p.status='active' and (not $8::boolean or p.environment='production') and j.version=$7 returning j.id,j.version`,
+        `update delivery_jobs j set status=$3,tracking_url=coalesce($4,tracking_url),proof_of_delivery_url=coalesce($5,proof_of_delivery_url),failure_reason=case when $3='failed' then $6 else failure_reason end,picked_up_at=case when $3='picked_up' then coalesce(picked_up_at,now()) else picked_up_at end,updated_at=now() from delivery_providers p where j.id=$1 and p.id=j.provider_id and p.partner_organization_id=$2 and p.status='active' and (not $8::boolean or p.environment='production') and j.version=$7 and not exists(select 1 from order_delivery_holds h where h.order_id=j.order_id and h.active) returning j.id,j.version`,
         [
           data.jobId,
           access.organizationId,
@@ -142,7 +142,7 @@ export const updateDeliveryJob = createServerFn({ method: "POST" })
         ],
       );
       if (rows.length !== 1)
-        throw new Error("Delivery job changed or is no longer available; refresh and retry");
+        throw new Error("Delivery job changed, is held by support, or is no longer available; refresh and retry");
       if(['failed','cancelled'].includes(data.status)){
         await sql.query(`update delivery_handover_requests set state='failed',updated_at=now() where job_id=$1 and state in ('issuing','issued')`,[data.jobId]);
         await sql.query(`update otp_challenges c set status='superseded',updated_at=now() from delivery_otp_verifiers v where v.job_id=$1 and c.id=v.challenge_id and v.consumed_at is null and c.status in ('pending','sending')`,[data.jobId]);
@@ -471,8 +471,9 @@ export const reassignHandoverRider=createServerFn({method:'POST'}).middleware([a
    const rows=await tx.query<{id:string;old_rider:string|null}>(`select j.id,j.handover_rider_user_id as old_rider from delivery_jobs j
      join delivery_providers p on p.id=j.provider_id and p.status='active'
      where j.id=$1 and p.partner_organization_id=$2 and j.status in ('assigned','accepted','picked_up','in_transit')
+       and not exists(select 1 from order_delivery_holds h where h.order_id=j.order_id and h.active)
      for update of j`,[data.jobId,access.organizationId]);
-   if(!rows[0] || rows[0].old_rider===data.newRiderUserId)throw new Error('Job unavailable or rider unchanged');
+   if(!rows[0] || rows[0].old_rider===data.newRiderUserId)throw new Error('Job unavailable, held by support, or rider unchanged');
    const eligible=await tx.query(`select 1 from partner_organization_users pu join "user" u on u.id=pu.user_id and u."emailVerified"=true
       where pu.organization_id=$1 and pu.user_id=$2 and pu.status='active' and elemarket_has_personnel_capability(pu.organization_id,pu.user_id,'rider') for update of pu`,
       [access.organizationId,data.newRiderUserId]);

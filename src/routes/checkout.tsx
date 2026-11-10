@@ -101,7 +101,8 @@ function CheckoutForm() {
       if (!merchantIds.length) throw new Error("Could not resolve merchants for this cart.");
       const next: Array<{ merchantId: string; quoteId: string; price: string; etaMinutes: number }> = [];
       for (const merchantId of merchantIds) {
-        const result = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier } });
+        const items = cart.filter((line) => (line.merchantId || resolved[line.productId]) === merchantId).map((line) => ({ productId: line.productId, variantId: line.variantId ?? null, quantity: line.quantity }));
+        const result = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier, items } });
         if (!result?.id) throw new Error("Delivery provider did not return a quote.");
         next.push({ merchantId, quoteId: result.id, price: result.price, etaMinutes: result.etaMinutes });
       }

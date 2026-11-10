@@ -9,6 +9,7 @@ import type {
   PaymentRefundResult,
 } from "../payment";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
+import { marketplaceSettlementChargePesewas } from "@/lib/commerce-guards.mjs";
 
 async function readProviderJson(response: Response): Promise<unknown> {
   const body = await readResponseBodyWithLimit(response, 512 * 1024);
@@ -110,7 +111,17 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference,
       metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId }),
     };
-    if (input.merchantSubaccount) body.subaccount = input.merchantSubaccount;
+    if (input.merchantSubaccount) {
+      body.subaccount = input.merchantSubaccount;
+      if (input.platformFee != null) {
+        const charge = marketplaceSettlementChargePesewas(input.amount, input.platformFee);
+        // A zero commission keeps the provider's configured split. Delivery is not commission.
+        if (charge > 0) {
+          body.transaction_charge = charge;
+          body.bearer = "account";
+        }
+      }
+    }
     if (input.callbackUrl) body.callback_url = input.callbackUrl;
     const response = await fetch(`${this.baseUrl}/transaction/initialize`, {
       method: "POST",

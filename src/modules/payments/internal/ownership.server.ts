@@ -5,9 +5,10 @@ export async function requireCustomerPayment(paymentId: string, userId: string) 
   const rows = await sql.query<{
     id: string; order_id: string; user_id: string; amount: string; currency: string;
     method: string; status: string; provider_key: string | null;
+    platform_fee: string;
   }>(
     `select p.id, p.order_id, p.user_id, p.amount::text, p.currency,
-            p.method, p.status, p.provider_key
+            p.method, p.status, p.provider_key, o.platform_fee::text
        from payments p
        join orders o on o.id = p.order_id
       where p.id = $1 and p.user_id = $2 and o.user_id = $2

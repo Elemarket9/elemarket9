@@ -169,6 +169,7 @@ export async function createExternalPaymentIntent(input: {
     merchantSubaccount: subaccountRows[0]?.provider_account_ref,
     idempotencyKey: result.attemptId,
     callbackUrl,
+    platformFee: owned.platform_fee,
   });
   const safeCheckoutUrl = validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
   // Initialization is not proof of authorization or settlement.

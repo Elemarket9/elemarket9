@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { getSql } from "@/lib/db";
@@ -5,13 +6,23 @@ import { isWorkspacePreview } from "@/lib/env.server";
 import { requireCustomerForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { haversineKm, quoteDelivery, type DeliveryTier } from "@/modules/shared/public/money";
+import {
+  assertDeliveryQuoteBounds,
+  formatPesewas,
+  parsePesewas,
+  quoteCartCanonical,
+} from "@/lib/commerce-guards.mjs";
 
+export type DeliveryQuoteItem = { productId: string; variantId?: string | null; quantity: number };
 export type DeliveryQuoteInput = {
   merchantId: string;
   address: string;
   lat?: number;
   lon?: number;
   tier?: "same_day" | "next_day" | "three_day";
+  items?: DeliveryQuoteItem[];
+  itemCount?: number;
+  declaredValue?: string;
 };
 export type DeliveryQuoteResult = {
   quoteId: string;
@@ -44,7 +55,15 @@ export class JsonHttpDeliveryAdapter implements DeliveryCarrierAdapter {
     const response = await fetchPinnedPublicHttps(this.endpoint, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.secret}` },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        merchantId: input.merchantId,
+        address: input.address,
+        lat: input.lat,
+        lon: input.lon,
+        tier: input.tier ?? "next_day",
+        itemCount: input.itemCount ?? 0,
+        declaredValue: input.declaredValue ?? "0.00",
+      }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) throw new Error(`Delivery provider returned HTTP ${response.status}`);
@@ -58,11 +77,7 @@ export class JsonHttpDeliveryAdapter implements DeliveryCarrierAdapter {
           "invalid delivery quote price",
         ),
       currency: z.literal("GHS"),
-      etaMinutes: z
-        .number()
-        .int()
-        .positive()
-        .max(60 * 24 * 30),
+      etaMinutes: z.number().int().positive().max(60 * 24 * 7),
       expiresAt: z.string().datetime(),
       tier: z.enum(["same_day", "next_day", "three_day"]),
       providerReference: z.string().min(1).max(256).optional(),
@@ -148,17 +163,10 @@ export async function requestDeliveryQuoteServer(input: {
     process.env.ELEMARKET_DELIVERY_PROVIDER?.trim() || "";
   if (!providerKey) throw new Error("Delivery provider is not configured");
   const adapter = getDeliveryAdapter(providerKey);
-  const data = await resolveDestination(input.data);
+  const destination = await resolveDestination(input.data);
+  const cart = await quotedCart(destination.merchantId, input.data.items ?? []);
+  const data = { ...destination, itemCount: cart.itemCount, declaredValue: cart.declaredValue };
   const quote = await adapter.quote(data);
-  // Never persist a provider-controlled amount or tier without validating it.
-  const deliveryPrice = Number(quote.price);
-  if (
-    !Number.isFinite(deliveryPrice) ||
-    deliveryPrice < 0 ||
-    deliveryPrice > 1_000_000 ||
-    !/^\d{1,9}(?:\.\d{1,2})?$/.test(quote.price)
-  )
-    throw new Error("Invalid delivery quote amount");
   if (quote.tier !== (input.data.tier ?? "next_day"))
     throw new Error("Delivery provider returned a mismatched service tier");
   const expires = Date.parse(quote.expiresAt);
@@ -180,39 +188,87 @@ export async function requestDeliveryQuoteServer(input: {
       Number(data.lon),
     ).toFixed(2),
   );
-  if (!Number.isFinite(distanceKm) || distanceKm < 0) throw new Error("Invalid delivery distance");
+  const bounded = assertDeliveryQuoteBounds({ price: quote.price, etaMinutes: quote.etaMinutes, distanceKm });
   const providers = await sql.query<{ id: string }>(
     `select id from delivery_providers where provider_key=$1 and status='active' and ($2::boolean or environment='production')`,
     [providerKey, isWorkspacePreview()],
   );
   if (!providers[0]) throw new Error("Delivery provider is not active in this environment");
   const quoteId = `dq_${crypto.randomUUID()}`;
-  const fingerprint = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(JSON.stringify({ ...data, userId: principal.userId })),
-  );
-  const fingerprintHex = Array.from(new Uint8Array(fingerprint), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
+  const fingerprintHex = createHash("sha256")
+    .update(quoteCartCanonical({
+      merchantId: data.merchantId,
+      address: data.address,
+      tier: quote.tier,
+      items: cart.items,
+    }))
+    .digest("hex");
   await sql.query(
     `insert into delivery_quotes(id,user_id,merchant_id,fingerprint,tier,price,eta_minutes,distance_km,dest_address,dest_lat,dest_lon,expires_at,provider_id,provider_reference)
-       values($1,$2,$3,$4,$5,$6,coalesce($7,0),$12,$8,$9,$10,$11,$13,$14)`,
+       values($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,$14)`,
     [
       quoteId,
       principal.userId,
       data.merchantId,
       fingerprintHex,
       quote.tier,
-      quote.price,
-      quote.etaMinutes,
+      bounded.price,
+      bounded.etaMinutes,
       data.address,
       data.lat ?? null,
       data.lon ?? null,
       quote.expiresAt,
-      distanceKm,
+      bounded.distanceKm,
       providers[0].id,
       quote.providerReference ?? quote.quoteId,
     ],
   );
-  return { ...quote, id: quoteId, providerKey, latitude: data.lat, longitude: data.lon };
+  return { ...quote, price: bounded.price, id: quoteId, providerKey, latitude: data.lat, longitude: data.lon };
+}
+
+async function quotedCart(merchantId: string, items: DeliveryQuoteItem[]) {
+  if (!items.length) throw new Error("Delivery quote requires the merchant cart");
+  const sql = await getSql();
+  const productIds = [...new Set(items.map((item) => item.productId))];
+  const products = await sql.query<{ id: string; price: string }>(
+    `select id, price::text as price from products where merchant_id=$1 and id = any($2::text[]) and status='active'`,
+    [merchantId, productIds],
+  );
+  const variants = await sql.query<{ id: string; product_id: string; price: string }>(
+    `select id, product_id, price::text as price from product_variants where product_id = any($1::text[]) and status='active'`,
+    [productIds],
+  );
+  const productPrice = new Map(products.map((row) => [row.id, row.price]));
+  const variantPrice = new Map(variants.map((row) => [`${row.product_id}\t${row.id}`, row.price]));
+  const accepted: DeliveryQuoteItem[] = [];
+  let declared = 0;
+  let itemCount = 0;
+  for (const item of items) {
+    if (!productPrice.has(item.productId)) continue;
+    const variantId = item.variantId?.trim() || null;
+    const price = variantId ? variantPrice.get(`${item.productId}\t${variantId}`) : productPrice.get(item.productId);
+    if (!price) throw new Error("Delivery quote item is not available");
+    accepted.push({ productId: item.productId, variantId, quantity: item.quantity });
+    declared += parsePesewas(price) * item.quantity;
+    itemCount += item.quantity;
+  }
+  if (!accepted.length || !Number.isSafeInteger(declared)) throw new Error("Delivery quote requires the merchant cart");
+  return { items: accepted, itemCount, declaredValue: formatPesewas(declared) };
+}
+
+/** Optional carrier handoff. Manual partner-portal dispatch remains the default. */
+export async function notifyCarrierOfJob(input: { orderId: string; jobId: string; providerKey: string; providerReference: string | null }) {
+  const normalized = input.providerKey.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  const endpoint = process.env[`ELEMARKET_DELIVERY_${normalized}_DISPATCH_ENDPOINT`]?.trim();
+  if (!endpoint) return { notified: false as const };
+  const secret = process.env[`ELEMARKET_DELIVERY_${normalized}_SECRET`]?.trim();
+  if (!secret) throw new Error("Delivery dispatch credentials are not configured");
+  const response = await fetchPinnedPublicHttps(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+    body: JSON.stringify({ orderId: input.orderId, jobId: input.jobId, providerReference: input.providerReference }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`Delivery provider dispatch returned HTTP ${response.status}`);
+  return { notified: true as const };
 }
