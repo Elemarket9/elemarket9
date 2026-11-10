@@ -53,7 +53,7 @@ function parse(value:string|undefined):Cursor|null{
 function identifier(q:string){const raw=q.normalize('NFKC').trim().toLowerCase();const compact=raw.replace(/[\s-]/g,'');if(/^(?:\d{8}|\d{10}|\d{12,15})$/.test(compact))return compact;
   return /^[a-z0-9][a-z0-9._/-]{2,79}$/i.test(raw)&&/\d/.test(raw)&&/[a-z]/i.test(raw)?raw:undefined;}
 
-export async function searchProducts(input:string|z.input<typeof searchInputSchema>,legacyLimit=40,options:{includeDiagnostics?:boolean}={}):Promise<SearchResponse>{
+export async function searchProducts(input:string|z.input<typeof searchInputSchema>,legacyLimit=40,options:{includeDiagnostics?:boolean;includeAggregates?:boolean}={}):Promise<SearchResponse>{
   const data=searchInputSchema.parse(typeof input==='string'?{q:input,limit:legacyLimit}:input);
   if((data.lat==null)!==(data.lon==null))throw new Error("invalid location: both lat and lon are required");
   if(data.minPrice!=null&&data.maxPrice!=null&&data.minPrice>data.maxPrice)throw new Error('invalid price range');
@@ -190,10 +190,11 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
     if(options.includeDiagnostics){hit.relevanceScore=Number(row._lane);hit.intelligenceScore=Number(row._score);hit.rankingSignals={merchantConfidence:Number(row._merchant),conversionQuality:Number(row._conversion),trustedCommerce:Number(row._commerce),popularity:Number(row._popularity),trendMomentum:Number(row._trend),freshness:Number(row._freshness),inventoryHealth:Number(row._inventory),explorationBonus:Number(row._exploration)};}
     return hit;
   });
+  let aggregates:FacetAggregate={counts:[],facetRows:[]};
+  if(options.includeAggregates!==false){
   const cacheKey=`${catalogRevision??'unversioned'}:${fingerprint}`;
   const nowMs=Date.now();
   const cached=facetCache.get(cacheKey);
-  let aggregates:FacetAggregate;
   if(cached&&cached.expires>nowMs){
     aggregates=cached.value;
   }else{
@@ -212,10 +213,11 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
       facetCache.set(cacheKey,{expires:nowMs+FACET_CACHE_TTL_MS,value:aggregates});
     }
   }
+  }
   const {counts,facetRows}=aggregates;
   const total=Number(counts[0]?.total??hits.length);const facets:Record<string,SearchFacet[]>={};for(const row of facetRows)(facets[row.facet]??=[]).push({value:row.value,count:Number(row.count)});
   const interpretedFilters={category:plan.category,subcategory:plan.subcategory,brand:plan.brand,minPrice:plan.hardFloor,maxPrice:plan.hardCeiling,budgetCeiling:plan.softBudget,availability:plan.availability,newest:plan.effectiveSort==='newest',effectiveSort:plan.effectiveSort};
-  if(!cursor&&data.q)await sql.query(`insert into marketplace_search_events(query_hash,result_count,zero_result,filter_fingerprint,search_version) values($1,$2,$3,$4,$5)`,[createHmac('sha256',secret()).update(normalizeDiscoveryQuery(data.q)).digest('hex'),total,total===0,fingerprint,SEARCH_VERSION]).catch(()=>undefined);
+  if(!cursor&&data.q&&options.includeAggregates!==false)await sql.query(`insert into marketplace_search_events(query_hash,result_count,zero_result,filter_fingerprint,search_version) values($1,$2,$3,$4,$5)`,[createHmac('sha256',secret()).update(normalizeDiscoveryQuery(data.q)).digest('hex'),total,total===0,fingerprint,SEARCH_VERSION]).catch(()=>undefined);
   return {source:'postgres',searchVersion:SEARCH_VERSION,query:data.q,interpretedQuery:{identifier:identity,tokens:meaningfulTokens(plan.lexical),effectiveQuery:plan.lexical,expandedTerms:plan.groups,attributes:plan.attributes.map(({key,value,hard})=>({key,value,hard})),degraded:metadata.degraded||mode==='neutral'},interpretedFilters,hits,total,totalExact:counts.length>0&&total<=5000,facetsSampled:counts.length===0||total>5000,nextCursor,facets,appliedFilters:{category:data.category??null,subcategory:data.subcategory??null,brand:data.brand??null,model:data.model??null,merchantId:data.merchantId??null,listingType:data.listingType??null,condition:data.condition??null,minPrice:data.minPrice??null,maxPrice:data.maxPrice??null,inStock:data.inStock,sort:data.sort}};
 }
 export { searchInputSchema };
