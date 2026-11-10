@@ -43,13 +43,19 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run security:ci
+      - name: Dependency security gate (collect remaining checks)
+        id: root_security
+        continue-on-error: true
+        run: npm run security:ci
       - run: npm run check:architecture
       - run: npm run validate:deployment-package
       - run: npm test
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+      - name: Enforce dependency security gate
+        if: always() && steps.root_security.outcome == 'failure'
+        run: exit 1
   mobile:
     runs-on: ubuntu-24.04
     defaults:
@@ -63,6 +69,12 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
-      - run: npm audit --audit-level=high
+      - name: Mobile security audit (collect remaining checks)
+        id: mobile_security
+        continue-on-error: true
+        run: npm audit --audit-level=high
       - run: npx tsc --noEmit
       - run: node node_modules/expo/bin/cli export --platform android --output-dir ${{ runner.temp }}/mobile-export
+      - name: Enforce mobile security gate
+        if: always() && steps.mobile_security.outcome == 'failure'
+        run: exit 1
