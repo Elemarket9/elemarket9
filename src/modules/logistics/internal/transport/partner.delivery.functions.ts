@@ -175,10 +175,15 @@ export const assignHandoverRider = createServerFn({ method: "POST" })
            and pu.status='active' and elemarket_has_personnel_capability(pu.organization_id,pu.user_id,'rider')
          join "user" verified_rider on verified_rider.id=pu.user_id and verified_rider."emailVerified"=true
          where j.id=$1 and p.id=j.provider_id and p.partner_organization_id=$2
-           and p.status='active' and j.status in ('assigned','accepted','picked_up','in_transit')
-           and j.handover_rider_user_id is distinct from $3 returning j.id`,
-        [data.jobId,access.organizationId,data.riderUserId]);
-      if (!assigned[0]) throw new Error("Rider assignment unchanged or unavailable; check job and rider status");
+           and p.status='active' and (not $4::boolean or p.environment='production')
+           and j.status in ('assigned','accepted','picked_up','in_transit')
+           -- Initial assignment may not replace an existing rider or active handover.
+           and j.handover_rider_user_id is null
+           and not exists(select 1 from order_delivery_holds h where h.order_id=j.order_id and h.active)
+           and not exists(select 1 from delivery_handover_requests h where h.job_id=j.id and h.state in ('issuing','issued'))
+           returning j.id`,
+        [data.jobId,access.organizationId,data.riderUserId,isSharedEnvironment()]);
+      if (!assigned[0]) throw new Error("Initial rider assignment unavailable; use audited reassignment to change an existing rider");
       await sql.query(`insert into partner_audit_events(organization_id,user_id,action,resource_type,resource_id,outcome,metadata)
         values($1,$2,'delivery.rider.assigned','delivery_job',$3,'success',$4::jsonb)`,
         [access.organizationId,userId,data.jobId,JSON.stringify({riderUserId:data.riderUserId})]);
