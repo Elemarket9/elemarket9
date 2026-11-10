@@ -1,9 +1,9 @@
 import {EIDE_VERSION} from './eide/version';
+import { discoverySigningSecret } from './eide/signing-secret';
 import { exposureRequest, signExposure } from './eide/attribution.server';
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getDiscoverySql as getSql } from "@/lib/db";
 import { z } from "zod";
-import { env } from "@/lib/env.server";
 import { normalizeDiscoveryQuery, meaningfulTokens } from "./eide/intelligence";
 import { buildQueryPlan } from "./eide/query-plan";
 import { loadDiscoveryMetadata } from "./eide/metadata.server";
@@ -33,7 +33,7 @@ export type SearchHit={id:string;name:string;merchantName:string;merchantId?:str
 export type SearchFacet={value:string;count:number};
 export type SearchResponse={source:"postgres"|"typesense";searchVersion:string;query:string;interpretedQuery:{identifier?:string;tokens:string[];effectiveQuery?:string;expandedTerms?:string[][];attributes?:{key:string;value:string;hard:boolean}[];degraded?:boolean};interpretedFilters?:Record<string,string|number|boolean|null>;hits:SearchHit[];total:number;totalExact?:boolean;facetsSampled?:boolean;nextCursor:string|null;facets:Record<string,SearchFacet[]>;appliedFilters:Record<string,string|number|boolean|null>};
 type Cursor={catalogRevision:string;featureRevision:number|null;seen:number;v:string;fingerprint:string;sort:string;lane:number;key:number;score:number;id:string;exp:number;rankedAt:number;mode:"features"|"neutral"};
-function secret(){const s=env("SEARCH_CURSOR_SECRET")||env("BETTER_AUTH_SECRET");if(s){if(process.env.NODE_ENV==="production"&&s.length<32)throw new Error("Search signing secret must contain at least 32 characters");return s;}if(process.env.NODE_ENV==="production")throw new Error("Search signing secret required");return "development-search-cursor-secret-change-me";}
+function secret(){return discoverySigningSecret();}
 function sign(cursor:Cursor){const body=Buffer.from(JSON.stringify(cursor)).toString("base64url");return body+"."+createHmac("sha256",secret()).update(body).digest("base64url");}
 function parse(value:string|undefined):Cursor|null{
   if(!value)return null;

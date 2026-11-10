@@ -24,7 +24,7 @@ function securityHeadersPlugin(): Plugin {
       server.middlewares.use((_req, res, next) => {
         const extraScriptSources = (process.env.ELEMARKET_CSP_SCRIPT_SRC ?? "").trim();
         const headers = {
-          "Content-Security-Policy": `default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline'${extraScriptSources ? ` ${extraScriptSources}` : ""}; connect-src 'self' https: ws: wss:`,
+          "Content-Security-Policy": `default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data: blob: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self'${extraScriptSources ? ` ${extraScriptSources}` : ""}; connect-src 'self' https: ws: wss:`,
           "Referrer-Policy": "strict-origin-when-cross-origin",
           "X-Content-Type-Options": "nosniff",
           "X-Frame-Options": "DENY",

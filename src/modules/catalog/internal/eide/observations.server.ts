@@ -1,10 +1,10 @@
 import {createHash} from 'node:crypto';
 import {getDiscoverySql} from '@/lib/db';
-import {env} from '@/lib/env.server';
 import {verifyExposure} from './attribution.server';
+import {discoverySigningSecret} from './signing-secret';
 export async function recordDiscoveryObservation(receipt:string,eventType:'impression'|'click'|'view') {
   if(!['impression','click','view'].includes(eventType))return false;
-  const signing=env('SEARCH_CURSOR_SECRET')||env('BETTER_AUTH_SECRET')||(process.env.NODE_ENV==='production'?'':'development-search-cursor-secret-change-me');
+  const signing=discoverySigningSecret();
   if(!signing)return false;
   const exposure=verifyExposure(receipt,createHash('sha256').update(signing).digest('hex'));
   if(!exposure)return false;
@@ -21,7 +21,7 @@ export async function recordDiscoveryObservation(receipt:string,eventType:'impre
 
 /** Optional post-checkout attribution. Reads authoritative ownership/items; never writes commerce. */
 export async function linkDiscoveryOrder(userId:string,orderId:string,receipt:string):Promise<boolean>{
- const signing=env('SEARCH_CURSOR_SECRET')||env('BETTER_AUTH_SECRET')||(process.env.NODE_ENV==='production'?'':'development-search-cursor-secret-change-me');
+ const signing=discoverySigningSecret();
  if(!signing||!userId||!orderId||orderId.length>128)return false;
  const exposure=verifyExposure(receipt,createHash('sha256').update(signing).digest('hex'));if(!exposure)return false;
  try{const sql=await getDiscoverySql();const rows=await sql.query<{order_id:string}>(`insert into eide_attributed_orders(order_id,product_id,exposure_request,query_hash,position,model_version)
