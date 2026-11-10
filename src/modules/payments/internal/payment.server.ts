@@ -10,6 +10,7 @@ import { emitSecurityAlert } from "@/lib/observability/security-alert.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { normalizeProviderKey } from "@/modules/payments/internal/provider-policy.server";
 import { env, getElemarketEnvironment } from "@/lib/env.server";
+import { safeRelativeCheckoutPath } from "@/lib/security/checkout-url";
 import {
   PaymentProviderError,
   PaymentWebhookError,
@@ -24,8 +25,10 @@ function validateProviderCheckoutUrl(
   if (!value) return undefined;
   try {
     if (value.startsWith("/")) {
+      const path = safeRelativeCheckoutPath(value);
+      if (!path) throw new Error("Unsafe provider checkout URL");
       if (getElemarketEnvironment() === "development" || getElemarketEnvironment() === "preview")
-        return value;
+        return path;
       throw new Error("Provider checkout URL must be absolute HTTPS in shared environments");
     }
     const url = new URL(value);
