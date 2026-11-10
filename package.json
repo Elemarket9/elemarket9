@@ -35,7 +35,7 @@
     "test:payment:simulation": "node --test tests/payment-simulation.integration.mjs",
     "test:wallet:simulation": "node --test tests/wallet-simulation.integration.mjs",
     "test:wallet:postgres": "node --test --test-concurrency=1 tests/wallet-adversarial.postgres.mjs tests/wallet-migration-upgrade.postgres.mjs",
-    "test:db:postgres": "node --test --test-concurrency=1 tests/database-operations.postgres.mjs tests/commerce-integrity.postgres.mjs tests/scheduled-jobs.postgres.mjs",
+    "test:db:postgres": "node --test --test-concurrency=1 tests/database-operations.postgres.mjs tests/commerce-integrity.postgres.mjs tests/scheduled-jobs.postgres.mjs tests/returns-policy.postgres.mjs",
     "simulate:wallet": "node scripts/wallet-e2e-simulation.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
     "test:frontend": "node tests/frontend.e2e.mjs",

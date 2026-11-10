@@ -39,7 +39,7 @@ the sum of a bucket, and every cedi sits in exactly one bucket.
 | Event | Movement |
 | --- | --- |
 | Payment completed | + merchant share (`orders.merchant_net`: products minus commission; delivery is not merchant revenue) to **withheld**, only for charges stamped `payments.settlement_model = 'platform_wallet'` when first initialized |
-| Release | withheld → **available** once the customer confirmed delivery by rider OTP, every item's return window (minimum 24 hours) has passed, and there is no open dispute, return or refund |
+| Release | withheld → **available** once the customer confirmed delivery by rider OTP, the longest return window that could still apply has closed (the product's window, and at least the 7-day faulty-item guarantee; never under 24 hours), and there is no open dispute, return or refund |
 | Refund processed | − merchant's proportional share: from withheld first, then available, and any remainder is recorded as **owed** (recovery). Available never goes negative. |
 | Release | repays anything owed first, then the rest becomes available |
 | Withdrawal requested | available → **processing** (reserved) |

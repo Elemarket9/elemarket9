@@ -175,7 +175,7 @@ test("backup drill: pg_dump -> verify-backup -> pg_restore --exit-on-error -> da
       provider.pay(intent.providerReference);
       const raw = JSON.stringify({ event: "charge.success", data: { id: 900 + i, reference: intent.providerReference, amount: 11500, currency: "GHS" } });
       await handlePaymentWebhook({ providerKey: "paystack", rawBody: raw, signature: provider.sign(raw) });
-      await deliverWithRiderOtp(sql, { orderId: order.orderId, at: new Date(Date.now() - 30 * 3600e3) });
+      await deliverWithRiderOtp(sql, { orderId: order.orderId, at: new Date(Date.now() - 8 * 24 * 3600e3) }); // past the 7-day return window
     }
     await sql.query(`select release_matured_wallet_funds(100)`);
     provider.restore(); provider = undefined;

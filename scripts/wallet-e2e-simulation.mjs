@@ -100,11 +100,11 @@ try {
     const [o] = await sql.query(`select product_total, delivery_total, platform_fee, merchant_net, grand_total from orders where id=$1`, [o1.orderId]);
     return `Collected ${ghs(o.grand_total)} = products ${ghs(o.product_total)} + delivery ${ghs(o.delivery_total)}. Marketplace commission ${ghs(o.platform_fee)}; merchant earning ${ghs(o.merchant_net)} credited as **withheld** (pending delivery). Charge kept in the platform provider account (no split).`;
   });
-  await step("2. Delivery → rider OTP handover 30 hours ago", async () => {
-    await deliverWithRiderOtp(sql, { orderId: o1.orderId, at: new Date(Date.now() - 30 * HOURS) });
+  await step("2. Delivery → rider OTP handover 8 days ago", async () => {
+    await deliverWithRiderOtp(sql, { orderId: o1.orderId, at: new Date(Date.now() - 8 * 24 * HOURS) });
     return "Order marked delivered through the real OTP handover guards. Earnings stay withheld until the release job runs.";
   });
-  await step("3. 24-hour hold expired → release to available", async () => {
+  await step("3. 7-day return window closed → release to available", async () => {
     const [{ n }] = await sql.query(`select release_matured_wallet_funds(100) as n`);
     const [{ again }] = await sql.query(`select release_matured_wallet_funds(100) as again`);
     return `Released ${n} order(s). Running the release again released ${again} (idempotent).`;
@@ -159,7 +159,7 @@ try {
     return `SIMULATED provider refund of ${ghs(p.grand_total)} processed; the merchant's share left the withheld balance.`;
   });
   await step("11. Refund competing with a withdrawal", async () => {
-    const o = await sell(30);
+    const o = await sell(8 * 24);
     await sql.query(`select release_matured_wallet_funds(100)`);
     const [{ available }] = await sql.query(`select available from merchant_wallet_balances where merchant_id=$1`, [m.merchant]);
     const [p] = await sql.query(`select p.id, o.grand_total from payments p join orders o on o.id=p.order_id where o.id=$1`, [o.orderId]);
@@ -172,7 +172,7 @@ try {
     return `Withdrawal of all ${ghs(available)}: ${w.status === "fulfilled" ? "accepted and paid" : `refused (${w.reason.message})`}. The refund was booked; anything already paid out is recorded as owed (recovery) and repaid from future releases, never as a negative balance.`;
   });
   await step("12. Duplicate payout attempt (same request twice; SIMULATED provider double-send)", async () => {
-    await sell(30); await sql.query(`select release_matured_wallet_funds(100)`);
+    await sell(8 * 24); await sql.query(`select release_matured_wallet_funds(100)`);
     const k1 = key();
     const a = await wallet.requestWithdrawal({ merchantId: m.merchant, userId: m.user, amount: "15.00", destinationId: m.destination, idempotencyKey: k1 });
     const b = await wallet.requestWithdrawal({ merchantId: m.merchant, userId: m.user, amount: "15.00", destinationId: m.destination, idempotencyKey: k1 });
