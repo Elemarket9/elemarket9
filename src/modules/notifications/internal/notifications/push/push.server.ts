@@ -60,31 +60,37 @@ export async function unregisterPushDevice(input: { userId: string; token: strin
 export async function sendPushToUser(userId: string, message: PushMessage) {
   const sql = await getSql();
   const devices = await sql.query<{ id: string; token: string }>(
-    `select id, token from push_devices where user_id = $1 and disabled_at is null`,
+    `select id, token from push_devices where user_id = $1 and disabled_at is null order by last_success_at desc nulls last, id asc limit 20`,
     [userId],
   );
   const provider = getPushProvider();
   const results: Array<{ id: string; accepted: boolean; providerId?: string }> = [];
-  for (const device of devices) {
-    try {
-      const result = await provider.sendToToken(device.token, message);
-      await sql.query(
-        `update push_devices set last_success_at = now(), failure_count = 0, last_error = null where id = $1`,
-        [device.id],
-      );
-      results.push({ id: device.id, ...result });
-    } catch (error) {
-      const code = (error as Error & { code?: string }).code;
-      const terminal = code === "UNREGISTERED" || code === "INVALID_ARGUMENT";
-      await sql.query(
-        `update push_devices
-            set failure_count = failure_count + 1,
-                last_error = $2,
-                disabled_at = case when $3 then now() else disabled_at end
-          where id = $1`,
-        [device.id, error instanceof Error ? error.message.slice(0, 500) : "Push delivery failed", terminal],
-      );
+  const pending = [...devices];
+  async function deliver() {
+    for (;;) {
+      const device = pending.shift();
+      if (!device) return;
+      try {
+        const result = await provider.sendToToken(device.token, message);
+        await sql.query(
+          `update push_devices set last_success_at = now(), failure_count = 0, last_error = null where id = $1`,
+          [device.id],
+        );
+        results.push({ id: device.id, ...result });
+      } catch (error) {
+        const code = (error as Error & { code?: string }).code;
+        const terminal = code === "UNREGISTERED" || code === "INVALID_ARGUMENT";
+        await sql.query(
+          `update push_devices
+              set failure_count = failure_count + 1,
+                  last_error = $2,
+                  disabled_at = case when $3 then now() else disabled_at end
+            where id = $1`,
+          [device.id, error instanceof Error ? error.message.slice(0, 500) : "Push delivery failed", terminal],
+        );
+      }
     }
   }
+  await Promise.all([deliver(), deliver(), deliver(), deliver()]);
   return results;
 }

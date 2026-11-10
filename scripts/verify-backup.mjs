@@ -144,10 +144,36 @@ function verifyDump(file) {
   pass("format", "plain SQL dump with all critical tables present");
 }
 
+async function restoreDump(file) {
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    fail("database_url", "DATABASE_URL is not configured.");
+    return;
+  }
+  let name = "";
+  try { name = new URL(databaseUrl).pathname.replace(/^\//, ""); }
+  catch { fail("database_url", "DATABASE_URL is not a postgres URL."); return; }
+  if (!name.endsWith("_restore")) {
+    fail("target", "Refusing to restore unless the database name ends with _restore.");
+    return;
+  }
+  verifyDump(file);
+  if (!summary.ok) return;
+  const result = spawnSync(process.env.PG_RESTORE_BIN || "pg_restore", ["--exit-on-error", "--no-owner", "--dbname", databaseUrl, path.resolve(file)], {
+    encoding: "utf8", timeout: 120_000, maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) {
+    fail("restore", "pg_restore --exit-on-error failed. The target database was not certified.");
+    return;
+  }
+  pass("restore", "pg_restore --exit-on-error completed against an isolated _restore database");
+}
+
 if (mode === "live") await verifyLive();
 else if (mode === "dump") verifyDump(target);
+else if (mode === "restore") await restoreDump(target);
 else {
-  console.error("Usage: node scripts/verify-backup.mjs live | dump <file>");
+  console.error("Usage: node scripts/verify-backup.mjs live | dump <file> | restore <file>");
   process.exit(2);
 }
 

@@ -67,7 +67,12 @@ async function main() {
 
   const signals = ["SIGTERM", "SIGINT"];
   for (const signal of signals) {
-    process.once(signal, () => forwardSignal(server, signal));
+    process.once(signal, () => {
+      forwardSignal(server, signal);
+      const killTimer = setTimeout(() => forwardSignal(server, "SIGKILL"), 15_000);
+      killTimer.unref?.();
+      server.once("exit", () => clearTimeout(killTimer));
+    });
   }
 
   server.once("error", (err) => {

@@ -56,6 +56,35 @@ jobs:
       - name: Enforce dependency security gate
         if: always() && steps.root_security.outcome == 'failure'
         run: exit 1
+  migrations:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: elemarket
+          POSTGRES_PASSWORD: elemarket
+          POSTGRES_DB: elemarket_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U elemarket -d elemarket_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Apply migrations twice
+        env:
+          DATABASE_URL: postgresql://elemarket:elemarket@127.0.0.1:5432/elemarket_ci
+        run: |
+          node scripts/migrate.mjs
+          node scripts/migrate.mjs
   mobile:
     runs-on: ubuntu-24.04
     defaults:

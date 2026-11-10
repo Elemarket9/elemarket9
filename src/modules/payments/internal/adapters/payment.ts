@@ -153,14 +153,26 @@ export class JsonHttpPaymentAdapter implements PaymentProviderAdapter {
     return parsed.data;
   }
   async verifyTransaction(reference: string): Promise<VerifiedPayment> {
-    const response = await fetchPinnedPublicHttps(
-      `${this.endpoint.replace(/\/$/, "")}/verify/${encodeURIComponent(reference)}`,
-      { headers: { authorization: `Bearer ${this.secret}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!response.ok)
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetchPinnedPublicHttps(
+          `${this.endpoint.replace(/\/$/, "")}/verify/${encodeURIComponent(reference)}`,
+          { headers: { authorization: `Bearer ${this.secret}` }, signal: AbortSignal.timeout(10_000) },
+        );
+      } catch (error) {
+        if (attempt === 1) throw error;
+        continue;
+      }
+      if (response.ok) break;
+      const failure = new PaymentProviderError("Payment provider transaction verification failed", response.status);
+      if (!failure.retryable || attempt === 1) throw failure;
+      await response.body?.cancel().catch(() => undefined);
+    }
+    if (!response?.ok)
       throw new PaymentProviderError(
         "Payment provider transaction verification failed",
-        response.status,
+        response?.status ?? 503,
       );
     const parsed = z
       .object({

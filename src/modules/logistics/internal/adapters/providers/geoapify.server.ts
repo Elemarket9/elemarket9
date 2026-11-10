@@ -35,13 +35,27 @@ export class GeoapifyLocationProvider implements LocationProvider {
   constructor(private readonly apiKey: string, private readonly baseUrl = "https://api.geoapify.com/v1") {}
 
   private async request(url: URL): Promise<GeocodedLocation> {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { accept: "application/json" },
-      redirect: "error",
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) throw new Error(`Location provider returned HTTP ${response.status}`);
+    let response: Response | undefined;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetch(url, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          redirect: "error",
+          signal: AbortSignal.timeout(8_000),
+        });
+      } catch (error) {
+        if (attempt === 1) throw error;
+        continue;
+      }
+      if (response.ok) break;
+      if ((response.status === 429 || response.status >= 500) && attempt === 0) {
+        await response.body?.cancel().catch(() => undefined);
+        continue;
+      }
+      throw new Error(`Location provider returned HTTP ${response.status}`);
+    }
+    if (!response?.ok) throw new Error("Location provider request failed");
     const body = await readResponseBodyWithLimit(response, 512 * 1024);
     let payload: unknown;
     try { payload = JSON.parse(body); } catch { throw new Error("Location provider returned invalid JSON"); }
