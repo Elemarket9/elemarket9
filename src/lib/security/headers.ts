@@ -1,9 +1,7 @@
+import { sanitizeCspSources } from "../commerce-guards.mjs";
+
 function configuredSources(name: string): string {
-  return (process.env[name] ?? "")
-    .split(/\s+/)
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .join(" ");
+  return sanitizeCspSources(process.env[name] ?? "").join(" ");
 }
 
 export function securityHeaders(options: { production: boolean; nonce?: string }): Record<string, string> {
@@ -22,7 +20,6 @@ export function securityHeaders(options: { production: boolean; nonce?: string }
     `img-src 'self' data: blob:${imageOrigins ? ` ${imageOrigins}` : ""}`,
     "font-src 'self' data:",
     "style-src 'self'",
-    "style-src-attr 'unsafe-inline'",
     `script-src 'self'${options.nonce ? ` 'nonce-${options.nonce}'` : ""}${extraScriptSources ? ` ${extraScriptSources}` : ""}`,
     `connect-src 'self'${extraConnectSources ? ` ${extraConnectSources}` : ""}`,
   ].join("; ");

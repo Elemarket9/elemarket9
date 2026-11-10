@@ -154,12 +154,11 @@ export async function verifyOtp(
   try {
     result = await adapter.verify({ number: challenge.destination, code: input.code });
   } catch (error) {
-    await sql.query(
-      `update otp_challenges
-          set attempts = greatest(attempts - 1, 0), updated_at = now()
-        where id = $1 and status = 'pending'`,
-      [challenge.id],
-    );
+    // A thrown provider response still consumed this guess. Refunding it lets a
+    // non-200 invalid code bypass the attempt lock.
+    if (challenge.attempts >= challenge.max_attempts) {
+      await sql.query(`update otp_challenges set status='locked', updated_at=now() where id=$1 and status='pending'`, [challenge.id]);
+    }
     throw error;
   }
 

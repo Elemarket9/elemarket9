@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
-import { isPrivateOrReservedIp } from "@/lib/security/ssrf.server";
+import { isPrivateOrReservedIp, requireUniformPublicAddress } from "@/lib/security/ssrf.server";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { encryptMerchantSensitiveData, decryptMerchantSensitiveData } from "@/lib/security/merchant-sensitive.server";
@@ -155,9 +155,7 @@ function normalizeRecord(raw: unknown, mapping: EnterpriseCatalogFieldMapping): 
 
 export async function pinnedGet(url: URL, headers: Headers): Promise<{ status: number; body: string }> {
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  const publicAddresses = addresses.map(a => a.address).filter(a => !isPrivateOrReservedIp(a));
-  if (!publicAddresses.length) throw new Error("Enterprise catalog endpoint no longer resolves to a public address");
-  const address = publicAddresses[0];
+  const address = requireUniformPublicAddress(addresses);
   return await new Promise((resolve, reject) => {
     const req = httpsRequest({
       protocol: "https:", hostname: address, port: 443, path: `${url.pathname}${url.search}`, method: "GET",

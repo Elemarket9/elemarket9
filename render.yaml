@@ -11,3 +11,17 @@ services:
         value: production
       - key: NODE_VERSION
         value: 22
+  - type: worker
+    name: elemarket-scheduler
+    env: node
+    buildCommand: npm ci
+    startCommand: node scripts/scheduler.mjs
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: ELEMARKET_SCHEDULER_BASE_URL
+        fromService:
+          name: elemarket-web
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL

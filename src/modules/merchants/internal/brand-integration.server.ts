@@ -469,11 +469,9 @@ export async function getBrandIntegrationHealth(input: { merchantId: string }): 
 async function pinnedPost(url: URL, headers: Headers, body: string): Promise<{ status: number; response: string }> {
   const { lookup } = await import("node:dns/promises");
   const { request } = await import("node:https");
-  const { isPrivateOrReservedIp } = await import("@/lib/security/ssrf.server");
+  const { requireUniformPublicAddress } = await import("@/lib/security/ssrf.server");
   const addresses = await lookup(url.hostname, { all: true, verbatim: true });
-  const publicAddresses = addresses.map((a) => a.address).filter((a) => !isPrivateOrReservedIp(a));
-  if (!publicAddresses.length) throw new Error("Integration endpoint no longer resolves to a public address");
-  const address = publicAddresses[0];
+  const address = requireUniformPublicAddress(addresses);
   return new Promise((resolve, reject) => {
     const req = request({
       protocol: "https:", hostname: address, port: 443, path: `${url.pathname}${url.search}`, method: "POST",

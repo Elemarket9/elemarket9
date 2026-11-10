@@ -13,7 +13,7 @@ function privateIpv4(ip: string): boolean {
   const ranges: ReadonlyArray<readonly [string, number]> = [
     ["0.0.0.0",8],["10.0.0.0",8],["100.64.0.0",10],["127.0.0.0",8],["169.254.0.0",16],
     ["172.16.0.0",12],["192.0.0.0",24],["192.0.2.0",24],["192.168.0.0",16],
-    ["198.18.0.0",15],["198.51.100.0",24],["203.0.113.0",24],["224.0.0.0",4],["240.0.0.0",4],
+    ["198.18.0.0",15],["198.51.100.0",24],["203.0.113.0",24],["192.88.99.0",24],["224.0.0.0",4],["240.0.0.0",4],
   ];
   return ranges.some(([network, prefix]) => inCidr4(ip, network, prefix));
 }
@@ -48,13 +48,16 @@ function ipv6Prefix(groups: number[], prefix: number): bigint {
 }
 function privateIpv6(ip: string): boolean {
   const groups = ipv6ToGroups(ip);
-  if (!groups) return false;
+  // Unparsed IPv6 is fail-closed. A parser gap must not be treated as a public address.
+  if (!groups) return true;
   const value = groups.reduce((n, g) => (n << 16n) | BigInt(g), 0n);
   const first = groups[0];
   // Unspecified, loopback, unique-local, link-local, multicast.
   if (value === 0n || value === 1n) return true;
   if ((first & 0xfe00) === 0xfc00) return true; // fc00::/7
+  if ((first & 0xffc0) === 0xfec0) return true; // fec0::/10
   if ((first & 0xffc0) === 0xfe80) return true; // fe80::/10
+  if (ipv6Prefix(groups, 64) === 0x0100000000000000n) return true; // 100::/64
   if ((first & 0xff00) === 0xff00) return true; // ff00::/8
   // Documentation / benchmarking / deprecated transition ranges.
   if (ipv6Prefix(groups, 32) === 0x20010db8n) return true; // 2001:db8::/32
@@ -101,4 +104,15 @@ export async function assertPublicHttpsEndpoint(input: string): Promise<URL> {
     throw new Error("Endpoint resolves to a private or reserved network");
   }
   return url;
+}
+
+/** Use the first answer only when every answer is a public IP. Mixed private answers are rejected. */
+export function requireUniformPublicAddress(addresses: ReadonlyArray<{ address: string }>): string {
+  if (
+    !addresses.length ||
+    addresses.some((entry) => !isIP(entry.address) || isPrivateOrReservedIp(entry.address))
+  ) {
+    throw new Error("Endpoint resolves to a restricted address");
+  }
+  return addresses[0].address;
 }

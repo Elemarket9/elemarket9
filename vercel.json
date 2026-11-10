@@ -34,7 +34,11 @@
     },
     {
       "path": "/api/internal/rider-invitations",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/collection-notifications",
+      "schedule": "* * * * *"
     }
   ]
 }

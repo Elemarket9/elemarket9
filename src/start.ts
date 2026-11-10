@@ -23,7 +23,8 @@ const securityMiddleware = createMiddleware().server(async ({ next }) => {
   // A loader error can replace Start's response headers. Apply the nonce to
   // the final response so its SSR bootstrap remains permitted by CSP too.
   const headers = new Headers(result.response.headers);
-  const configuredHeaders = securityHeaders({ production: true, nonce: cspNonce });
+  const shared = process.env.ELEMARKET_ENV === "production" || process.env.ELEMARKET_ENV === "staging";
+  const configuredHeaders = securityHeaders({ production: shared, nonce: cspNonce });
 
   for (const [key, value] of Object.entries(configuredHeaders)) headers.set(key, value);
   return { ...result, response: new Response(result.response.body, {
