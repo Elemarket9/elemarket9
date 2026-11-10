@@ -135,10 +135,14 @@ test("withheld funds cannot be withdrawn, and do not release before the return w
   await deliver(seed.firstOrder, 1); // 1 day ago, window is 2 days
   await wallet.runWalletSettlement();
   assert.equal((await balances()).available, 0);
+  // Past the product's 2-day window but inside the 7-day faulty-item guarantee.
+  await deliver(seed.firstOrder, 3);
+  await wallet.runWalletSettlement();
+  assert.equal((await balances()).available, 0, "still withheld while a faulty item can be returned");
 });
 
 test("after delivery and the return window, funds become available", async () => {
-  await deliver(seed.firstOrder, 3);
+  await deliver(seed.firstOrder, 8);
   const run = await wallet.runWalletSettlement();
   assert.equal(run.released, 1);
   const b = await balances();
@@ -150,7 +154,7 @@ test("after delivery and the return window, funds become available", async () =>
 
 test("an open dispute keeps funds withheld", async () => {
   const order = await earn();
-  await deliver(order.orderId, 5);
+  await deliver(order.orderId, 8);
   await sql.query(
     `insert into customer_order_disputes(id, order_id, payment_id, customer_id, reason, status)
      values($1,$2,$3,$4,'Item damaged on arrival','open')`,

@@ -92,7 +92,7 @@ out 113 + fees 7. **0 invariant violations.** One open exception
 |---|---|
 | `npm test` | 43 / 43 pass (includes the payout driver contract) |
 | `npm run check:architecture` (boundaries, contracts, provider neutrality) | pass |
-| `npm run validate:deployment-package` (217 migrations, checksums) | pass |
+| `npm run validate:deployment-package` (216 migration files, 0001–0217 with 0034 never used; checksums) | pass |
 | `npm run typecheck`, `npm run lint`, `npm run build` | pass |
 | `npm run test:payment:simulation` | 6 / 6 pass |
 | `npm run test:wallet:simulation` (in-memory) | 11 / 11 pass |
@@ -121,9 +121,6 @@ capabilities from the adapter's declaration. The neutrality guard
 
 ## H. Remaining external requirements (cannot be verified locally)
 
-- **Licensing:** whether holding merchant earnings in the platform's provider
-  account and releasing them later is permitted for ELEMARKET under Bank of
-  Ghana rules (Act 987) and the chosen provider's contract.
 - **Provider guarantees:** that the real provider honours idempotency keys on
   transfers, offers authoritative status lookup, signs webhooks, and lists
   transfers. The adapter must declare only what is contractually guaranteed.

@@ -19,6 +19,8 @@ const enabled = Boolean(integrationDatabaseUrl());
 const skip = !enabled && "PostgreSQL integration not enabled (RUN_DB_INTEGRATION=1, ELEMARKET_INTEGRATION_DATABASE_URL=…_test)";
 const mockPath = path.resolve("scripts/helpers/mock-payout-provider.mjs");
 const HOURS = 3600e3;
+// Earnings mature once the faulty-item return window (7 days by policy) has closed.
+const MATURED = 7 * 24 + 2;
 
 let db, harness, sql, wallet, payments, handlePaymentWebhook, provider, sim, authz;
 let event = 70_000, keySeq = 0;
@@ -82,7 +84,7 @@ async function newMerchant(driver = "mocka") {
 }
 
 /** Customer pays (simulated provider), rider OTP handover at `deliveredHoursAgo`, then release. */
-async function earn(m, { deliveredHoursAgo = 26, release = true } = {}) {
+async function earn(m, { deliveredHoursAgo = MATURED, release = true } = {}) {
   const order = await checkout(sql, m);
   const intent = await payments.createExternalPaymentIntent({ paymentId: order.paymentId, userId: m.user });
   provider.pay(intent.providerReference);
@@ -500,7 +502,7 @@ test("T29 concurrent holds, releases, refunds and withdrawals stay consistent", 
   for (const m of merchants) {
     work.push(...[...Array(3)].map(() => request(m, "50.00").catch(() => null)));
     work.push(sql.query(`select release_matured_wallet_funds(1000)`));
-    work.push(earn(m, { deliveredHoursAgo: 30 }));
+    work.push(earn(m, { deliveredHoursAgo: MATURED }));
   }
   work.push(...[...Array(4)].map(() => wallet.runWalletSettlement()));
   await Promise.all(work);

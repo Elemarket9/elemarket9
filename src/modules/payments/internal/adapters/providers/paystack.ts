@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { readResponseBodyWithLimit } from "@/lib/security/body.server";
 import type {
+  MobileMoneyNetwork,
+  MobileMoneyPromptInput,
+  MobileMoneyPromptResult,
   PaymentAdapterInput,
   PaymentAdapterResult,
   PaymentProviderAdapter,
@@ -67,6 +70,36 @@ const refundResponse = z.object({
     .nullable()
     .optional(),
 });
+
+const chargeResponse = z.object({
+  status: z.boolean(),
+  message: z.string().max(500).optional(),
+  data: z
+    .object({
+      reference: z.string().min(1).max(256),
+      status: z.string().min(1).max(64),
+      display_text: z.string().max(500).optional().nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+
+/**
+ * Paystack's Ghana mobile money codes. Its documentation names Telecel as "vod"
+ * and AirtelTigo as "atl" (older pages say "tgo"), so each can be overridden with
+ * ELEMARKET_PAYMENT_PAYSTACK_MOMO_<NETWORK>_CODE after a sandbox check.
+ */
+function mobileMoneyProviderCode(network: MobileMoneyNetwork): string {
+  const defaults: Record<MobileMoneyNetwork, string> = { mtn: "mtn", telecel: "vod", airteltigo: "atl" };
+  const override = process.env[`ELEMARKET_PAYMENT_PAYSTACK_MOMO_${network.toUpperCase()}_CODE`]?.trim().toLowerCase();
+  return override && /^[a-z]{2,8}$/.test(override) ? override : defaults[network];
+}
+
+/** +233XXXXXXXXX -> 0XXXXXXXXX, the local form Paystack's Ghana examples use. */
+function localGhanaPhone(phone: string): string {
+  if (!/^\+233[25][0-9]{8}$/.test(phone)) throw new Error("A verified Ghana mobile number is required");
+  return `0${phone.slice(4)}`;
+}
 
 const webhookSchema = z.object({
   event: z.string().min(1).max(128),
@@ -164,6 +197,59 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: "initiated",
       checkoutUrl: parsed.data.data.authorization_url,
       metadata: { accessCode: parsed.data.data.access_code },
+    };
+  }
+  readonly supportsMobileMoneyPrompt = true;
+  async requestMobileMoneyPrompt(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult> {
+    if (!input.customerEmail) throw new Error("Provider requires a customer email");
+    if (input.currency !== "GHS") throw new Error("Mobile money prompts support GHS only");
+    const amountMinor = moneyToMinorUnits(input.amount);
+    if (amountMinor <= 0) throw new Error("Invalid payment amount");
+    const reference = deterministicPaymentReference(input.attemptId);
+    const body: Record<string, unknown> = {
+      email: input.customerEmail,
+      amount: String(amountMinor),
+      currency: "GHS",
+      reference,
+      mobile_money: { phone: localGhanaPhone(input.phone), provider: mobileMoneyProviderCode(input.network) },
+      metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId, channel: "pay_on_delivery" }),
+    };
+    if (input.merchantSubaccount) {
+      body.subaccount = input.merchantSubaccount;
+      if (input.platformFee != null) {
+        const charge = marketplaceSettlementChargePesewas(input.amount, input.platformFee);
+        if (charge > 0) {
+          body.transaction_charge = charge;
+          body.bearer = "account";
+        }
+      }
+    }
+    return this.chargeCall("/charge", body, reference);
+  }
+  async submitMobileMoneyCode(input: { reference: string; code: string }): Promise<MobileMoneyPromptResult> {
+    if (!/^[A-Za-z0-9]{3,12}$/.test(input.code)) throw new Error("Enter the code exactly as the network gave it");
+    return this.chargeCall("/charge/submit_otp", { otp: input.code, reference: input.reference }, input.reference);
+  }
+  private async chargeCall(path: string, body: Record<string, unknown>, reference: string): Promise<MobileMoneyPromptResult> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${this.secret}` },
+      body: JSON.stringify(body),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const parsed = chargeResponse.safeParse(await readProviderJson(response));
+    const data = parsed.success ? parsed.data.data : null;
+    if (!response.ok || !parsed.success || !data || data.reference !== reference) {
+      throw new PaymentProviderError("Provider could not send the mobile money prompt", response.status, response.status >= 500);
+    }
+    // Only the signed webhook completes a payment; "success" here is not settlement.
+    const providerStatus = data.status.toLowerCase();
+    return {
+      providerReference: reference,
+      status: providerStatus === "failed" ? "failed" : "initiated",
+      needsCustomerCode: providerStatus === "send_otp",
+      metadata: { providerStatus, displayText: data.display_text ?? null, channel: "pay_on_delivery" },
     };
   }
   async verifyWebhook(rawBody: string, signature: string | null): Promise<boolean> {

@@ -125,8 +125,7 @@ export async function getWalletSnapshot(merchantId: string) {
   const withheldOrders = await sql.query<{ order_id: string; amount: string; status: string; releases_at: string | null; hold_reason: string | null }>(
     `select o.id as order_id, sum(e.amount)::text as amount, o.status,
             case when elemarket_order_delivered_at(o.id) is null then null
-                 else (elemarket_order_delivered_at(o.id) + greatest(interval '24 hours', make_interval(days => coalesce(
-                   (select max(p.return_window_days) from order_items oi join products p on p.id=oi.product_id where oi.order_id=o.id),0))))::text
+                 else elemarket_order_release_at(o.id)::text
             end as releases_at,
             case when exists(select 1 from customer_order_disputes d where d.order_id=o.id and d.status in ('open','under_review')) then 'Open dispute'
                  when exists(select 1 from return_requests r where r.order_id=o.id and r.status in ('requested','approved','received','refund_pending')) then 'Return in progress'

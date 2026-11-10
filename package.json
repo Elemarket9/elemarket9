@@ -5,7 +5,10 @@
   "type": "module",
   "overrides": {
     "nf3": "0.3.17",
-    "jiti": "2.7.0"
+    "jiti": "2.7.0",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.6"
+    }
   },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
@@ -23,7 +26,7 @@
     "validate:firebase": "node scripts/validate-firebase-client-env.mjs",
     "build:production": "npm run validate:startup -- --require-shared && npm run validate:push-client && vite build",
     "security:deps": "npm audit --audit-level=high",
-    "security:signatures": "npm audit signatures",
+    "security:signatures": "node scripts/audit-signatures.mjs",
     "security:ci": "npm run security:deps && npm run security:signatures",
     "release:verify": "npm run check:architecture && npm run validate:startup && npm run validate:deployment-package && npm run security:ci && npm run typecheck && npm run lint && npm run build:production",
     "validate:deployment-package": "node scripts/validate-deployment-package.mjs",
@@ -32,6 +35,7 @@
     "test:payment:simulation": "node --test tests/payment-simulation.integration.mjs",
     "test:wallet:simulation": "node --test tests/wallet-simulation.integration.mjs",
     "test:wallet:postgres": "node --test --test-concurrency=1 tests/wallet-adversarial.postgres.mjs tests/wallet-migration-upgrade.postgres.mjs",
+    "test:db:postgres": "node --test --test-concurrency=1 tests/database-operations.postgres.mjs tests/commerce-integrity.postgres.mjs tests/scheduled-jobs.postgres.mjs tests/returns-policy.postgres.mjs tests/checkout-pickup.postgres.mjs tests/pay-on-delivery.postgres.mjs",
     "simulate:wallet": "node scripts/wallet-e2e-simulation.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
     "test:frontend": "node tests/frontend.e2e.mjs",
@@ -125,6 +129,6 @@
   },
   "version": "2.11.3",
   "engines": {
-    "node": "22.x"
+    "node": "22.x || 26.x"
   }
 }

@@ -23,6 +23,8 @@ export type DeliveryQuoteInput = {
   items?: DeliveryQuoteItem[];
   itemCount?: number;
   declaredValue?: string;
+  /** Collect from this pickup point instead of door delivery. */
+  pickupLocationId?: string;
 };
 export type DeliveryQuoteResult = {
   quoteId: string;
@@ -61,6 +63,8 @@ export class JsonHttpDeliveryAdapter implements DeliveryCarrierAdapter {
         lat: input.lat,
         lon: input.lon,
         tier: input.tier ?? "next_day",
+        handoverKind: input.pickupLocationId ? "pickup" : "delivery",
+        pickupLocationId: input.pickupLocationId ?? null,
         itemCount: input.itemCount ?? 0,
         declaredValue: input.declaredValue ?? "0.00",
       }),
@@ -163,7 +167,12 @@ export async function requestDeliveryQuoteServer(input: {
     process.env.ELEMARKET_DELIVERY_PROVIDER?.trim() || "";
   if (!providerKey) throw new Error("Delivery provider is not configured");
   const adapter = getDeliveryAdapter(providerKey);
-  const destination = await resolveDestination(input.data);
+  // A pickup quote is addressed to the pickup point's registered address and
+  // coordinates; the customer's own address is not used or geocoded.
+  const pickup = input.data.pickupLocationId ? await pickupDestination(input.data.pickupLocationId, providerKey) : null;
+  const destination = pickup
+    ? { ...input.data, address: pickup.address, lat: pickup.latitude, lon: pickup.longitude }
+    : await resolveDestination(input.data);
   const cart = await quotedCart(destination.merchantId, input.data.items ?? []);
   const data = { ...destination, itemCount: cart.itemCount, declaredValue: cart.declaredValue };
   const quote = await adapter.quote(data);
@@ -204,8 +213,8 @@ export async function requestDeliveryQuoteServer(input: {
     }))
     .digest("hex");
   await sql.query(
-    `insert into delivery_quotes(id,user_id,merchant_id,fingerprint,tier,price,eta_minutes,distance_km,dest_address,dest_lat,dest_lon,expires_at,provider_id,provider_reference)
-       values($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,$14)`,
+    `insert into delivery_quotes(id,user_id,merchant_id,fingerprint,tier,price,eta_minutes,distance_km,dest_address,dest_lat,dest_lon,expires_at,provider_id,provider_reference,pickup_location_id)
+       values($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,$14,$15)`,
     [
       quoteId,
       principal.userId,
@@ -221,9 +230,40 @@ export async function requestDeliveryQuoteServer(input: {
       bounded.distanceKm,
       providers[0].id,
       quote.providerReference ?? quote.quoteId,
+      pickup?.id ?? null,
     ],
   );
-  return { ...quote, price: bounded.price, id: quoteId, providerKey, latitude: data.lat, longitude: data.lon };
+  return {
+    ...quote, price: bounded.price, id: quoteId, providerKey, latitude: data.lat, longitude: data.lon,
+    // The address the order must be placed with (the pickup point's, for pickup).
+    address: data.address,
+    pickupLocationId: pickup?.id ?? null,
+  };
+}
+
+/** Active pickup points of the configured delivery company that have an active attendant. */
+export async function listCheckoutPickupLocationsServer() {
+  const providerKey = process.env.ELEMARKET_DELIVERY_PROVIDER?.trim() || "";
+  if (!providerKey) return [];
+  const sql = await getSql();
+  return sql.query<{ id: string; name: string; address: string; latitude: number; longitude: number }>(
+    `select l.id, l.name, l.address, l.latitude, l.longitude
+       from pickup_locations l
+       join partner_organizations o on o.id = l.organization_id and o.status = 'active'
+       join delivery_providers p on p.partner_organization_id = o.id and p.provider_key = $1 and p.status = 'active'
+                                and ($2::boolean or p.environment = 'production')
+      where l.status = 'active'
+        and exists(select 1 from pickup_location_attendants a where a.location_id = l.id and a.status = 'active'
+                     and elemarket_has_personnel_capability(l.organization_id, a.user_id, 'pickup_attendant'))
+      order by l.name limit 200`,
+    [providerKey, isWorkspacePreview()],
+  );
+}
+
+async function pickupDestination(locationId: string, providerKey: string) {
+  const location = (await listCheckoutPickupLocationsServer()).find((row) => row.id === locationId);
+  if (!location || !providerKey) throw new Error("Pickup point is not available");
+  return location;
 }
 
 async function quotedCart(merchantId: string, items: DeliveryQuoteItem[]) {

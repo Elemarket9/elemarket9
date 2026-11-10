@@ -51,6 +51,8 @@ export const listPickupOperations=createServerFn({method:'GET'}).middleware([aut
  const jobs=await sql.query<JsonObject>(`select j.id,j.order_id as "orderId",j.status,j.pickup_location_id as "locationId",l.name as "locationName",
    j.handover_rider_user_id as "personnelId",j.pickup_arrived_at::text as "arrivedAt",j.collection_due_at::text as "collectionDueAt",
    o.delivery_contact_snapshot_verified as "contactVerified",exists(select 1 from order_delivery_holds h where h.order_id=o.id and h.active) as "onHold",
+   (o.payment_timing='on_delivery') as "payOnDelivery",case when o.payment_timing='on_delivery' then o.grand_total::text end as "amountDue",
+   exists(select 1 from payments pay where pay.order_id=o.id and pay.status='completed') as "paid",
    (select n.status from delivery_notification_outbox n where n.job_id=j.id and n.kind='collection_ready') as "notificationStatus"
    from delivery_jobs j join pickup_locations l on l.id=j.pickup_location_id
    join delivery_providers p on p.id=j.provider_id and p.partner_organization_id=l.organization_id join orders o on o.id=j.order_id

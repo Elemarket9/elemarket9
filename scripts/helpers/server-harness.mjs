@@ -32,6 +32,7 @@ export function configureSimulationEnv(extra = {}) {
 export function installPaymentProviderMock() {
   const ledger = new Map();
   const initializeBodies = [];
+  const chargeBodies = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init = {}) => {
     const u = new URL(String(url));
@@ -45,6 +46,20 @@ export function installPaymentProviderMock() {
       if (!ledger.has(b.reference)) ledger.set(b.reference, { amount: Number(b.amount), currency: b.currency, status: "abandoned" });
       return json(200, { status: true, data: { reference: b.reference, authorization_url: `https://checkout.paystack.com/${b.reference.slice(0, 12)}`, access_code: "ac_sim" } });
     }
+    // Mobile money prompts (pay on delivery). Telecel ("vod") needs a voucher first.
+    if (u.pathname === "/charge") {
+      const b = JSON.parse(init.body);
+      chargeBodies.push(b);
+      if (!ledger.has(b.reference)) ledger.set(b.reference, { amount: Number(b.amount), currency: b.currency, status: "pending" });
+      const status = b.mobile_money?.provider === "vod" ? "send_otp" : "pay_offline";
+      return json(200, { status: true, data: { reference: b.reference, status, display_text: status === "send_otp" ? "Dial *110# to generate a voucher" : "Approve the prompt on your phone" } });
+    }
+    if (u.pathname === "/charge/submit_otp") {
+      const b = JSON.parse(init.body);
+      chargeBodies.push({ submitOtp: b });
+      if (!ledger.has(b.reference)) return json(404, { status: false });
+      return json(200, { status: true, data: { reference: b.reference, status: "pay_offline", display_text: "Approve the prompt on your phone" } });
+    }
     const m = u.pathname.match(/^\/transaction\/verify\/(.+)$/);
     if (m) {
       const ref = decodeURIComponent(m[1]);
@@ -57,6 +72,7 @@ export function installPaymentProviderMock() {
   return {
     ledger,
     initializeBodies,
+    chargeBodies,
     pay: (ref, ok = true) => { ledger.get(ref).status = ok ? "success" : "failed"; },
     sign: (raw) => createHmac("sha512", PAYMENT_SECRET).update(raw).digest("hex"),
     restore: () => { globalThis.fetch = realFetch; },

@@ -20,7 +20,7 @@ Portal origins are derived from the configured portal hostnames during the build
 
 ## Development
 
-Use Node.js 22.x and npm. The isolated development preview can use PGlite with
+Use Node.js 26.x (the production runtime; 22.x still works during the transition) and npm. The isolated development preview can use PGlite with
 pgcrypto; staging/production require an explicit PostgreSQL connection.
 
 ```sh
