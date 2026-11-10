@@ -1,7 +1,14 @@
 # Single-VPS deployment, not a claim of certified production readiness.
 name: elemarket
+# Bound container log growth so a busy or failing worker cannot consume VPS storage.
+x-bounded-logs: &bounded_logs
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
 services:
   postgres:
+    logging: *bounded_logs
     image: postgres:16
     restart: unless-stopped
     environment:
@@ -17,6 +24,7 @@ services:
       retries: 8
     networks: [private]
   redis:
+    logging: *bounded_logs
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${ELEMARKET_REDIS_PASSWORD:?set ELEMARKET_REDIS_PASSWORD}"]
@@ -30,6 +38,7 @@ services:
     volumes: [redis_data:/data]
     networks: [private]
   app:
+    logging: *bounded_logs
     build:
       context: .
       args:
@@ -69,6 +78,7 @@ services:
   # Optional, private matcher/PAD bridge. DO NOT enable biometric sign-in until
   # an independently reviewed PAD service is available and tested.
   executive-face-bridge:
+    logging: *bounded_logs
     profiles: [executive-biometrics]
     build:
       context: .
@@ -92,6 +102,7 @@ services:
   # No public port, no camera-source hardware assurance. Production activation
   # requires independent security evaluation. Vendor models are NOT bundled.
   pad-verifier:
+    logging: *bounded_logs
     profiles: [executive-biometrics]
     build:
       context: .
@@ -113,6 +124,7 @@ services:
     cap_drop: [ALL]
     # NO published ports. In default mode this service refuses all decisions.
   scheduler:
+    logging: *bounded_logs
     build: .
     restart: unless-stopped
     command: ["node", "scripts/scheduler.mjs"]
@@ -133,6 +145,7 @@ services:
       retries: 2
     networks: [private]
   proxy:
+    logging: *bounded_logs
     image: caddy:2
     restart: unless-stopped
     environment:
