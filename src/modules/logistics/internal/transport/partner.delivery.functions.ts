@@ -425,6 +425,9 @@ export const loadMyRiderJobs=createServerFn({method:"GET"}).middleware([authMidd
    j.updated_at::text as "updatedAt",j.failure_reason as "failureReason",j.proof_of_delivery_url as "proofOfDeliveryUrl",
    o.address,o.delivery_contact_snapshot_verified as "contactVerified",
    exists(select 1 from order_delivery_holds h where h.order_id=o.id and h.active) as "deliveryOnHold",
+   (o.payment_timing='on_delivery') as "payOnDelivery",
+   case when o.payment_timing='on_delivery' then o.grand_total::text end as "amountDue",
+   exists(select 1 from payments pay where pay.order_id=o.id and pay.status='completed') as "paid",
    p.name as "providerName",p.partner_organization_id as "organizationId"
    from delivery_jobs j join delivery_providers p on p.id=j.provider_id and p.status='active'
    join partner_organizations org on org.id=p.partner_organization_id and org.status='active'

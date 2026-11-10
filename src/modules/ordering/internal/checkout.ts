@@ -149,3 +149,43 @@ export const createPendingCheckout = createServerFn({ method: "POST" })
     await requireCustomerForUserId(context.userId);
     return createPendingCheckoutServer(data, getAuthenticatedUserId(context));
   });
+
+/** Whether this customer can choose pay on delivery now, and the order limit. */
+export const getPayOnDeliveryOption = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = getAuthenticatedUserId(context);
+    const [{ requireCustomerForUserId }, { getSql }, { payOnDeliveryProviderReady }] = await Promise.all([
+      import("@/modules/identity/public/auth/authorization.server"),
+      import("@/lib/db"),
+      import("@/modules/payments/public/pay-on-delivery.server"),
+    ]);
+    await requireCustomerForUserId(userId);
+    if (!(await payOnDeliveryProviderReady())) return { eligible: false as const, reason: "Pay on delivery is not available yet" };
+    const sql = await getSql();
+    const [row] = await sql.query<{ r: { eligible: boolean; reason?: string; maxOrderAmount?: string } }>(
+      `select elemarket_pay_on_delivery_eligibility($1) as r`, [userId]);
+    return row.r.eligible
+      ? { eligible: true as const, maxOrderAmount: row.r.maxOrderAmount ?? "0.00" }
+      : { eligible: false as const, reason: row.r.reason ?? "Pay on delivery is not available" };
+  });
+
+/** Switch a freshly created, unpaid order group to pay on delivery (mobile money at the door). */
+export const choosePayOnDelivery = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ groupId: z.string().trim().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    const userId = getAuthenticatedUserId(context);
+    const [{ requireCustomerForUserId }, { getSql }, { enforceRateLimit }, { payOnDeliveryProviderReady }] = await Promise.all([
+      import("@/modules/identity/public/auth/authorization.server"),
+      import("@/lib/db"),
+      import("@/lib/security/rate-limit.server"),
+      import("@/modules/payments/public/pay-on-delivery.server"),
+    ]);
+    await requireCustomerForUserId(userId);
+    await enforceRateLimit("pay-on-delivery-choice", { windowSeconds: 600, maxRequests: 10, subject: userId });
+    if (!(await payOnDeliveryProviderReady())) throw new Error("Pay on delivery is not available yet");
+    const sql = await getSql();
+    const [row] = await sql.query<{ r: { orders: number } }>(`select choose_pay_on_delivery($1,$2) as r`, [userId, data.groupId]);
+    return { orders: row.r.orders, paymentTiming: "on_delivery" as const };
+  });

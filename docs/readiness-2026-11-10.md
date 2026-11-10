@@ -24,6 +24,16 @@ Branch `upgrade/real-world-readiness`, based on `main` at df1bbfe. This report c
 
 Regression test: `tests/scheduled-jobs.postgres.mjs` fails 3/3 on the old code and passes 3/3 on the fix.
 
+## Customer features added after comparing with Jumia Ghana
+
+| Feature | What it does | How it is switched on |
+|---|---|---|
+| Return window fix | **Defect:** listings had no return window and returns needed a shipment record that ordinary orders never get, so **no customer could return anything**. Now every listing has a window (7 days unless the seller sets one), and wrong, damaged, defective, incomplete or misdescribed items can always be returned within 7 days, even "non-returnable" ones. Merchant earnings are released only after that window closes. | Always on. Staff adjust `marketplace_return_policy` (`default_window_days`, `faulty_item_days`). |
+| Pickup at checkout | The customer chooses door delivery or a pickup point. The quote is priced to the point, and checkout shows the door-delivery price for comparison. Dispatch creates a pickup job, and the existing arrival notice and attendant OTP handover apply. | Shown when the delivery company has an active pickup point with an attendant (provider portal, Pickup operations). |
+| Pay on delivery (mobile money at the door) | The order is confirmed and dispatched unpaid, with stock reserved. At the door, the rider or attendant sends a MoMo prompt to the customer's verified phone. Payment completes only by the provider's signed webhook, and the handover code is refused until then. A declined prompt can be retried, and a new prompt is never sent while an earlier one could still be approved. A refused parcel returned to the merchant cancels the order and restocks it. No one handles cash. | **Off by default.** Staff set `pay_on_delivery_policy.enabled = true` and the limits: `max_order_amount` (GHS 2,000), `max_open_orders` (2) and `max_refused_deliveries` (2). |
+
+Tests on PostgreSQL: `tests/returns-policy.postgres.mjs` (8), `tests/checkout-pickup.postgres.mjs` (5), `tests/pay-on-delivery.postgres.mjs` (7).
+
 ## What is proven
 
 All results below are under Node 26.13.0 with PostgreSQL 16.
@@ -53,6 +63,7 @@ These are required before taking real orders:
 1. **Payment provider.** Activate at least one payment provider with test keys first, then live keys.
    - Until then the payment webhook answers 503. The smoke test flags this as a warning.
    - Run a sandbox charge, refund and payout end to end.
+   - Before switching on pay on delivery, test mobile money prompts in the provider sandbox on each network. Telecel needs the customer's voucher code. The AirtelTigo code is set by `ELEMARKET_PAYMENT_PAYSTACK_MOMO_AIRTELTIGO_CODE` (default `atl`), because the provider's documentation also mentions `tgo`.
 2. **Payout provider.** Configure a payout driver for merchant withdrawals. The provider holds and disburses the funds; ELEMARKET only keeps the ledger and sends instructions. Until then `wallet-settlement` reports `payoutsConfigured: false`.
 3. **Infrastructure.** VPS, DNS for the five hosts, and real TLS certificates. After deploy, run:
    ```

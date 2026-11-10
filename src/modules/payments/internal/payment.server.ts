@@ -16,6 +16,7 @@ import {
   PaymentWebhookError,
 } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
+import type { MobileMoneyNetwork } from "@/modules/payments/internal/adapters/payment";
 
 export type PaymentStatus = "initiated" | "authorized" | "completed" | "failed" | "refunded";
 
@@ -59,7 +60,14 @@ export async function createExternalPaymentIntent(input: {
   paymentId: string;
   providerKey?: string;
   userId: string;
+  /**
+   * Pay on delivery: send a mobile money approval prompt to this verified phone
+   * instead of creating a hosted checkout. Callers must have authorized the
+   * person at the door; `userId` is still the paying customer.
+   */
+  mobileMoneyPrompt?: { phone: string; network: MobileMoneyNetwork };
 }) {
+  const prompt = input.mobileMoneyPrompt;
   const sql = await getSql();
   const owned = await requireCustomerPayment(input.paymentId, input.userId);
   const payment = {
@@ -95,6 +103,8 @@ export async function createExternalPaymentIntent(input: {
     provider[0].driver_key ?? undefined,
   );
   assertPaymentInitializationReady(adapter, normalizedProviderKey);
+  if (prompt && (adapter.supportsMobileMoneyPrompt !== true || !adapter.requestMobileMoneyPrompt))
+    throw new Error("Payment provider cannot send mobile money prompts");
   if (
     provider[0].requires_merchant_account &&
     adapter.supportsDirectSubaccountSettlement !== true
@@ -151,6 +161,11 @@ export async function createExternalPaymentIntent(input: {
   ]);
   const result = attemptRows[0]?.result;
   if (!result) throw new Error("Payment attempt could not be created");
+  // A prompt already out: never send a second one while the first can still be
+  // approved (that could charge the customer twice). The caller closes stale ones.
+  if (prompt && result.existing) {
+    return { ...result, status: "pending" as const, providerReference: result.providerReference ?? undefined, checkoutUrl: undefined, awaitingCustomer: true };
+  }
   if (result.existing && result.providerReference && result.checkoutUrl) {
     return {
       ...result,
@@ -201,8 +216,9 @@ export async function createExternalPaymentIntent(input: {
     : undefined;
   let external;
   let safeCheckoutUrl: string | undefined;
+  let needsCustomerCode = false;
   try {
-    external = await adapter.createPayment({
+    const adapterInput = {
       paymentId: result.paymentId,
       attemptId: result.attemptId,
       amount: String(payment.amount),
@@ -213,11 +229,18 @@ export async function createExternalPaymentIntent(input: {
       idempotencyKey: result.attemptId,
       callbackUrl,
       platformFee: owned.platform_fee,
-    });
+    };
+    if (prompt) {
+      const prompted = await adapter.requestMobileMoneyPrompt!({ ...adapterInput, phone: prompt.phone, network: prompt.network });
+      needsCustomerCode = prompted.needsCustomerCode === true;
+      external = prompted;
+    } else {
+      external = await adapter.createPayment(adapterInput);
+    }
     if (external.providerReference !== reference) {
       throw new Error("Payment provider reference did not match the reserved attempt");
     }
-    safeCheckoutUrl = validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
+    safeCheckoutUrl = prompt ? undefined : validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
   } catch (error) {
     await sql.query(
       `update payment_attempts
@@ -262,6 +285,8 @@ export async function createExternalPaymentIntent(input: {
     providerReference: external.providerReference,
     checkoutUrl: safeCheckoutUrl,
     recovered,
+    needsCustomerCode,
+    displayText: typeof external.metadata?.displayText === "string" ? external.metadata.displayText : null,
   };
 }
 

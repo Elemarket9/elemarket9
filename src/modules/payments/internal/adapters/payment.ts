@@ -17,6 +17,20 @@ export type PaymentAdapterInput = {
   platformFee?: string;
 };
 
+/** Ghana mobile money networks, named neutrally; drivers map them to provider codes. */
+export type MobileMoneyNetwork = "mtn" | "telecel" | "airteltigo";
+
+export type MobileMoneyPromptInput = PaymentAdapterInput & {
+  /** The order's verified customer phone, +233XXXXXXXXX. Never rider-supplied. */
+  phone: string;
+  network: MobileMoneyNetwork;
+};
+
+export type MobileMoneyPromptResult = PaymentAdapterResult & {
+  /** The network needs a code from the customer (e.g. a voucher) before it prompts. */
+  needsCustomerCode?: boolean;
+};
+
 export type PaymentRefundResult = {
   providerRefundId: string | null;
   status: "processing" | "processed" | "needs_attention";
@@ -38,6 +52,15 @@ export interface PaymentProviderAdapter {
   /** Provider-specific webhook signature headers belong to the adapter boundary. */
   readonly webhookSignatureHeaders?: readonly string[];
   createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult>;
+  /**
+   * Pay on delivery: ask the provider to send a mobile money approval prompt to
+   * the customer's phone, under the attempt's deterministic reference. Completion
+   * still arrives only through the signed webhook. Declare it only when the
+   * provider supports direct mobile money charges.
+   */
+  readonly supportsMobileMoneyPrompt?: boolean;
+  requestMobileMoneyPrompt?(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult>;
+  submitMobileMoneyCode?(input: { reference: string; code: string }): Promise<MobileMoneyPromptResult>;
   verifyWebhook?(rawBody: string, signature: string | null): Promise<boolean>;
   parseWebhook?(rawBody: string): Promise<ParsedPaymentWebhook | null>;
   verifyTransaction?(reference: string): Promise<VerifiedPayment>;

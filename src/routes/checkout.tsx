@@ -1,13 +1,13 @@
 import {linkSearchOrders} from '@/modules/catalog/public/observations.functions';
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CreditCard, LockKeyhole, ShieldCheck, ShoppingBag, Truck } from "lucide-react";
+import { ArrowLeft, CreditCard, LockKeyhole, MapPin, ShieldCheck, ShoppingBag, Truck } from "lucide-react";
 import { RedirectToSignIn, SignInGate } from "@/modules/identity/public/auth/gates";
-import { createPendingCheckout, listAvailableCheckoutPaymentMethods, type CheckoutPaymentMethod } from "@/modules/ordering/public/checkout";
+import { choosePayOnDelivery, createPendingCheckout, getPayOnDeliveryOption, listAvailableCheckoutPaymentMethods, type CheckoutPaymentMethod } from "@/modules/ordering/public/checkout";
 import { getAssistedOrderDraft } from "@/modules/support/public/support.functions";
 import { fingerprintCheckout } from "@/modules/ordering/public/checkout-fingerprint";
 import { createPaymentIntent } from "@/modules/payments/public/payment";
-import { requestDeliveryQuote } from "@/modules/logistics/public/adapters/delivery";
+import { listCheckoutPickupLocations, requestDeliveryQuote } from "@/modules/logistics/public/adapters/delivery";
 import { resolveProductMerchants } from "@/modules/catalog/public/catalog";
 import { formatGhs, fromPesewas, lineTotal, sumMoney, toPesewas } from "@/modules/shared/public/money";
 import { previewCustomerFinancing, type FinancingProvider } from "@/modules/financing/public/financing";
@@ -38,10 +38,21 @@ function CheckoutForm() {
   const [promoCode, setPromoCode] = useState("");
   const [tier, setTier] = useState<"same_day" | "next_day" | "three_day">("next_day");
   const [quotes, setQuotes] = useState<Array<{ merchantId: string; quoteId: string; price: string; etaMinutes: number }>>([]);
+  // Door delivery or collection at a pickup point. A pickup order is placed with the
+  // pickup point's address, which the server binds to the quote.
+  const [fulfillment, setFulfillment] = useState<"delivery" | "pickup">("delivery");
+  const [pickupLocations, setPickupLocations] = useState<Array<{ id: string; name: string; address: string }>>([]);
+  const [pickupLocationId, setPickupLocationId] = useState("");
+  const [doorDeliveryTotal, setDoorDeliveryTotal] = useState<string | null>(null);
+  const pickupLocation = pickupLocations.find((l) => l.id === pickupLocationId) ?? null;
+  const orderAddress = fulfillment === "pickup" ? (pickupLocation?.address ?? "") : address.trim();
+  const resetQuotes = () => { setQuotes([]); setDoorDeliveryTotal(null); setFinancingQuote(null); setFinancingProviders([]); setSelectedFinancingProvider(""); };
   const [error, setError] = useState<string | null>(null);
   // Orders are written atomically before payment. The customer must see the
   // authoritative DB prices, promotions and delivery amount before redirect.
   const [prepared, setPrepared] = useState<{groupId: string; orders: PreparedMerchantOrder[]} | null>(null);
+  const [payOnDelivery, setPayOnDelivery] = useState<{ eligible: true; maxOrderAmount: string } | { eligible: false; reason: string } | null>(null);
+  const [payOnDeliveryDone, setPayOnDeliveryDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const operation = useRef(false);
   const checkoutAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
@@ -52,6 +63,12 @@ function CheckoutForm() {
   const [financingBusy, setFinancingBusy] = useState(false);
   const total = useMemo(() => cartTotal(cart), [cart]);
   const deliveryTotal = quotes.length ? sumMoney(quotes.map((q) => q.price)) : "0.00";
+
+  useEffect(() => {
+    let active = true;
+    void listCheckoutPickupLocations().then((rows) => { if (active) setPickupLocations(rows); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -91,7 +108,8 @@ function CheckoutForm() {
     if (operation.current) return;
     setError(null);
     if (!cart.length) return setError("Your cart is empty.");
-    if (address.trim().length < 8) return setError("Enter a complete delivery address.");
+    if (fulfillment === "pickup" && !pickupLocation) return setError("Choose a pickup point.");
+    if (fulfillment === "delivery" && address.trim().length < 8) return setError("Enter a complete delivery address.");
     operation.current = true;
     setBusy(true);
     try {
@@ -100,13 +118,22 @@ function CheckoutForm() {
       const merchantIds = [...new Set(cart.map((line) => line.merchantId || resolved[line.productId]).filter(Boolean))] as string[];
       if (!merchantIds.length) throw new Error("Could not resolve merchants for this cart.");
       const next: Array<{ merchantId: string; quoteId: string; price: string; etaMinutes: number }> = [];
+      const doorPrices: string[] = [];
       for (const merchantId of merchantIds) {
         const items = cart.filter((line) => (line.merchantId || resolved[line.productId]) === merchantId).map((line) => ({ productId: line.productId, variantId: line.variantId ?? null, quantity: line.quantity }));
-        const result = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier, items } });
+        const result = await requestDeliveryQuote({ data: fulfillment === "pickup"
+          ? { merchantId, address: orderAddress, tier, items, pickupLocationId }
+          : { merchantId, address: orderAddress, tier, items } });
         if (!result?.id) throw new Error("Delivery provider did not return a quote.");
         next.push({ merchantId, quoteId: result.id, price: result.price, etaMinutes: result.etaMinutes });
+        // For comparison only: what door delivery to the customer's address would cost.
+        if (fulfillment === "pickup" && address.trim().length >= 8) {
+          const door = await requestDeliveryQuote({ data: { merchantId, address: address.trim(), tier, items } }).catch(() => null);
+          if (door?.price) doorPrices.push(door.price);
+        }
       }
       setQuotes(next);
+      setDoorDeliveryTotal(fulfillment === "pickup" && doorPrices.length === next.length ? sumMoney(doorPrices) : null);
 
     } catch {
       setError("Could not quote delivery. Please try again.");
@@ -144,7 +171,7 @@ function CheckoutForm() {
     if (operation.current) return;
     setError(null);
     if (!cart.length) return setError("Your cart is empty.");
-    if (address.trim().length < 8) return setError("Enter a complete delivery address.");
+    if (orderAddress.length < 8) return setError(fulfillment === "pickup" ? "Choose a pickup point." : "Enter a complete delivery address.");
     if (!method) return setError("No payment method is currently available. Please try again later or contact support.");
     // The transactional promo engine intentionally prevents allocating one
     // coupon across multiple merchants until group-wide discount accounting exists.
@@ -164,7 +191,7 @@ function CheckoutForm() {
       const payload = {
         items: cart.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })),
         quotes: stored.map(({ merchantId, quoteId }) => ({ merchantId, quoteId })),
-        address: address.trim(),
+        address: orderAddress,
         method,
         promoCode: promoCode.trim() || null,
         assistedDraftId,
@@ -191,6 +218,7 @@ function CheckoutForm() {
       const links=orders.flatMap(order=>cart.filter(line=>line.attributionReceipt&&line.merchantId===order.merchantId).map(line=>({orderId:order.orderId,receipt:line.attributionReceipt!}))).slice(0,40);
       if(links.length)void linkSearchOrders({data:{links}}).catch(()=>undefined);
       setPrepared({groupId:response.groupId,orders});
+      if(method==="mobile_money")void getPayOnDeliveryOption().then(setPayOnDelivery).catch(()=>setPayOnDelivery(null));
     } catch (error) {
       setError(error instanceof Error && error.message.startsWith("Please check out items") ? error.message : "Checkout could not be completed. Verify product availability and delivery quotes, then try again.");
     } finally {
@@ -219,6 +247,26 @@ function CheckoutForm() {
     finally{operation.current=false;setBusy(false);}
   }
 
+  async function confirmPayOnDelivery() {
+    if(!prepared||operation.current)return;
+    operation.current=true;setBusy(true);setError(null);
+    try {
+      await choosePayOnDelivery({data:{groupId:prepared.groupId}});
+      writeCart([]);
+      setPayOnDeliveryDone(true);
+    }catch(error){setError(error instanceof Error&&error.message?error.message:"Pay on delivery could not be selected. You can still pay now.");}
+    finally{operation.current=false;setBusy(false);}
+  }
+
+  if(prepared&&payOnDeliveryDone){
+    return <main className="min-h-screen bg-market-bg px-4 py-12"><section className="mx-auto max-w-2xl rounded-3xl border border-market-line bg-white p-7 shadow-market">
+      <ShieldCheck className="text-market-green" size={38}/>
+      <h1 className="mt-3 text-2xl font-black">Order confirmed: pay on delivery</h1>
+      <p className="mt-2 text-sm text-market-muted">When your parcel arrives, the rider sends a mobile money approval prompt to your verified phone for {formatGhs(sumMoney(prepared.orders.map((o)=>o.grandTotal)))}. Approve it on your phone, then give the rider your handover code. The parcel is only handed over after payment.</p>
+      <Link to="/orders" className="mt-6 inline-block rounded-xl bg-market-green px-5 py-3 font-black text-white">View my orders</Link>
+    </section></main>;
+  }
+
   if(prepared){
     const grandTotal=sumMoney(prepared.orders.map((order)=>order.grandTotal));
     return <main className="min-h-screen bg-market-bg px-4 py-12"><section className="mx-auto max-w-2xl rounded-3xl border border-market-line bg-white p-7 shadow-market">
@@ -234,6 +282,8 @@ function CheckoutForm() {
       <div className="mt-6 flex items-center justify-between border-t border-market-line pt-5 text-lg font-black"><span>Total to pay</span><span>{formatGhs(grandTotal)}</span></div>
       {error?<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>:null}
       <button type="button" disabled={busy} onClick={()=>void proceedWithConfirmedPayment()} className="mt-6 w-full rounded-xl bg-market-orange px-5 py-4 font-black text-white disabled:opacity-50">{busy?'Opening secure payment…':'Confirm amount and continue to payment'}</button>
+      {payOnDelivery?.eligible&&prepared.orders.every((o)=>toPesewas(o.grandTotal)<=toPesewas(payOnDelivery.maxOrderAmount))?<button type="button" disabled={busy} onClick={()=>void confirmPayOnDelivery()} className="mt-3 w-full rounded-xl border-2 border-market-green px-5 py-4 font-black text-market-green disabled:opacity-50">Pay on delivery with mobile money</button>:null}
+      {payOnDelivery&&!payOnDelivery.eligible?<p className="mt-3 text-xs text-market-muted">Pay on delivery: {payOnDelivery.reason}.</p>:null}
       <p className="mt-3 text-xs text-market-muted">If the price is unexpected, do not continue. Pending unpaid orders automatically expire under the marketplace reservation policy.</p>
     </section></main>;
   }
@@ -267,12 +317,29 @@ function CheckoutForm() {
                 <p className="text-sm text-market-muted">Secure order creation. Payment is completed separately.</p>
               </div>
             </div>
+            <div className="mt-7">
+              <p className="text-sm font-black">How do you want to receive it?</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <button type="button" disabled={busy || financingBusy} onClick={() => { setFulfillment("delivery"); resetQuotes(); }} className={`rounded-xl border px-4 py-3 text-left text-sm font-black ${fulfillment === "delivery" ? "border-market-green bg-market-green/10" : "border-market-line"}`}><Truck size={16} className="mr-2 inline" />Deliver to my door</button>
+                <button type="button" disabled={busy || financingBusy || pickupLocations.length === 0} onClick={() => { setFulfillment("pickup"); resetQuotes(); }} className={`rounded-xl border px-4 py-3 text-left text-sm font-black disabled:opacity-50 ${fulfillment === "pickup" ? "border-market-green bg-market-green/10" : "border-market-line"}`}><MapPin size={16} className="mr-2 inline" />Collect from a pickup point{pickupLocations.length === 0 ? <span className="block text-xs font-semibold text-market-muted">No pickup points available yet</span> : null}</button>
+              </div>
+              {fulfillment === "pickup" && (
+                <label className="mt-3 block text-sm font-black">
+                  Pickup point
+                  <select value={pickupLocationId} disabled={busy || financingBusy} onChange={(e) => { setPickupLocationId(e.target.value); resetQuotes(); }} className="mt-2 h-12 w-full rounded-xl border border-market-line bg-white px-4 outline-none focus:border-market-green">
+                    <option value="">Choose a pickup point</option>
+                    {pickupLocations.map((l) => <option key={l.id} value={l.id}>{l.name} · {l.address}</option>)}
+                  </select>
+                  <span className="mt-1 block text-xs font-normal text-market-muted">We text you when your parcel arrives. Bring your phone: the attendant checks a one-time code. Parcels are held for 7 days.</span>
+                </label>
+              )}
+            </div>
             <label className="mt-7 block text-sm font-black">
-              Delivery address
+              {fulfillment === "pickup" ? "Your address (optional, to compare with door delivery)" : "Delivery address"}
               <input
                 value={address}
                 disabled={busy || financingBusy}
-                onChange={(e) => { setAddress(e.target.value); setQuotes([]); setFinancingQuote(null); setFinancingProviders([]); setSelectedFinancingProvider(""); }}
+                onChange={(e) => { setAddress(e.target.value); resetQuotes(); }}
                 maxLength={400}
                 className="mt-2 h-12 w-full rounded-xl border border-market-line px-4 outline-none focus:border-market-green"
                 placeholder="Street, area, city"
@@ -374,9 +441,12 @@ function CheckoutForm() {
             </div>
             {quotes.length > 0 && (
               <div className="mt-3 flex justify-between text-sm">
-                <span className="font-bold text-market-muted">Delivery</span>
+                <span className="font-bold text-market-muted">{fulfillment === "pickup" ? "Pickup" : "Delivery"}</span>
                 <span className="font-black">{formatGhs(deliveryTotal)}</span>
               </div>
+            )}
+            {quotes.length > 0 && fulfillment === "pickup" && pickupLocation && (
+              <p className="mt-2 text-xs text-market-muted">Collect at {pickupLocation.name}, {pickupLocation.address}.{doorDeliveryTotal ? ` Door delivery would cost ${formatGhs(doorDeliveryTotal)}${toPesewas(doorDeliveryTotal) > toPesewas(deliveryTotal) ? `, so you save ${formatGhs(fromPesewas(toPesewas(doorDeliveryTotal) - toPesewas(deliveryTotal)))}` : ""}.` : ""}</p>
             )}
             <p className="mt-3 text-xs text-market-muted">Delivery is quoted separately and must be live, unexpired and tied to this address before an order is created.</p>{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL && import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL ? <p className="mt-2 text-[11px] text-market-muted">Location lookup powered by <a href={import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL} target="_blank" rel="noreferrer" className="underline">{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL}</a>.</p> : null}
             <div className="mt-5 flex items-center gap-2 text-xs font-bold"><LockKeyhole size={14} /> Protected checkout</div>
