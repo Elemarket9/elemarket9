@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { authClient, authEnabled } from "@/modules/identity/public/auth/client";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 import { getProviderGatewayContext } from "../../modules/administration/public/transport/provider/gateway.functions";
 export const Route=createFileRoute("/provider/login")({component:ProviderLogin});
 function ProviderLogin(){
@@ -16,7 +17,7 @@ function ProviderLogin(){
   sessionStorage.setItem("elemarket.auth.post2faCallback", "/provider/login");
   const result=await authClient.signIn.email({email:email.trim(),password,});
   if(result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
-  if(result.error) throw new Error(result.error.message??"Invalid provider credentials");
+  if(result.error) throw new Error(publicAuthError("sign-in"));
   const ctx=await getProviderGatewayContext();
   if(!ctx.authorized){if(ctx.application){window.location.assign("/provider/status");return;}await authClient.signOut();throw new Error("This account is not an approved ELEMARKET provider. Apply through the Provider Hub.");}
   window.location.assign("/provider/dashboard");

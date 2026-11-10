@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { authClient, authEnabled } from "@/modules/identity/public/auth/client";
 import { requestEmailOtpCode, requestOtpCode, verifyEmailOtpCode } from "@/modules/identity/public/auth/otp";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 import { createMerchantApplication, getCustomerProfile, getMerchantRegistrationContext, saveSignupProfile, markPhoneVerified } from "@/modules/identity/public/auth/account.functions";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { loadActiveCatalogTaxonomy, type ActiveCatalogGroup } from "@/modules/catalog/public/catalog";
@@ -106,7 +107,7 @@ function MerchantRegister() {
       const result = await authClient.signUp.email({
         email: email.trim(), password, name: name.trim(), callbackURL: "/merchant/register",
       });
-      if (result.error) throw new Error(result.error.message ?? "Could not create account");
+      if (result.error) throw new Error(publicAuthError("sign-up"));
       const otp = await requestEmailOtpCode({ data: { email: email.trim(), purpose: "signup" } });
       setEmailChallengeId(otp.challengeId);
       setStage("email");
@@ -124,7 +125,7 @@ function MerchantRegister() {
     try {
       await verifyEmailOtpCode({ data: { challengeId: emailChallengeId, code: emailCode, purpose: "signup" } });
       const signed = await authClient.signIn.email({ email: email.trim(), password,});
-      if (signed.error) throw new Error(signed.error.message ?? "Email verified, but sign-in failed");
+      if (signed.error) throw new Error(publicAuthError("sign-in"));
       await saveSignupProfile({ data: { name: name.trim(), phone: phone.trim() } });
       await createMerchantApplication({
         data: {

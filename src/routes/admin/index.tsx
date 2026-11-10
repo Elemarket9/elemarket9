@@ -3,6 +3,7 @@ import { useState } from "react";
 import { getAdminAccessState } from "../../modules/administration/public/transport/admin/access.functions";
 import { adminDefaultRoute } from "@/modules/administration/public/admin-default-route";
 import { authClient, authEnabled, signOut } from "@/modules/identity/public/auth/client";
+import { publicAuthError } from "@/modules/identity/public/auth/public-auth-error";
 import { ExecutiveFaceLogin } from "@/components/executive-face-login";
 
 export const Route = createFileRoute("/admin/")({
@@ -35,12 +36,12 @@ function AdminEntry() {
         password,
       });
       if (result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect) return;
-      if (result.error) throw new Error("Invalid administrator credentials");
+      if (result.error) throw new Error(publicAuthError("sign-in"));
 
       const current = await getAdminAccessState();
       if (!current.authenticated || !current.isAdmin) {
         await signOut("");
-        throw new Error("This account is not authorized for administrator access");
+        throw new Error(publicAuthError("sign-in"));
       }
 
       window.location.assign(current.twoFactorEnabled ? (adminDefaultRoute(current)) : "/admin/security");
