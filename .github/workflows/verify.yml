@@ -85,6 +85,18 @@ jobs:
         run: |
           node scripts/migrate.mjs
           node scripts/migrate.mjs
+      - name: PostgreSQL client tools for the backup drill
+        run: pg_dump --version && pg_restore --version
+      - name: Wallet safety on PostgreSQL
+        env:
+          RUN_DB_INTEGRATION: '1'
+          ELEMARKET_INTEGRATION_DATABASE_URL: postgresql://elemarket:elemarket@127.0.0.1:5432/elemarket_ci_test
+        run: npm run test:wallet:postgres
+      - name: Database operations, commerce integrity and scheduled jobs on PostgreSQL
+        env:
+          RUN_DB_INTEGRATION: '1'
+          ELEMARKET_INTEGRATION_DATABASE_URL: postgresql://elemarket:elemarket@127.0.0.1:5432/elemarket_ci_test
+        run: npm run test:db:postgres
   mobile:
     runs-on: ubuntu-24.04
     defaults:
