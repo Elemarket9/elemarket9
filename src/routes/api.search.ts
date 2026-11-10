@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { searchProducts } from "@/modules/catalog/public/search.server";
+import { isDatabaseUnavailable } from "@/lib/db-unavailable.mjs";
 import { enforceRateLimit, rateLimitResponse } from "@/lib/security/rate-limit.server";
 
 const SEARCH_SORTS = new Set(["relevance", "price_asc", "price_desc", "newest"]);
@@ -38,6 +39,7 @@ export const Route = createFileRoute("/api/search")({
         } catch (error) {
           const limited = rateLimitResponse(error);
           if (limited) return limited;
+          if (isDatabaseUnavailable(error)) return new Response("Search unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
           throw error;
         }
         const url = new URL(request.url);

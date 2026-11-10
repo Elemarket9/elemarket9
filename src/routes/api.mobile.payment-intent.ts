@@ -7,6 +7,7 @@ import { rateLimitResponse } from "@/lib/security/rate-limit.server";
 import { requireCustomerForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
+import { logServerError } from "@/lib/observability/safe-error.mjs";
 
 const schema = z.object({ paymentId: z.string().min(1).max(128) });
 
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/api/mobile/payment-intent")({
     } catch (error) {
       const limited = rateLimitResponse(error);
       if (limited) return limited;
-      console.error("[mobile-payment-intent] failed", error);
+      logServerError("[mobile-payment-intent] failed", error);
       return Response.json({ error: "Payment could not be started" }, { status: 400, headers: { "cache-control": "no-store" } });
     }
   } } },
