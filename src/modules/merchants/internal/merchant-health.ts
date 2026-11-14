@@ -27,7 +27,7 @@ export const recalculateMerchantHealthScore = createServerFn({ method: "POST" })
   .validator(z.object({ merchantId: merchantIdSchema }))
   .handler(async ({ data, context }) => {
     const userId = getAuthenticatedUserId(context);
-    await requireAdminForUserId(userId);
+    await requireAdminForUserId(userId, "admin.merchants.moderate");
     await enforceRateLimit("merchant-health-recalculate", { windowSeconds: 3600, maxRequests: 120, subject: userId });
     const sql = await getSql();
     const rows = await sql.query<{ result: JsonObject }>(

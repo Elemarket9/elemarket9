@@ -133,7 +133,7 @@ export const createHomepageAdCampaign=createServerFn({method:'POST'}).middleware
 
 const reviewSchema=z.object({campaignId:z.string().trim().min(1).max(128),action:z.enum(['approve','pause','reject','archive']),reason:z.string().trim().max(1000).optional()});
 export const reviewHomepageAdCampaign=createServerFn({method:'POST'}).middleware([authMiddleware]).validator(reviewSchema).handler(async({data,context})=>{
-  const adminId=getAuthenticatedUserId(context); await requireAdminForUserId(adminId); await requireFreshSession(); await enforceRateLimit('homepage-ad-review',{windowSeconds:60,maxRequests:30,subject:adminId}); const sql=await getSql();
+  const adminId=getAuthenticatedUserId(context); await requireAdminForUserId(adminId,'admin.campaigns.manage'); await requireFreshSession(); await enforceRateLimit('homepage-ad-review',{windowSeconds:60,maxRequests:30,subject:adminId}); const sql=await getSql();
   const rows=await sql.query<{id:string,status:string}>(`update homepage_ad_campaigns set status=case when $2='approve' then case when starts_at<=now() and ends_at>now() then 'active' else 'scheduled' end when $2='pause' then 'paused' when $2='reject' then 'rejected' else 'archived' end,reviewed_by=$3,reviewed_at=now(),rejection_reason=case when $2='reject' then $4 else null end,updated_at=now() where id=$1 returning id,status`,[data.campaignId,data.action,adminId,data.reason??null]); if(!rows[0]) throw new Error('Campaign not found');
   await sql.query(`select record_audit_event($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,['admin.homepage_ad.reviewed','homepage_ad',data.campaignId,adminId,'admin',null,'success',JSON.stringify({action:data.action,reason:data.reason??null})]); return {status:rows[0].status};
 });

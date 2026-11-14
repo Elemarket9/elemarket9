@@ -74,7 +74,7 @@ export async function dispatchDeliveries(limit = 25) {
 /** Admin retries local assignment; the purchased quote determines the carrier. */
 export async function assignDeliveryManually(orderId: string) {
   const userId = await requireFreshSession();
-  await requireAdminForUserId(userId);
+  await requireAdminForUserId(userId, "admin.providers.manage");
   const sql = await getSql();
   await sql.query(
     `insert into delivery_dispatch_outbox(order_id) select id from orders where id=$1 and status in ('paid','confirmed','fulfilling') and delivery_quote_id is not null on conflict(order_id) do update set status='pending',next_attempt_at=now(),updated_at=now() where delivery_dispatch_outbox.status in ('needs_attention','pending')`,
