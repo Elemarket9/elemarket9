@@ -91,13 +91,9 @@ export type AdminDashboardData = {
   }>;
 };
 
-export const loadAdminDashboard = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
-  .handler(async ({ context }): Promise<AdminDashboardData> => {
-    const userId = getAuthenticatedUserId(context);
-    await requireAdminForUserId(userId);
-    const sql = await getSql();
-
+/** Aggregate counts only: no personal data, evidence or payloads. Shared by the
+ * owner control centre and the read-only overview (admin.overview.view). */
+async function loadDashboardMetrics(sql: Awaited<ReturnType<typeof getSql>>): Promise<AdminDashboardData["metrics"]> {
     const merchantReviews = await sql.query<{ n: number }>(
         `select count(*)::int as n from merchant_applications where status in ('pending','reviewing')`,
       );
@@ -132,6 +128,38 @@ export const loadAdminDashboard = createServerFn({ method: "GET" })
          (select count(*)::int from provider_gateway_applications where status in ('review','information_requested')) as pending_partners`,
       [Math.round(reviewSlaHours),Math.round(paymentDelayMinutes)],
     );
+    return {
+        merchantReviews: merchantReviews[0]?.n ?? 0,
+        pendingPayments: pendingPayments[0]?.n ?? 0,
+        rejectedWebhooks24h: rejectedWebhooks24h[0]?.n ?? 0,
+        errors24h: errors24h[0]?.n ?? 0,
+        activeMerchants: activeMerchants[0]?.n ?? 0,
+        refundExceptions: refundExceptions[0]?.n ?? 0,
+        ordersToday: ordersToday[0]?.n ?? 0,
+        overdueMerchantReviews: exceptionCounts[0]?.overdue_reviews ?? 0,
+        stalePaymentAttempts: exceptionCounts[0]?.stale_payments ?? 0,
+        openRiskFlags: exceptionCounts[0]?.open_risk ?? 0,
+        pendingProviderApplications: exceptionCounts[0]?.pending_partners ?? 0,
+    };
+}
+
+/** Read-only overview for delegated managers: aggregate counts, nothing actionable. */
+export const loadAdminOverview = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<{ metrics: AdminDashboardData["metrics"]; generatedAt: string }> => {
+    await requireAdminForUserId(getAuthenticatedUserId(context), "admin.overview.view");
+    const sql = await getSql();
+    return { metrics: await loadDashboardMetrics(sql), generatedAt: new Date().toISOString() };
+  });
+
+export const loadAdminDashboard = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }): Promise<AdminDashboardData> => {
+    const userId = getAuthenticatedUserId(context);
+    await requireAdminForUserId(userId);
+    const sql = await getSql();
+
+    const metrics = await loadDashboardMetrics(sql);
     const merchantRows = await sql.query<{
         id: string;
         business_name: string;
@@ -272,19 +300,7 @@ export const loadAdminDashboard = createServerFn({ method: "GET" })
     });
 
     return {
-      metrics: {
-        merchantReviews: merchantReviews[0]?.n ?? 0,
-        pendingPayments: pendingPayments[0]?.n ?? 0,
-        rejectedWebhooks24h: rejectedWebhooks24h[0]?.n ?? 0,
-        errors24h: errors24h[0]?.n ?? 0,
-        activeMerchants: activeMerchants[0]?.n ?? 0,
-        refundExceptions: refundExceptions[0]?.n ?? 0,
-        ordersToday: ordersToday[0]?.n ?? 0,
-        overdueMerchantReviews: exceptionCounts[0]?.overdue_reviews ?? 0,
-        stalePaymentAttempts: exceptionCounts[0]?.stale_payments ?? 0,
-        openRiskFlags: exceptionCounts[0]?.open_risk ?? 0,
-        pendingProviderApplications: exceptionCounts[0]?.pending_partners ?? 0,
-      },
+      metrics,
       catalogTaxonomy,
       merchantReviews: merchantRows.map((row) => ({
         id: row.id,
@@ -394,29 +410,27 @@ export const requestAdminProviderRefund = createServerFn({ method: "POST" })
     await requireAdminForUserId(userId, "admin.finance.refunds");
     await requireFreshSession();
     await enforceRateLimit("admin-provider-refund", { windowSeconds: 300, maxRequests: 10, subject: userId });
-    // Order lock, idempotent provider-refund preparation, and audit commit atomically.
-    // The actual external API call runs AFTER commit; it must never occur inside a DB lock.
-    const requestId = await withTransaction(async (sql) => {
-      const rows = await sql.query<{ payment_id: string | null }>(
-        `select payment_id from orders where id=$1 for update`, [data.orderId],
+    // Four-eyes control: above the threshold this only RECORDS the request; a
+    // different administrator must approve it before any money moves.
+    const { requiresDualApproval, createDualApproval } = await import("../../dual-approval.server");
+    const queued = await withTransaction(async (sql) => {
+      const rows = await sql.query<{ payment_id: string | null; amount: string | null; currency: string | null }>(
+        `select p.id as payment_id, p.amount::text as amount, p.currency
+           from orders o join payments p on p.order_id=o.id and p.status='completed'
+          where o.id=$1 order by p.created_at desc limit 1 for update of o`, [data.orderId],
       );
-      const paymentId = rows[0]?.payment_id;
-      if (!paymentId) throw new Error("Order has no completed payment");
-      const prepared = await sql.query<{ result: unknown }>(
-        `select prepare_provider_refund_for_payment($1,$2,$3) as result`,
-        [paymentId, userId, "admin_refund_request"],
-      );
-      const result = prepared[0]?.result as { requestId?: string } | null;
-      if (!result?.requestId) throw new Error("Provider refund request could not be prepared");
-      await sql.query(`select record_audit_event($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`, [
-        "admin.refund.execution_requested", "order", data.orderId, userId, "admin", null, "success",
-        JSON.stringify({refundRequestId:result.requestId,reason:data.note.trim()}),
-      ]);
-      return String(result.requestId);
+      if (!rows[0]?.payment_id || rows[0].amount === null) throw new Error("Order has no completed payment");
+      if (!requiresDualApproval(rows[0].amount)) return null;
+      return createDualApproval(sql, {
+        action: "order_refund", subjectId: data.orderId, amount: rows[0].amount, currency: rows[0].currency ?? "GHS",
+        payload: { paymentId: rows[0].payment_id }, capability: "admin.finance.refunds", requestedBy: userId, reason: data.note.trim(),
+      });
     });
-    const { executeProviderRefundAsAdmin } = await import("@/modules/payments/public/refunds.server");
-    return await executeProviderRefundAsAdmin(requestId);
+    if (queued) return { status: "awaiting_approval" as const, approvalId: queued.approvalId };
+    const { executeAdminOrderRefund } = await import("../../admin-refunds.server");
+    return executeAdminOrderRefund({ orderId: data.orderId, actorId: userId, note: data.note, source: "admin_refund_request" });
   });
+
 
 
 

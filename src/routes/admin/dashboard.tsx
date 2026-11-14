@@ -140,7 +140,11 @@ function Dashboard() {
     setRefundBusyId(orderId);
     setMessage(null);
     try {
-      await requestAdminProviderRefund({ data: { orderId, note } });
+      const result = await requestAdminProviderRefund({ data: { orderId, note } });
+      if (result.status === "awaiting_approval") {
+        setMessage("Refund recorded and waiting for a second administrator in Finance approvals. No money has moved yet.");
+        return;
+      }
       window.location.reload();
     } catch {
       setMessage("Provider refund request failed. Verify the payment and provider status.");

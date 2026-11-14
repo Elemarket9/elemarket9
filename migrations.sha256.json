@@ -217,5 +217,7 @@
   "0217_wallet_payout_safety.sql": "f90c9e356cdbf32c987ec1c0fff2932bd72b7ba5b081459b4c3f49dab4d2a034",
   "0218_return_policy_guarantee.sql": "de4f0118c938ab124bd27d1fad47ccd944f1799c2cd7710e7ed628bb8eb2af54",
   "0219_checkout_pickup.sql": "11ff7d2854b8d26f96abc467c65b5ffd07565281a4eac81b69026a8a6dd9b7a4",
-  "0220_pay_on_delivery.sql": "2d6e64114a3d8f2e3a59c3f71543d4ae3194e4c8a9e77639c98288d8f2c431f7"
+  "0220_pay_on_delivery.sql": "2d6e64114a3d8f2e3a59c3f71543d4ae3194e4c8a9e77639c98288d8f2c431f7",
+  "0221_admin_separation_of_duties.sql": "2518b71dc62e7645bb5c5176df27241718d134f3a88ff553902f69232e1eb0f2",
+  "0222_fix_refund_preparation_order_binding.sql": "f182902d393682e32d3b7b0aec20b57ebf52a9771aa4b66fa1135e812026cc2f"
 }

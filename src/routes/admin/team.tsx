@@ -126,7 +126,7 @@ function AdminTeam() {
       <fieldset className="mt-5"><legend className="font-black">What this role may do</legend><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {catalogue.availablePermissions.map(permission => <label key={permission} className="flex items-start gap-2 rounded-lg border border-market-line p-3 text-sm">
           <input type="checkbox" className="mt-1" checked={permissions.includes(permission)} onChange={e => setPermissions(current => e.target.checked ? [...current, permission] : current.filter(p => p !== permission))} />
-          <span className="break-words font-medium">{permission}</span>
+          <span className="break-words"><span className="font-medium">{catalogue.permissionLabels?.[permission] ?? permission}</span><span className="block text-xs text-market-muted">{permission}</span></span>
         </label>)}
       </div></fieldset>
       <label className="mt-5 block text-sm font-bold">Reason for this role or permission change<textarea value={roleReason} onChange={e => setRoleReason(e.target.value)} minLength={12} maxLength={1000} rows={2} className="mt-1 w-full rounded-xl border p-3" /></label>

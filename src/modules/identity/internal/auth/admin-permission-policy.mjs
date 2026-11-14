@@ -11,7 +11,32 @@ export const ADMIN_CAPABILITIES = Object.freeze([
   'admin.campaigns.manage', 'admin.audit.read', 'admin.staff.directory',
   'admin.finance.refunds', 'admin.finance.policy', 'admin.finance.view',
   'admin.staff.manage',
+  'admin.overview.view', 'admin.finance.payouts',
 ]);
+
+/** Plain-language descriptions shown to the Main Administrator when defining roles. */
+/** @type {Readonly<Record<string, string>>} */
+export const ADMIN_CAPABILITY_LABELS = Object.freeze({
+  'admin.operations': 'Marketplace operations (all merchant, customer, product and category moderation)',
+  'admin.support': 'Customer support inbox, assisted orders and delivery holds',
+  'admin.merchants.review': 'Review and approve merchant applications',
+  'admin.merchants.moderate': 'Suspend or reinstate merchants; recalculate merchant health',
+  'admin.customers.moderate': 'Suspend or reinstate customers',
+  'admin.products.moderate': 'Approve, suspend or reinstate products',
+  'admin.categories.manage': 'Turn catalogue categories on or off',
+  'admin.enterprise.manage': 'Enterprise merchant onboarding',
+  'admin.providers.manage': 'Payment, delivery and partner providers; delivery allocation',
+  'admin.financing.manage': 'Customer and merchant financing providers',
+  'admin.campaigns.manage': 'Homepage campaigns and advertising review',
+  'admin.audit.read': 'Read the audit history',
+  'admin.staff.directory': 'See the staff directory and role catalogue',
+  'admin.staff.manage': 'Hire, suspend and assign roles (only within own permissions)',
+  'admin.finance.refunds': 'Request and approve customer refunds',
+  'admin.finance.policy': 'Set commission policy; move merchants to wallet payouts',
+  'admin.finance.view': 'View commission policy and wallet reconciliation (read-only)',
+  'admin.finance.payouts': 'Settle stuck merchant payouts and reconciliation exceptions',
+  'admin.overview.view': 'Read-only marketplace overview (control-centre figures)',
+});
 
 /** A few legacy/managerial bundle grants expand into explicit backend capabilities. */
 /** @type {Readonly<Record<string, readonly string[]>>} */

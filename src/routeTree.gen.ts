@@ -37,8 +37,10 @@ import { Route as AdminCommissionsRouteImport } from './routes/admin/commissions
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminEnterpriseRouteImport } from './routes/admin/enterprise'
 import { Route as AdminExecutiveFaceRouteImport } from './routes/admin/executive-face'
+import { Route as AdminFinanceRouteImport } from './routes/admin/finance'
 import { Route as AdminFinancingRouteImport } from './routes/admin/financing'
 import { Route as AdminOperationsRouteImport } from './routes/admin/operations'
+import { Route as AdminOverviewRouteImport } from './routes/admin/overview'
 import { Route as AdminPartnersRouteImport } from './routes/admin/partners'
 import { Route as AdminRefundsRouteImport } from './routes/admin/refunds'
 import { Route as AdminSecurityRouteImport } from './routes/admin/security'
@@ -248,6 +250,11 @@ const AdminExecutiveFaceRoute = AdminExecutiveFaceRouteImport.update({
   path: '/admin/executive-face',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/admin/finance',
+  path: '/admin/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFinancingRoute = AdminFinancingRouteImport.update({
   id: '/admin/financing',
   path: '/admin/financing',
@@ -256,6 +263,11 @@ const AdminFinancingRoute = AdminFinancingRouteImport.update({
 const AdminOperationsRoute = AdminOperationsRouteImport.update({
   id: '/admin/operations',
   path: '/admin/operations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminOverviewRoute = AdminOverviewRouteImport.update({
+  id: '/admin/overview',
+  path: '/admin/overview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminPartnersRoute = AdminPartnersRouteImport.update({
@@ -638,8 +650,10 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/security': typeof AdminSecurityRoute
@@ -737,8 +751,10 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/security': typeof AdminSecurityRoute
@@ -837,8 +853,10 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
   '/admin/refunds': typeof AdminRefundsRoute
   '/admin/security': typeof AdminSecurityRoute
@@ -938,8 +956,10 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/overview'
     | '/admin/partners'
     | '/admin/refunds'
     | '/admin/security'
@@ -1037,8 +1057,10 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/overview'
     | '/admin/partners'
     | '/admin/refunds'
     | '/admin/security'
@@ -1136,8 +1158,10 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/overview'
     | '/admin/partners'
     | '/admin/refunds'
     | '/admin/security'
@@ -1236,8 +1260,10 @@ export interface RootRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEnterpriseRoute: typeof AdminEnterpriseRoute
   AdminExecutiveFaceRoute: typeof AdminExecutiveFaceRoute
+  AdminFinanceRoute: typeof AdminFinanceRoute
   AdminFinancingRoute: typeof AdminFinancingRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
+  AdminOverviewRoute: typeof AdminOverviewRoute
   AdminPartnersRoute: typeof AdminPartnersRoute
   AdminRefundsRoute: typeof AdminRefundsRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
@@ -1505,6 +1531,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminExecutiveFaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/admin/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/financing': {
       id: '/admin/financing'
       path: '/admin/financing'
@@ -1517,6 +1550,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/operations'
       fullPath: '/admin/operations'
       preLoaderRoute: typeof AdminOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/overview': {
+      id: '/admin/overview'
+      path: '/admin/overview'
+      fullPath: '/admin/overview'
+      preLoaderRoute: typeof AdminOverviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/partners': {
@@ -2030,8 +2070,10 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEnterpriseRoute: AdminEnterpriseRoute,
   AdminExecutiveFaceRoute: AdminExecutiveFaceRoute,
+  AdminFinanceRoute: AdminFinanceRoute,
   AdminFinancingRoute: AdminFinancingRoute,
   AdminOperationsRoute: AdminOperationsRoute,
+  AdminOverviewRoute: AdminOverviewRoute,
   AdminPartnersRoute: AdminPartnersRoute,
   AdminRefundsRoute: AdminRefundsRoute,
   AdminSecurityRoute: AdminSecurityRoute,

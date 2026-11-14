@@ -101,15 +101,19 @@ async function requireFinanceAdmin(adminId: string) {
     import("@/modules/identity/public/auth/authorization.server"),
     import("@/modules/identity/public/auth/verify.server"),
   ]);
-  await requireAdminForUserId(adminId, "admin.finance.policy");
+  await requireAdminForUserId(adminId, "admin.finance.payouts");
   await requireFreshSession();
 }
 
 export const listWalletReconciliation = createServerFn({ method: "GET" })
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
-    const { requireAdminForUserId } = await import("@/modules/identity/public/auth/authorization.server");
-    await requireAdminForUserId(getAuthenticatedUserId(context), "admin.finance.view");
+    // Read-only finance staff and payout officers (who settle these items) may both see the queue.
+    const { getAdminCapabilitiesForUserId } = await import("@/modules/identity/public/auth/authorization.server");
+    const caps = await getAdminCapabilitiesForUserId(getAuthenticatedUserId(context));
+    if (!caps.some((c) => c === "admin.full" || c === "admin.finance.view" || c === "admin.finance.payouts")) {
+      throw new Error("Forbidden: administrator permission required");
+    }
     const { listWalletExceptions } = await import("@/modules/wallet/internal/wallet.server");
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
@@ -120,20 +124,8 @@ export const listWalletReconciliation = createServerFn({ method: "GET" })
     return { exceptions: JSON.parse(JSON.stringify(await listWalletExceptions("open"))), quarantined, summary: JSON.parse(JSON.stringify(summary.summary)) };
   });
 
-export const resolveWalletPayout = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator(z.object({
-    payoutId: z.string().regex(/^wpo_[a-f0-9]{32}$/),
-    outcome: z.enum(["paid", "failed", "requeue"]),
-    evidence: z.string().trim().min(20).max(2000),
-    providerReference: z.string().trim().min(1).max(256).optional(),
-  }))
-  .handler(async ({ data, context }) => {
-    const adminId = getAuthenticatedUserId(context);
-    await requireFinanceAdmin(adminId);
-    const { resolvePayoutByAdmin } = await import("@/modules/wallet/internal/wallet.server");
-    return resolvePayoutByAdmin({ ...data, adminId });
-  });
+// Manual payout settlement lives in administration (requestPayoutResolution) so
+// high-value "paid"/"failed" decisions go through two-person approval.
 
 export const resolveWalletReconciliationException = createServerFn({ method: "POST" })
   .middleware([authMiddleware])

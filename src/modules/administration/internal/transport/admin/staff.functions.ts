@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withTransaction, getSql } from "@/lib/db";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
 import { requireAdminForUserId } from "@/modules/identity/public/auth/authorization.server";
-import { ADMIN_CAPABILITIES, canDelegatedAdminManageRoles } from "@/modules/identity/public/auth/admin-permission-policy.mjs";
+import { ADMIN_CAPABILITIES, ADMIN_CAPABILITY_LABELS, canDelegatedAdminManageRoles } from "@/modules/identity/public/auth/admin-permission-policy.mjs";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { getPortalConfiguration } from "@/lib/security/portal-policy.mjs";
@@ -198,7 +198,7 @@ export const loadAdminRoles = createServerFn({ method: "GET" })
          from admin_roles r left join admin_role_permissions p on p.role_key=r.role_key
         group by r.role_key order by r.system_role desc,r.display_name`,
     );
-    return { roles, availablePermissions: [...ADMIN_CAPABILITIES] };
+    return { roles, availablePermissions: [...ADMIN_CAPABILITIES], permissionLabels: { ...ADMIN_CAPABILITY_LABELS } as Record<string, string> };
   });
 
 const roleSchema = z.object({
