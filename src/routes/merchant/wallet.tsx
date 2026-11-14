@@ -153,6 +153,10 @@ function Balances({ wallet }: { wallet: Snapshot }) {
 function Withdraw({ wallet }: { wallet: Snapshot }) {
   const now = Date.now();
   const verified = wallet.destinations.filter((d) => d.status === "verified" && new Date(d.usableFrom).getTime() <= now);
+  const coolingFrom = wallet.destinations
+    .filter((d) => d.status === "verified" && new Date(d.usableFrom).getTime() > now)
+    .map((d) => d.usableFrom)
+    .sort()[0];
   const active = wallet.payouts.find((p) => ["reserved", "processing", "under_review"].includes(p.status));
   const [amount, setAmount] = useState("");
   const [destinationId, setDestinationId] = useState(verified[0]?.id ?? "");
@@ -191,7 +195,11 @@ function Withdraw({ wallet }: { wallet: Snapshot }) {
       ) : null}
       <p className="mt-2 text-xs text-market-muted">Withdraw between {ghs(wallet.limits.minAmount)} and {ghs(wallet.limits.maxAmount)}, up to {wallet.limits.dailyCount} times a day.</p>
       {!wallet.payoutsConfigured ? <p className="mt-3 text-sm text-market-muted">Withdrawals are not switched on yet.</p> : null}
-      {wallet.payoutsConfigured && !verified.length ? <p className="mt-3 text-sm text-market-muted">Add a payout account first.</p> : null}
+      {wallet.payoutsConfigured && !verified.length ? (
+        <p className="mt-3 text-sm text-market-muted">
+          {coolingFrom ? `Your new payout account can be used from ${when(coolingFrom)}.` : "Add a payout account first."}
+        </p>
+      ) : null}
       <form onSubmit={review} className="mt-4 grid gap-3">
         <label className="text-sm font-bold">Amount (GH₵)
           <input className="market-input mt-1 w-full rounded-xl border border-market-line px-3 py-2" inputMode="decimal" required
@@ -200,6 +208,7 @@ function Withdraw({ wallet }: { wallet: Snapshot }) {
         <label className="text-sm font-bold">To
           <select className="market-input mt-1 w-full rounded-xl border border-market-line px-3 py-2" value={destinationId}
             onChange={(e) => { setDestinationId(e.target.value); setQuote(null); }} disabled={disabled}>
+            {!verified.length ? <option value="">No payout account ready</option> : null}
             {verified.map((d) => <option key={d.id} value={d.id}>{d.rail === "bank" ? "Bank" : "Mobile money"} {d.displayHint} · {d.accountName}</option>)}
           </select>
         </label>
@@ -237,9 +246,9 @@ function Destinations({ wallet }: { wallet: Snapshot }) {
     <Card title="Payout accounts">
       <ul className="mt-3 grid gap-2 text-sm">
         {wallet.destinations.length ? wallet.destinations.map((d) => (
-          <li key={d.id} className="flex items-center justify-between rounded-xl border border-market-line px-3 py-2">
+          <li key={d.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl border border-market-line px-3 py-2">
             <span>{d.rail === "bank" ? "Bank" : "Mobile money"} {d.displayHint} · {d.accountName}</span>
-            <span className={`text-xs font-black ${d.status === "verified" ? "text-market-green" : "text-market-muted"}`}>
+            <span className={`text-xs font-black whitespace-nowrap ${d.status === "verified" ? "text-market-green" : "text-market-muted"}`}>
               {d.status !== "verified" ? "Pending" : new Date(d.usableFrom).getTime() > Date.now() ? `Usable from ${when(d.usableFrom)}` : "Verified"}
             </span>
           </li>
@@ -307,26 +316,117 @@ function Payouts({ wallet }: { wallet: Snapshot }) {
   );
 }
 
+type LedgerEntry = Snapshot["ledger"][number];
+type ActivityEvent = {
+  key: string;
+  type: string;
+  createdAt: string;
+  reference: string;
+  /** Balances money left (debited) and entered (credited) in this one event. */
+  from: string[];
+  to: string[];
+  /** "move" = money changed balance only; "in"/"out" = the merchant's total changed. */
+  kind: "move" | "in" | "out";
+  amount: number;
+};
+
+const cents = (v: string) => Math.round(Number(v) * 100);
+
+/**
+ * The ledger is double-entry: one business event (a release, a withdrawal) is
+ * written as a debit from one balance and a credit to another. Sellers think in
+ * events, so consecutive entries of the same type for the same order/withdrawal
+ * are shown as one row, "From → To", instead of a minus line and a plus line.
+ * The raw entries are untouched; this is presentation only.
+ */
+// The transfer fee of a paid withdrawal is booked as its own `payout_fee` entry
+// next to `payout_paid`; both belong to the same event. On its own a fee would
+// otherwise read as "+GH₵ 1.00" earnings.
+const EVENT_TYPE: Record<string, string> = { payout_fee: "payout_paid" };
+
+function groupLedgerEntries(entries: LedgerEntry[]): ActivityEvent[] {
+  // Pass 1: split the (id-ordered) entries into runs that belong to one event.
+  const runs: Array<{ key: string; entries: LedgerEntry[] }> = [];
+  for (const e of entries) {
+    const key = `${EVENT_TYPE[e.type] ?? e.type}|${e.orderId ?? ""}|${e.payoutId ?? ""}`;
+    const last = runs[runs.length - 1];
+    if (last && last.key === key) last.entries.push(e);
+    else runs.push({ key, entries: [e] });
+  }
+  // Pass 2: describe each run as one movement.
+  const label = (e: LedgerEntry) => BUCKET_LABEL[e.bucket] ?? e.bucket;
+  return runs.map(({ key, entries: es }) => {
+    const debits = es.filter((e) => cents(e.amount) < 0);
+    const credits = es.filter((e) => cents(e.amount) > 0);
+    const out = -debits.reduce((n, e) => n + cents(e.amount), 0);
+    const inn = credits.reduce((n, e) => n + cents(e.amount), 0);
+    const move = debits.length > 0 && credits.length > 0;
+    const first = es[0];
+    return {
+      key: `${key}:${first.id}`,
+      type: es.find((e) => e.type !== "payout_fee")?.type ?? first.type,
+      createdAt: first.createdAt,
+      reference: first.orderId ? `Order ${first.orderId.slice(-8)}` : first.payoutId ? `Withdrawal ${first.payoutId.slice(-8)}` : "",
+      from: [...new Set(debits.map(label))],
+      to: [...new Set(credits.map(label))],
+      kind: move ? "move" : inn - out < 0 ? "out" : "in",
+      amount: (move ? Math.max(inn, out) : Math.abs(inn - out)) / 100,
+    };
+  });
+}
+
+function ActivityAmount({ event }: { event: ActivityEvent }) {
+  const value = ghs(event.amount.toFixed(2));
+  if (event.kind === "move") return <span className="font-bold">{value}</span>;
+  return <span className={`font-bold ${event.kind === "out" ? "text-market-orange" : "text-market-green"}`}>{event.kind === "out" ? "−" : "+"}{value}</span>;
+}
+
+function ActivityBalances({ event }: { event: ActivityEvent }) {
+  if (event.kind === "move") return <>{event.from.join(", ")} <span aria-label="to">→</span> {event.to.join(", ")}</>;
+  return <>{(event.kind === "out" ? event.from : event.to).join(", ")}</>;
+}
+
 function Ledger({ wallet }: { wallet: Snapshot }) {
+  const events = groupLedgerEntries(wallet.ledger);
   return (
     <Card title="Activity" className="lg:col-span-2">
-      {wallet.ledger.length ? (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase text-market-muted"><tr><th className="py-2">When</th><th>What</th><th>Balance</th><th>Reference</th><th className="text-right">Amount</th></tr></thead>
-            <tbody>
-              {wallet.ledger.map((e) => (
-                <tr key={e.id} className="border-t border-market-line">
-                  <td className="py-2 whitespace-nowrap">{when(e.createdAt)}</td>
-                  <td>{TYPE_LABEL[e.type] ?? e.type}</td>
-                  <td>{BUCKET_LABEL[e.bucket] ?? e.bucket}</td>
-                  <td className="text-xs text-market-muted">{e.orderId ? `Order ${e.orderId.slice(-8)}` : e.payoutId ? `Withdrawal ${e.payoutId.slice(-8)}` : ""}</td>
-                  <td className={`text-right font-bold ${e.amount.startsWith("-") ? "text-market-orange" : "text-market-green"}`}>{e.amount.startsWith("-") ? "−" : "+"}{ghs(e.amount.replace("-", ""))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {events.length ? (
+        <>
+          {/* Phones: one card per event so nothing is squeezed into five columns. */}
+          <ul className="mt-3 grid gap-2 text-sm md:hidden">
+            {events.map((ev) => (
+              <li key={ev.key} className="rounded-xl border border-market-line px-3 py-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-bold">{TYPE_LABEL[ev.type] ?? ev.type}</span>
+                  <span className="shrink-0 whitespace-nowrap"><ActivityAmount event={ev} /></span>
+                </div>
+                <p className="mt-0.5 text-xs text-market-muted"><ActivityBalances event={ev} /></p>
+                <p className="mt-0.5 text-xs text-market-muted">{when(ev.createdAt)}{ev.reference ? ` · ${ev.reference}` : ""}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 hidden overflow-x-auto md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs uppercase text-market-muted">
+                <tr><th className="py-2 pr-4">When</th><th className="pr-4">What</th><th className="pr-4">Balance</th><th className="pr-4">Reference</th><th className="text-right">Amount</th></tr>
+              </thead>
+              <tbody>
+                {events.map((ev) => (
+                  <tr key={ev.key} className="border-t border-market-line">
+                    <td className="py-2 pr-4 whitespace-nowrap">{when(ev.createdAt)}</td>
+                    <td className="pr-4">{TYPE_LABEL[ev.type] ?? ev.type}</td>
+                    <td className="pr-4"><ActivityBalances event={ev} /></td>
+                    <td className="pr-4 text-xs text-market-muted whitespace-nowrap">{ev.reference}</td>
+                    <td className="text-right whitespace-nowrap"><ActivityAmount event={ev} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-market-muted">
+            <span className="text-market-green font-bold">+</span> adds to your earnings, <span className="text-market-orange font-bold">−</span> takes from them; amounts without a sign moved between your balances.
+          </p>
+        </>
       ) : <p className="mt-3 text-sm text-market-muted">No wallet activity yet.</p>}
     </Card>
   );
