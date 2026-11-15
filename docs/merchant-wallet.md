@@ -160,7 +160,7 @@ Reject requests whose timestamp is more than 5 minutes off.
 | Call | Body | Response |
 | --- | --- | --- |
 | `POST {endpoint}/destinations` | `{rail: "mobile_money"\|"bank", accountNumber, institutionCode, accountName}` | `{destinationRef, resolvedAccountName?, verified}` |
-| `POST {endpoint}/payouts` | `{payoutId, amount: "98.50", currency: "GHS", rail, destinationRef, narration}` | `{providerReference, status: "processing"\|"paid"\|"failed", amount?, currency?, failureReason?}` |
+| `POST {endpoint}/payouts` | `{payoutId, amount: "98.50", currency: "GHS", rail, destinationRef, narration}` | `{providerReference, status: "processing"\|"paid"\|"failed", amount: "98.50", currency: "GHS", failureReason?}` |
 | `GET {endpoint}/payouts/{payoutId}` | — | same as above, or `404` if unknown |
 | `POST {endpoint}/fees` (only with `ELEMARKET_PAYOUT_HTTP_REMOTE_FEES=1`) | `{amount, currency, rail}` | `{fee: "1.00"}` |
 | `GET {endpoint}/payouts?since=<ISO time>` (only with `ELEMARKET_PAYOUT_HTTP_LISTING=1`) | — | `[{payoutId, providerReference, status, amount, currency}]`, every transfer since then |
@@ -174,6 +174,7 @@ Rules for the provider side:
   ELEMARKET then returns the money to the merchant's available balance. Any
   other error is treated as "may have been sent" and retried with the same key.
 - `amount` is what the merchant receives (the fee is already deducted).
+- Every payout creation and read-back response must include the transfer's `amount` and `currency`. Missing financial details are treated as uncertain, not as confirmation.
 - Only `destinationRef` (an opaque token) and the last 4 digits are stored by
   ELEMARKET. Raw account numbers pass through once and are not kept.
 
