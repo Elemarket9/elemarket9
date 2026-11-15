@@ -26,6 +26,8 @@ A customer buys product(s) from seller A (GH₵150) and seller B (GH₵200), and
 
 The platform account also pays the PSP fee out of its own share. Any underlying delivery-provider obligation must be settled through the applicable delivery-provider contract; it is not merchant income.
 
+**Critical hold-policy distinction:** Provider-direct transaction splitting may settle sellers before ELEMARKET's order receipt/return period ends. It does **not** implement the return-window hold required for wallet entitlements. Do not imply PSP multi-split alone provides escrow or delayed release. Before rollout, verify each PSP's actual split settlement timing and buyer-refund recovery mechanism; if those cannot satisfy the marketplace policy, use a licensed provider-held delayed-disbursement arrangement with explicit per-merchant liability instead, and keep this provider-direct mode disabled.
+
 ## Transaction implementation required **before enabling**
 
 1. Retain one order + order items + reservation + per-merchant payment/accounting entry per merchant. Add one **group charge** (not N individual external payment attempts) and immutable links to all of those orders. Verify one customer owns every member; all quotes are current; all merchants are active and use compatible provider-direct settlement/subaccounts. Reject mixed providers, currencies or settlement modes unless the chosen provider contract explicitly supports them.
