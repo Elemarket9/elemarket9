@@ -125,6 +125,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // and verifies it before another initialize, so it cannot create a second charge.
   readonly supportsIdempotentInitialization = true;
   readonly supportsDirectSubaccountSettlement = true;
+  readonly supportsMultiMerchantSplit = true;
   readonly webhookSignatureHeaders = ["x-paystack-signature"] as const;
   constructor(
     private readonly secret: string,
@@ -144,6 +145,20 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference,
       metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId }),
     };
+    if (input.multiMerchantSplit && input.merchantSubaccount) throw new Error("Conflicting payment split modes");
+    if (input.multiMerchantSplit) {
+      const split = input.multiMerchantSplit;
+      const accounts = new Set(split.subaccounts.map((x) => x.subaccount));
+      const allocated = split.subaccounts.reduce((n, x) => n + x.share, 0);
+      if (split.amountMinor !== amountMinor || split.platformMinor !== amountMinor - allocated ||
+        split.platformMinor < 0 || split.subaccounts.length < 2 || accounts.size !== split.subaccounts.length ||
+        !split.subaccounts.every((x) => typeof x.subaccount === "string" && x.subaccount.length > 0 && x.subaccount.length <= 256 &&
+          Number.isSafeInteger(x.share) && x.share > 0) || !Number.isSafeInteger(allocated)) {
+        throw new Error("Unsafe multi-seller split allocation");
+      }
+      // Exact pesewa merchant shares. Platform bears processor fees.
+      body.split = { type: "flat", bearer_type: "account", subaccounts: split.subaccounts };
+    }
     if (input.merchantSubaccount) {
       body.subaccount = input.merchantSubaccount;
       if (input.platformFee != null) {
@@ -208,6 +223,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   }
   readonly supportsMobileMoneyPrompt = true;
   async requestMobileMoneyPrompt(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult> {
+    if (input.multiMerchantSplit) throw new Error("Atomic multi-seller split requires hosted checkout");
     if (!input.customerEmail) throw new Error("Provider requires a customer email");
     if (input.currency !== "GHS") throw new Error("Mobile money prompts support GHS only");
     const amountMinor = moneyToMinorUnits(input.amount);
