@@ -63,8 +63,11 @@ async function groupState(g){
 async function sendSuccess(g){
   const [grp]=await sql.query("select provider_reference,amount::text from checkout_group_charges where group_id=$1",[g.groupId]);
   provider.pay(grp.provider_reference);
+  const split=provider.ledger.get(grp.provider_reference)?.split;
   const raw=JSON.stringify({event:"charge.success",data:{id:100011+Number(grp.amount.replace(".",""))%10000,
-    reference:grp.provider_reference,amount:Math.round(Number(grp.amount)*100),currency:"GHS"}});
+    reference:grp.provider_reference,amount:Math.round(Number(grp.amount)*100),currency:"GHS",
+    ...(split?{split}:{}),
+  }});
   const answer=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
   return {answer,raw,ref:grp.provider_reference};
 }
@@ -175,4 +178,41 @@ test("a definitively failed group payment cancels every merchant order and relea
   assert.equal(result.status,"failed");
   const statuses=await groupState(g);
   assert.equal(statuses.every(x=>x.orderStatus==="cancelled"&&x.paymentStatus==="failed"),true);
+});
+
+
+test("signed provider success without exact seller shares cannot mark merchant orders paid",async()=>{
+  const g=await seedGroup();
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  const [charge]=await sql.query("select provider_reference,amount::text from checkout_group_charges where group_id=$1",[g.groupId]);
+  provider.pay(charge.provider_reference);
+  const expected=provider.ledger.get(charge.provider_reference).split;
+  const changed=JSON.parse(JSON.stringify(expected));
+  changed.shares.subaccounts[0].amount+=1;
+  const raw=JSON.stringify({event:"charge.success",data:{
+    id:999101,reference:charge.provider_reference,amount:Math.round(Number(charge.amount)*100),
+    currency:"GHS",split:changed,
+  }});
+  const response=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  assert.equal(response.reconciliationRequired,true);
+  const orders=await groupState(g);
+  assert.equal(orders.every(x=>x.paymentStatus==="initiated"&&x.orderStatus==="payment_pending"),true);
+  // After a correctly signed and matching event, the same provider transaction
+  // can be marked complete. It does not create another customer charge.
+  const {answer}=await sendSuccess(g);
+  assert.equal(answer.status,"completed");
+  assert.equal((await groupState(g)).every(x=>x.paymentStatus==="completed"),true);
+});
+
+test("a provider read-back that confirms gross but omits seller shares stays under review",async()=>{
+  const g=await seedGroup();
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  const [charge]=await sql.query("select id,provider_reference from checkout_group_charges where group_id=$1",[g.groupId]);
+  provider.pay(charge.provider_reference);
+  provider.ledger.get(charge.provider_reference).split=undefined;
+  await sql.query("update checkout_group_charges set updated_at=now()-interval '10 minutes' where id=$1",[charge.id]);
+  const {reconcileStaleGroupCharges}=await harness.load("/src/modules/payments/public/reconciliation.server.ts");
+  const status=await reconcileStaleGroupCharges(20);
+  assert.ok(status.mismatches>=1);
+  assert.equal((await groupState(g)).every(x=>x.paymentStatus==="initiated"&&x.orderStatus==="payment_pending"),true);
 });
