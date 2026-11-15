@@ -155,7 +155,11 @@ export async function getWalletSnapshot(merchantId: string) {
       where merchant_id=$1 and status <> 'disabled' and driver_key is not null order by created_at desc`,
     [merchantId, limits.destinationCooldownHours]);
   let payoutsConfigured = true;
-  try { activePayoutDriverKey(); } catch { payoutsConfigured = false; }
+  try {
+    // Validate the actual driver configuration, not merely the presence of
+    // an environment variable naming a potentially unusable adapter.
+    await getPayoutDriver(activePayoutDriverKey());
+  } catch { payoutsConfigured = false; }
   return {
     merchantId,
     walletEnabled: merchant.settlement_model === "platform_wallet",
