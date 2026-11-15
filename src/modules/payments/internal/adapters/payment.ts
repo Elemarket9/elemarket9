@@ -71,6 +71,13 @@ export interface PaymentProviderAdapter {
   verifyTransaction?(reference: string): Promise<VerifiedPayment>;
   /** Enable only after provider contract and concurrency tests prove duplicate safety. */
   readonly supportsIdempotentRefunds?: boolean;
+  /**
+   * True only when reconcileRefund lists EVERY refund the provider holds for the
+   * transaction, so "not_found" proves no refund exists (or only failed ones).
+   * The executor then re-creates a stuck refund, but only once the first attempt
+   * is old enough for the provider's records to have settled.
+   */
+  readonly reconcileProvesAbsence?: boolean;
   /** Must identify the exact attempt, verify amount/currency/reference, and never create a refund. */
   reconcileRefund?(input: {
     providerReference: string;

@@ -69,8 +69,15 @@ async function executeRefund(requestId: string) {
         providerRefundId: request.provider_refund_id,
       });
       if (verified.status !== "not_found") result = verified;
-      else if (adapter.supportsIdempotentRefunds !== true)
-        throw new Error("Provider has not proved duplicate-safe refund creation");
+      else if (adapter.supportsIdempotentRefunds !== true) {
+        // The provider holds no live refund for this payment. Re-create it only
+        // when the adapter's lookup is complete and the first attempt is old
+        // enough that a refund still being recorded would already show.
+        const attemptedAt = request.creation_attempted_at ? new Date(request.creation_attempted_at).getTime() : 0;
+        const settled = Date.now() - attemptedAt >= 10 * 60_000;
+        if (!(adapter.reconcileProvesAbsence === true && settled))
+          throw new Error("Provider shows no refund yet; waiting before a safe retry");
+      }
     }
     if (!result) {
       if (!adapter.refundPayment) throw new Error("Configured provider does not support refunds");
