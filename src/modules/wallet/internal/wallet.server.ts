@@ -275,6 +275,11 @@ type ClaimedPayout = {
 async function applyProviderState(payoutId: string, state: PayoutState, source: string) {
   const sql = await getSql();
   const outcome = state.status === "processing" ? "accepted" : state.status;
+  // Do not accept a successful provider payout without amount/currency proof.
+  // It may be real, so quarantine rather than releasing its reservation.
+  if (state.status !== "failed" && (!state.amount || !state.currency)) {
+    return quarantine(payoutId, "Provider payout proof is missing amount or currency", source);
+  }
   if (state.currency && state.currency !== "GHS") {
     const [r] = await sql.query<{ result: { status: string } }>(
       `select wallet_settle_payout($1,'needs_attention',$2,$3,null,$4) as result`,
@@ -509,13 +514,20 @@ export async function reconcileProviderRecords(sinceHours = 7 * 24) {
             [`dup:${payoutId}`, payoutId, key, JSON.stringify({ transfers: live.map((r) => ({ ref: r.providerReference, status: r.status, amount: r.amount })) })]);
         }
         for (const r of live) {
+          if (r.currency !== "GHS") {
+            exceptions++;
+            await sql.query(`select wallet_record_exception('currency_mismatch','critical',$1,$2,$3,$4::jsonb)`,
+              [`listing-currency:${payoutId}:${r.providerReference}`, payoutId, key,
+                JSON.stringify({ expected: "GHS", reported: r.currency })]);
+          }
           if (toPesewas(r.amount) !== toPesewas(mine.net_amount)) {
             exceptions++;
             await sql.query(`select wallet_record_exception('amount_mismatch','critical',$1,$2,$3,$4::jsonb)`,
               [`listing-amount:${payoutId}:${r.providerReference}`, payoutId, key, JSON.stringify({ expectedNet: mine.net_amount, reported: r.amount })]);
           }
         }
-        const paid = recs.find((r) => r.status === "paid");
+        const paid = recs.find((r) => r.status === "paid" && r.currency === "GHS"
+          && toPesewas(r.amount) === toPesewas(mine.net_amount));
         if (paid && mine.status !== "paid") await applyProviderState(payoutId, paid, "listing");
       }
       report[key] = { checked: records.length, exceptions };
@@ -588,7 +600,7 @@ export async function handlePayoutWebhook(input: { rawBody: string; headers: Hea
     if (declaredCapabilities(driver).statusLookup && driver.getPayout) {
       state = await driver.getPayout(payout.id, payout.provider_reference ?? notice.providerReference);
     } else if (notice.status && notice.providerReference) {
-      state = { providerReference: notice.providerReference, status: notice.status, amount: notice.amount };
+      state = { providerReference: notice.providerReference, status: notice.status, amount: notice.amount, currency: notice.currency };
     }
     if (!state) throw new PayoutWebhookError("Provider payout status is not available yet", 503);
     const status = await applyProviderState(payout.id, state, "webhook");

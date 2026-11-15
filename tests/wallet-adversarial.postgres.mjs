@@ -302,12 +302,30 @@ test("T10 conflicting callbacks are reconciled, never silently applied", { skip 
   const r = await request(m, "30.00");
   assert.equal(r.status, "processing");
   const ref = (await sim.transfers(r.payoutId))[0].reference;
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "failed" }));
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "processing" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "29.00", currency: "GHS" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "failed", amount: "29.00", currency: "GHS" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "processing", amount: "29.00", currency: "GHS" }));
   assert.equal((await payout(r.payoutId)).status, "paid", "a final state is never reversed by a later message");
   assert.deepEqual(await exceptions(r.payoutId), ["failure_after_success"]);
   assert.equal(await ledgerCount(r.payoutId, "payout_returned"), 0, "no funds released on the conflicting report");
+  await assertInvariants(m);
+  selectDriver("mocka");
+});
+
+test("T10b webhook-only payout cannot be marked paid without amount and currency", { skip }, async () => {
+  const m = await newMerchant("mockc"); await earn(m);
+  const r = await request(m, "30.00");
+  const ref = (await sim.transfers(r.payoutId))[0].reference;
+  await sim.finish(r.payoutId, "paid");
+  // Authenticated webhook, but it does not include enough monetary evidence.
+  const incomplete = await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
+  assert.equal(incomplete.status, "needs_attention", "unknown transfer amount must be quarantined");
+  assert.equal((await payout(r.payoutId)).status, "needs_attention");
+  assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 0, "unproven payout must not change balances");
+  // A new authenticated event with complete proof can finish the same payout once.
+  const complete = await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "29.00", currency: "GHS" }));
+  assert.equal(complete.status, "paid");
+  assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 2);
   await assertInvariants(m);
   selectDriver("mocka");
 });
@@ -551,7 +569,7 @@ test("T30 the same guarantees hold for every provider adapter, with no core chan
     const r = await request(m, "20.00");
     const ref = (await sim.transfers(r.payoutId))[0].reference;
     await sim.finish(r.payoutId, "paid");
-    if (drv === "mockc") await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
+    if (drv === "mockc") await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "19.00", currency: "GHS" }));
     else { await due(r.payoutId); await wallet.reconcilePayouts(); }
     assert.equal((await payout(r.payoutId)).status, "paid", drv);
     // Uncertainty is handled per declared capability, never by a blind resend.

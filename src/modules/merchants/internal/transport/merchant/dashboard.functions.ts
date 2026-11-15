@@ -319,3 +319,14 @@ export const listMerchantAdCampaigns=createServerFn({method:"GET"}).middleware([
   const userId=getAuthenticatedUserId(context); await authorizeMerchant(data.merchantId,userId); const sql=await getSql();
   return sql.query<{id:string;product_id:string;product_name:string;name:string;title:string;subtitle:string|null;placement:string;status:string;starts_at:string;ends_at:string;target_city:string|null;priority:number;impression_count:number;click_count:number;rejection_reason:string|null}>(`select c.id,c.product_id,p.name product_name,c.name,c.title,c.subtitle,c.placement,c.status,c.starts_at,c.ends_at,c.target_city,c.priority,c.impression_count,c.click_count,c.rejection_reason from homepage_ad_campaigns c join products p on p.id=c.product_id and p.merchant_id=c.merchant_id where c.merchant_id=$1 order by c.created_at desc limit 100`,[data.merchantId]);
 });
+
+
+/** Seller-scoped operational sales analytics; financial ledger remains authoritative. */
+export const loadMerchantSalesInsights = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator(z.object({ merchantId: merchantIdSchema, days: z.union([z.literal(7), z.literal(30), z.literal(90)]) }))
+  .handler(async ({ data, context }) => {
+    await authorizeMerchant(data.merchantId, getAuthenticatedUserId(context));
+    const { getMerchantSalesInsights } = await import("@/modules/merchants/internal/sales-insights.server");
+    return getMerchantSalesInsights(data.merchantId, data.days);
+  });

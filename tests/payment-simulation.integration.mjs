@@ -190,3 +190,26 @@ test("free delivery stays blocked: the delivery fee pays the rider", async () =>
     /invalid delivery quote price/,
   );
 });
+
+
+test("seller insights count paid orders, show real products, and isolate merchants", async () => {
+  const paidMerchant = await seedOrder(sql);
+  const otherMerchant = await seedOrder(sql);
+  const { getMerchantSalesInsights } = await harness.load("/src/modules/merchants/internal/sales-insights.server.ts");
+  const initially = await getMerchantSalesInsights(paidMerchant.merchant, 7);
+  assert.equal(initially.summary.orders, 0, "unpaid checkouts must not count as sales");
+  const intent = await createExternalPaymentIntent({ paymentId: paidMerchant.payment, userId: paidMerchant.user });
+  provider.pay(intent.providerReference);
+  const raw = JSON.stringify({ event: "charge.success", data: {
+    id: 99021, reference: intent.providerReference, amount: 11500, currency: "GHS",
+  } });
+  await handlePaymentWebhook({ providerKey: "paystack", rawBody: raw, signature: provider.sign(raw) });
+  const report = await getMerchantSalesInsights(paidMerchant.merchant, 7);
+  assert.equal(report.daily.length, 7);
+  assert.equal(report.summary.orders, 1);
+  assert.equal(Number(report.summary.productSales), 100);
+  assert.equal(report.topProducts[0].units, 1);
+  assert.equal(Number(report.topProducts[0].productSales), 100);
+  const unrelated = await getMerchantSalesInsights(otherMerchant.merchant, 7);
+  assert.equal(unrelated.summary.orders, 0, "another merchant's sales must remain isolated");
+});
