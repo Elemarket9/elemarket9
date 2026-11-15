@@ -224,5 +224,6 @@
   "0224_admin_order_management.sql": "bf7d5f821132cceb2d3f17c3f2fd3e9e04fe3e86f51f14830636de1d81c3d590",
   "0225_risk_review_queue.sql": "e7411a1ac1ffd162dc4db123032feea57f1571058966be57ccb67c0b83232f8f",
   "0226_review_moderation.sql": "8655658bb0ed4df49ac8e3acda97082fbdf6b238cae11e8391f2719eb7b68c50",
+  "0228_marketplace_promotions.sql": "f12ad3fc2378c89a0b88c904e7a727f34640e70824ddf6f79e8e17791fdc9944",
   "0229_backoffice_report_indexes.sql": "cd010b3df9fd9956445ddb6e46185185e37b631408f488327a81b1954bb56753"
 }
