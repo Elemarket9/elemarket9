@@ -444,13 +444,17 @@ export async function handlePaymentWebhook(
     `select id from payment_attempts where provider_key=$1 and provider_reference=$2 limit 1`,
     [normalizedProviderKey, body.providerReference],
   );
-  const depositBinding = binding[0]
+  const groupBinding = binding[0] ? [] : await sql.query<{ id: string }>(
+    `select id from checkout_group_charges where provider_key=$1 and provider_reference=$2 limit 1`,
+    [normalizedProviderKey, body.providerReference],
+  );
+  const depositBinding = binding[0] || groupBinding[0]
     ? []
     : await sql.query<{ id: string }>(
         `select id from financing_deposit_payment_attempts where provider_key=$1 and provider_reference=$2 limit 1`,
         [normalizedProviderKey, body.providerReference],
       );
-  if (!binding[0] && !depositBinding[0]) {
+  if (!binding[0] && !depositBinding[0] && !groupBinding[0]) {
     throw new PaymentWebhookError("Payment reference is not bound yet", {
       status: 503,
       retryable: true,
@@ -507,6 +511,35 @@ export async function handlePaymentWebhook(
   const payloadHash = Array.from(new Uint8Array(digest), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
+
+  if (groupBinding[0]) {
+    const isRefund = body.eventType.startsWith("refund.");
+    const rows = isRefund
+      ? await sql.query<{ result: unknown }>(
+        `select apply_checkout_group_refund_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
+        [normalizedProviderKey,body.eventId,body.eventType,body.providerReference,
+         body.amount,body.currency,body.providerRefundId ?? null,payloadHash],
+      )
+      : await sql.query<{ result: unknown }>(
+        `select apply_checkout_group_charge_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
+        [normalizedProviderKey,body.eventId,body.eventType,body.providerReference,
+         body.status,body.amount,body.currency,payloadHash],
+      );
+    const outcome = rows[0]?.result ?? null;
+    if (outcome && typeof outcome === "object") {
+      if ("rejected" in outcome && outcome.rejected === true) {
+        throw new PaymentWebhookError("Group payment evidence was rejected", { status: 400, retryable: false });
+      }
+      if ("retryable" in outcome && outcome.retryable === true) {
+        throw new PaymentWebhookError("Group payment evidence cannot yet be bound", { status: 503, retryable: true });
+      }
+    }
+    await recordMetric("payment.group_webhook.processed", {
+      entityId: body.providerReference,
+      metadata: {providerKey:normalizedProviderKey,eventType:body.eventType,status:body.status},
+    });
+    return outcome;
+  }
 
   if (depositBinding[0]) {
     const deposit = await ports.applyFinancingDeposit({
