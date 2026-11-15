@@ -244,7 +244,7 @@ function CheckoutForm() {
         if(grouped.status==="completed" || grouped.awaitingConfirmation) {
           // A delayed or lost provider response must not generate a second charge.
           writeCart([]);
-          window.location.assign(`/payment/group-return?groupId=${encodeURIComponent(prepared.groupId)}`);
+          window.location.assign(`/payment/return?groupId=${encodeURIComponent(prepared.groupId)}`);
           return;
         }
         throw new Error("Group checkout is not ready; verify this payment status before retrying.");
