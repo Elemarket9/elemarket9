@@ -184,7 +184,7 @@ export async function startCustomerGroupPayment(input: { groupId: string; userId
   const adapter = capability ?? await getPaymentAdapter(charge.provider_key,provider[0].driver_key ?? undefined);
   const callback = getPaymentCallbackOrigin();
   const callbackUrl = callback
-    ? `${callback.replace(/\/$/,"")}/payment/group-return?groupId=${encodeURIComponent(charge.group_id)}`
+    ? `${callback.replace(/\/$/,"")}/payment/return?groupId=${encodeURIComponent(charge.group_id)}`
     : undefined;
   try {
     const snapshot = decision.snapshot;
