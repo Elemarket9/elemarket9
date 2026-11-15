@@ -57,7 +57,7 @@ export async function loadWalletHistory(input: WalletHistoryFilter) {
 function csvCell(value: string | number | null): string {
   const raw = String(value ?? "");
   // Prevent formula injection when downloaded statements are opened in Excel.
-  const safe = /^[\\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
+  const safe = /^[\s]*[=+@-]/.test(raw) ? "'" + raw : raw;
   return '"' + safe.replaceAll('"', '""') + '"';
 }
 
