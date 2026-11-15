@@ -312,6 +312,24 @@ test("T10 conflicting callbacks are reconciled, never silently applied", { skip 
   selectDriver("mocka");
 });
 
+test("T10b webhook-only payout cannot be marked paid without amount and currency", { skip }, async () => {
+  const m = await newMerchant("mockc"); await earn(m);
+  const r = await request(m, "30.00");
+  const ref = (await sim.transfers(r.payoutId))[0].reference;
+  await sim.finish(r.payoutId, "paid");
+  // Authenticated webhook, but it does not include enough monetary evidence.
+  const incomplete = await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
+  assert.equal(incomplete.status, "needs_attention", "unknown transfer amount must be quarantined");
+  assert.equal((await payout(r.payoutId)).status, "needs_attention");
+  assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 0, "unproven payout must not change balances");
+  // A new authenticated event with complete proof can finish the same payout once.
+  const complete = await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "29.00", currency: "GHS" }));
+  assert.equal(complete.status, "paid");
+  assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 2);
+  await assertInvariants(m);
+  selectDriver("mocka");
+});
+
 test("T11 repeated delivery completion releases earnings once", { skip }, async () => {
   const m = await newMerchant();
   const order = await earn(m, { release: false });
