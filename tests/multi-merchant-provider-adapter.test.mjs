@@ -55,3 +55,18 @@ test("provider refuses allocation drift or conflicting single merchant subaccoun
   await assert.rejects(adapter.createPayment({ ...args, merchantSubaccount: "sub1" }));
   await assert.rejects(adapter.requestMobileMoneyPrompt({ ...args, phone: "+233200000000", network: "mtn" }));
 });
+
+
+test("uncertain group initialization cannot be recovered on matching total without proving seller allocations", async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return Response.json({ status: false, data: null }, { status: 503 });
+  };
+  try {
+    const adapter = new PaystackPaymentAdapter("secret", "https://api.paystack.test");
+    await assert.rejects(adapter.createPayment(args), /requires verified provider split reconciliation/);
+    assert.equal(calls.length, 1, "must not infer subaccount payouts from amount-only verification");
+  } finally { globalThis.fetch = original; }
+});
