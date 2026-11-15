@@ -6,6 +6,7 @@ import { getSql } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import type { JsonObject, JsonValue } from "@/lib/db-types";
 import { applyOrderDeliveryHold } from "./delivery-hold.server";
+import { maskEmail } from "@/modules/shared/public/display";
 
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
 export type SupportStatus = "open" | "waiting_customer" | "waiting_support" | "resolved" | "closed";
@@ -32,8 +33,7 @@ const replySchema=conversationIdSchema.extend({body:z.string().trim().min(1).max
 /** Read-only support viewers (admin.support.view only) see masked customer emails (security audit L3). */
 export function supportEmailFor(caps: readonly string[], email: string | null): string | null {
   if (!email || caps.includes("admin.full") || caps.includes("admin.support")) return email;
-  const at = email.indexOf("@");
-  return at < 1 ? "•••" : `${email[0]}••${email.slice(at)}`;
+  return maskEmail(email);
 }
 
 export const listSupportInbox=createServerFn({method:"GET"}).middleware([authMiddleware]).handler(async({context})=>{

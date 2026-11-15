@@ -12,6 +12,7 @@ import {
   resumeAdminMerchantPromotion,
   updateAdminMarketplacePromotion,
 } from "@/modules/administration/public/transport/admin/promotions.functions";
+import { formatGhs as ghs, formatDateTime as when } from "@/modules/shared/public/display";
 
 export const Route = createFileRoute("/admin/promotions")({
   head: () => ({ meta: [{ title: "Deals & promotions | ELEMARKET" }, { name: "robots", content: "noindex,nofollow,noarchive" }] }),
@@ -35,8 +36,6 @@ type MerchantPromo = MerchantPromotionRow;
 type Data = { marketplace: Marketplace[]; merchant: MerchantPromo[]; scope: PromotionScopeOptions };
 type Run = (key: string, fn: () => Promise<string>) => Promise<void>;
 
-const ghs = (v: string | number) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const when = (v: string | Date | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 const toLocalInput = (v: string | Date) => {
   const d = new Date(v);
   const pad = (x: number) => String(x).padStart(2, "0");

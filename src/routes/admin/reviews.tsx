@@ -14,6 +14,7 @@ import {
   REVIEW_MODERATION_REASON_LABELS,
   type ReviewModerationReason,
 } from "@/modules/engagement/public/review-moderation.shared";
+import { formatDateTime as when } from "@/modules/shared/public/display";
 
 const PAGE = 50;
 
@@ -38,7 +39,6 @@ type Queue = Awaited<ReturnType<typeof loadReviewModerationQueue>>;
 type Item = Queue["items"][number];
 type Filters = { status: "all" | "reported" | "published" | "hidden"; rating: string; lowStar: boolean; productId: string; merchantId: string };
 
-const when = (v: string | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 const reasonLabel = (r: string | null) => (r ? REVIEW_MODERATION_REASON_LABELS[r as ReviewModerationReason] ?? r : "—");
 
 function errorText(e: unknown) {

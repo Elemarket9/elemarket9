@@ -55,20 +55,7 @@ export function isClaimActive(assignedAt: string | null | undefined, now: number
   return Number.isFinite(at) && at > now - RISK_CLAIM_TTL_MINUTES * 60_000;
 }
 
-/** "ama.mensah@example.com" -> "a***h@e******.com". Never returns the full address. */
-export function maskEmail(email: string | null | undefined): string | null {
-  if (!email) return null;
-  const at = email.lastIndexOf("@");
-  if (at <= 0 || at === email.length - 1) return "***";
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  const dot = domain.lastIndexOf(".");
-  const host = dot > 0 ? domain.slice(0, dot) : domain;
-  const tld = dot > 0 ? domain.slice(dot) : "";
-  const maskPart = (part: string) =>
-    part.length <= 2 ? `${part[0] ?? ""}*` : `${part[0]}${"*".repeat(Math.min(part.length - 2, 6))}${part.at(-1)}`;
-  return `${maskPart(local)}@${maskPart(host)}${tld}`;
-}
+export { maskEmail } from "@/modules/shared/public/display";
 
 export const RISK_DECISION_LABELS: Record<RiskDecision, string> = {
   dismissed_false_positive: "Dismissed: false positive",

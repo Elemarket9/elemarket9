@@ -228,5 +228,7 @@
   "0233_review_moderation.sql": "16758485ce94d8f0b583ae382f821ab0791b50193ab3e8ad72dc6cf34618e1a5",
   "0234_marketplace_promotions.sql": "3c14d8de8bce2d9d3f3cdce49fd2bbf6dbf9859cac9d857f20912724f3a3f1cb",
   "0235_backoffice_report_indexes.sql": "cd010b3df9fd9956445ddb6e46185185e37b631408f488327a81b1954bb56753",
-  "0236_audit_hardening_independent_approval.sql": "172ad5e1efe8b5ab141f1998ca40c470146880c6e6d5969bd3feb656295f1b7e"
+  "0236_audit_hardening_independent_approval.sql": "172ad5e1efe8b5ab141f1998ca40c470146880c6e6d5969bd3feb656295f1b7e",
+  "0237_drop_duplicate_indexes_and_functions.sql": "d22f934baab43481acbb506fd1ec60149d91847c9561095084cbc68981110542",
+  "0238_money_audit_fixes.sql": "597a8c07c0d4a1eee97547fdb1c00fe618d56b9f56ce0f3ef62c3df3de5bcbac"
 }

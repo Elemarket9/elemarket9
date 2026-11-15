@@ -22,6 +22,7 @@ import {
   type RiskDecision,
   type RiskEvidenceEntry,
 } from "@/modules/administration/public/risk-review-format";
+import { formatGhs as ghs, formatDateTime as when } from "@/modules/shared/public/display";
 
 const search = z.object({
   view: z.enum(["queue", "history"]).optional(),
@@ -69,9 +70,7 @@ type Detail = Awaited<ReturnType<typeof getRiskFlag>>;
 type Can = { moderateCustomers: boolean; moderateMerchants: boolean };
 type Run = (key: string, fn: () => Promise<string>) => Promise<void>;
 
-const when = (v: string | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 const time = (v: string | null) => (v ? new Date(v).toLocaleTimeString("en-GH", { hour: "2-digit", minute: "2-digit" }) : "—");
-const ghs = (v: string | number) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const age = (v: string) => {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(v)) / 60_000));
   if (minutes < 60) return `${minutes} min`;

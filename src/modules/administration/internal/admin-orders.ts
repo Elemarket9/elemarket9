@@ -145,16 +145,8 @@ export function normalizeAdminOrderSearch(raw: AdminOrderSearchInput): Normalize
   };
 }
 
-/** k***a@example.com : enough to confirm with a caller, not enough to harvest. */
-export function maskEmail(email: string | null | undefined): string | null {
-  if (!email) return null;
-  const at = email.lastIndexOf("@");
-  if (at <= 0) return "•••";
-  const local = email.slice(0, at);
-  const domain = email.slice(at + 1);
-  const shown = local.length <= 2 ? local[0] : `${local[0]}•••${local[local.length - 1]}`;
-  return `${shown}${local.length <= 2 ? "•••" : ""}@${domain}`;
-}
+export { maskEmail } from "@/modules/shared/public/display";
+import { formatGhs as ghs } from "@/modules/shared/public/display";
 
 /** +233•••••4567 : country code and last 4 digits only. */
 /**
@@ -209,7 +201,6 @@ export type OrderTimelineSources = {
 };
 
 const words = (v: string) => v.replaceAll("_", " ");
-const ghs = (v: string) => `GH₵ ${Number(v).toFixed(2)}`;
 
 function iso(v: When): string | null {
   if (!v) return null;

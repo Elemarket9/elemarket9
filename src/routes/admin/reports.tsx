@@ -7,6 +7,7 @@ import { exportAdminReportCsv, loadAdminReports, type AdminReport } from "@/modu
 import {
   REPORT_MAX_DAYS, REPORT_PRESETS, presetRange, validateReportRange, type ReportExportSection, type ReportPreset,
 } from "@/modules/administration/public/reports/report-range";
+import { formatGhs as ghs } from "@/modules/shared/public/display";
 
 const searchSchema = z.object({
   preset: z.enum(REPORT_PRESETS).optional(),
@@ -57,8 +58,6 @@ const PRESET_LABEL: Record<ReportPreset, string> = {
   this_month: "This month", last_month: "Last month", custom: "Custom dates",
 };
 
-const ghs = (v: string | null | undefined) =>
-  v === null || v === undefined ? "—" : `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const pct = (v: string | null | undefined) => (v === null || v === undefined ? "—" : `${Number(v).toLocaleString("en-GH", { maximumFractionDigits: 2 })}%`);
 const count = (n: number) => n.toLocaleString("en-GH");
 function duration(minutes: string | null | undefined) {

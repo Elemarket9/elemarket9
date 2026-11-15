@@ -45,13 +45,12 @@ test('claim lasts 30 minutes', () => {
   assert.match(fs.readFileSync('migrations/0232_risk_review_queue.sql', 'utf8'), /risk_flag_claim_ttl\(\)[\s\S]*?interval '30 minutes'/);
 });
 
-test('emails are always masked', () => {
-  assert.equal(fmt.maskEmail('ama.mensah@example.com'), 'a******h@e*****e.com');
-  assert.equal(fmt.maskEmail('ab@x.io'), 'a*@x*.io');
-  assert.equal(fmt.maskEmail('nodomain'), '***');
+test('emails are always masked, the same way as everywhere else in the back office', () => {
+  assert.equal(fmt.maskEmail('ama.mensah@example.com'), 'a•••h@example.com');
+  assert.equal(fmt.maskEmail('ab@x.io'), 'a•••@x.io');
+  assert.equal(fmt.maskEmail('nodomain'), '•••');
   assert.equal(fmt.maskEmail(null), null);
-  const masked = fmt.maskEmail('kwame.nkrumah.longname@ghanapost.gov.gh');
-  assert.ok(!masked.includes('nkrumah') && !masked.includes('ghanapost'), masked);
+  assert.ok(!fmt.maskEmail('kwame.nkrumah.longname@ghanapost.gov.gh').includes('nkrumah'));
 });
 
 test('evidence renders as ordered, labelled plain text', () => {

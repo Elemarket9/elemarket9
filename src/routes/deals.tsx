@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { listPublicMarketplaceDeals } from "@/modules/administration/public/transport/public/deals.functions";
+import { formatGhs as ghs } from "@/modules/shared/public/display";
 
 export const Route = createFileRoute("/deals")({
   head: () => ({ meta: [{ title: "Deals | ELEMARKET" }, { name: "description", content: "Current ELEMARKET promo codes you can use at checkout." }] }),
@@ -12,7 +13,6 @@ type Deal = {
   max_discount: string | null; min_subtotal: string; ends_at: string | Date; first_order_only: boolean; categories: string[];
 };
 
-const ghs = (v: string | number) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function Deals() {
   const { deals } = Route.useLoaderData() as { deals: Deal[] };

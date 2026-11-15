@@ -11,6 +11,7 @@ import {
   previewMerchantWithdrawal,
   requestMerchantWithdrawal,
 } from "../../modules/wallet/public/transport/merchant/wallet.functions";
+import { formatGhs as ghs, formatDateTime as when } from "@/modules/shared/public/display";
 
 type Snapshot = Awaited<ReturnType<typeof loadMerchantWallet>>;
 
@@ -47,8 +48,6 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "Failed (returned to available)", cancelled: "Cancelled",
 };
 
-const ghs = (v: string) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const when = (v: string | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 
 function safeError(error: unknown) {
   const message = error instanceof Error ? error.message : "";

@@ -181,9 +181,27 @@ test("a refund returns what the customer paid and claws back exactly merchant_ne
             coalesce(sum(amount) filter (where entry_type='refund'),0)::numeric as refund
        from wallet_ledger_entries where order_id=$1`, [order.orderId]);
   assert.deepEqual([n(ledger.sale), n(ledger.refund)], [95, -95], "merchant returns exactly what they were credited");
-  // As for merchant promotions, a paid-then-refunded redemption stays used (anti refund/redeem abuse).
-  assert.equal((await redemption(order.orderId)).status, "applied");
-  assert.equal(n((await budget(promotionId)).consumed), 4.99);
+  // Money audit M2: a refunded sale must give its ELEMARKET-funded discount back to
+  // the campaign, or buy -> cancel -> refund loops drain the budget with no sales.
+  assert.equal((await redemption(order.orderId)).status, "applied", "still spent while the refund is only pending");
+  // The provider's refund confirmation moves the order to refunded.
+  await sql.query(`update orders set status='refunded' where id=$1 and status='refund_pending'`, [order.orderId]);
+  const [{ status }] = await sql.query(`select status from orders where id=$1`, [order.orderId]);
+  assert.equal(status, "refunded");
+  assert.equal((await redemption(order.orderId)).status, "released");
+  assert.deepEqual(await budget(promotionId).then((b) => [n(b.reserved), n(b.consumed)]), [0, 0]);
+});
+
+// Money audit H2: a cancelled order kept a payable payment.
+test("a cancelled order can no longer be paid", { skip }, async () => {
+  const { promotionId, code } = await marketplacePromo();
+  const s = await shop();
+  const order = await buy(s, { promoCode: code });
+  await cancel(order, s.user);
+  await assert.rejects(payments.createExternalPaymentIntent({ paymentId: order.paymentId, userId: s.user }), /cancelled/);
+  const attempts = await sql.query(`select 1 from payment_attempts where payment_id=$1`, [order.paymentId]);
+  assert.equal(attempts.length, 0);
+  assert.deepEqual(await budget(promotionId).then((b) => [n(b.reserved), n(b.consumed)]), [0, 0]);
 });
 
 test("discount = min(computed, max_discount, commission - 0.01), per merchant order", { skip }, async () => {

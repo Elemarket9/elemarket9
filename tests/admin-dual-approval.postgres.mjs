@@ -182,3 +182,31 @@ test("an approval interrupted before recording its outcome does not block the or
   const [old] = await sql.query(`select status, execution_error from admin_dual_approvals where id=$1`, [approvalId]);
   assert.equal(old.status, "failed");
 });
+
+// Duplicate-removal guard (migration 0237): no two indexes on a table may be identical.
+test("the schema has no exact-duplicate indexes", { skip }, async () => {
+  const dupes = await sql.query(
+    `select indrelid::regclass::text as "table", string_agg(indexrelid::regclass::text, ' = ' order by indexrelid) as indexes
+       from pg_index i join pg_class c on c.oid=i.indexrelid join pg_namespace n on n.oid=c.relnamespace
+      where n.nspname='public'
+      group by indrelid, indkey::text, indclass::text, indoption::text, indisunique,
+               coalesce(pg_get_expr(indexprs,indrelid),''), coalesce(pg_get_expr(indpred,indrelid),'')
+     having count(*)>1`);
+  assert.deepEqual(dupes, []);
+});
+
+test("no database function has more than one signature (stale overloads drift)", { skip }, async () => {
+  const overloads = await sql.query(
+    `select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and not exists (select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')
+      group by proname having count(*)>1`);
+  assert.deepEqual(overloads, []);
+});
+
+test("no database function has more than one signature (stale overloads drift)", { skip }, async () => {
+  const overloads = await sql.query(
+    `select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and not exists (select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')
+      group by proname having count(*)>1`);
+  assert.deepEqual(overloads, []);
+});

@@ -219,12 +219,14 @@ test('operations page shows actions only for their exact permission', () => {
 });
 
 test('catalog read-only never exposes customer data and masks merchant owner emails (security audit M3)', () => {
-  const { operationsSectionReader, maskEmailForViewer } = loadTypeScript(MODERATION, harness([]).deps);
+  const { operationsSectionReader } = loadTypeScript(MODERATION, harness([]).deps);
+  const { maskEmail } = loadTypeScript('src/modules/shared/internal/display.ts');
   const can = operationsSectionReader(['admin.catalog.view']);
   assert.equal(can('admin.customers.moderate'), false);
   assert.equal(can('admin.merchants.moderate'), true);
   assert.equal(can('admin.products.moderate'), true);
-  assert.equal(maskEmailForViewer('ama@example.com'), 'a••@example.com');
-  assert.equal(maskEmailForViewer(null), null);
+  assert.equal(maskEmail('ama@example.com'), 'a•••a@example.com');
+  assert.equal(maskEmail(null), null);
+  assert.match(fs.readFileSync(MODERATION, 'utf8'), /fullOwnerEmail \? \(r\.owner_email\?\?null\) : maskEmail\(/);
   assert.equal(operationsSectionReader(['admin.customers.moderate'])('admin.customers.moderate'), true);
 });

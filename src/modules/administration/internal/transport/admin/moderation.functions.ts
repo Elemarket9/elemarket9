@@ -5,6 +5,7 @@ import { getSql } from "@/lib/db";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
 import { requireAdminForUserId, getAdminCapabilitiesForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
+import { maskEmail } from "@/modules/shared/public/display";
 
 export type AdminModerationData = {
   merchants: Array<{ id:string; name:string; status:string; tier:string; settlementModel:string; catalogSource:string; ownerId:string|null; ownerEmail:string|null }>;
@@ -21,13 +22,6 @@ export function operationsSectionReader(perms: readonly string[]) {
     || (perms.includes("admin.catalog.view") && sectionCapability !== "admin.customers.moderate");
 }
 
-/** "ama@example.com" -> "a••@example.com". Read-only viewers never see full owner emails. */
-export function maskEmailForViewer(email: string | null): string | null {
-  if (!email) return null;
-  const at = email.indexOf("@");
-  if (at < 1) return "•••";
-  return `${email[0]}••${email.slice(at)}`;
-}
 
 export const loadAdminModeration = createServerFn({ method:"GET" }).middleware([authMiddleware]).handler(async ({context}):Promise<AdminModerationData> => {
   const adminId=getAuthenticatedUserId(context);
@@ -41,7 +35,7 @@ export const loadAdminModeration = createServerFn({ method:"GET" }).middleware([
     can('admin.products.moderate') ? sql.query<any>(`select p.id,p.name,p.merchant_id,p.status,p.price::text,to_char(p.created_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') as created_at,m.name as merchant_name from products p join merchants m on m.id=p.merchant_id where p.status in ('pending_review','suspended','active') order by case p.status when 'pending_review' then 0 when 'suspended' then 1 else 2 end,p.created_at desc limit 100`) : Promise.resolve([]),
   ]);
   const fullOwnerEmail = perms.includes("admin.full") || perms.includes("admin.merchants.moderate");
-  return { merchants:merchants.map((r:any)=>({id:r.id,name:r.name,status:r.status,tier:r.tier,settlementModel:r.settlement_model,catalogSource:r.catalog_source,ownerId:r.owner_id??null,ownerEmail:fullOwnerEmail ? (r.owner_email??null) : maskEmailForViewer(r.owner_email??null)})), customers:customers.map((r:any)=>({id:r.id,name:r.name,email:r.email,status:r.status,createdAt:r.createdAt})), products:products.map((r:any)=>({id:r.id,name:r.name,merchantId:r.merchant_id,merchantName:r.merchant_name,status:r.status,price:r.price,createdAt:r.created_at})) };
+  return { merchants:merchants.map((r:any)=>({id:r.id,name:r.name,status:r.status,tier:r.tier,settlementModel:r.settlement_model,catalogSource:r.catalog_source,ownerId:r.owner_id??null,ownerEmail:fullOwnerEmail ? (r.owner_email??null) : maskEmail(r.owner_email??null)})), customers:customers.map((r:any)=>({id:r.id,name:r.name,email:r.email,status:r.status,createdAt:r.createdAt})), products:products.map((r:any)=>({id:r.id,name:r.name,merchantId:r.merchant_id,merchantName:r.merchant_name,status:r.status,price:r.price,createdAt:r.created_at})) };
 });
 
 const merchantAction=z.object({merchantId:z.string().min(1).max(128),action:z.enum(["suspend","reinstate"]),reason:z.string().trim().min(10).max(2000)});

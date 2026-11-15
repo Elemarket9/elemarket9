@@ -215,3 +215,11 @@ test('two-person threshold: default, boundary, override and fail-closed', () => 
     else process.env.ELEMARKET_DUAL_APPROVAL_THRESHOLD_GHS = saved;
   }
 });
+
+// Duplicate-removal guard: one implementation of money/date formatting and
+// email masking. Pages must not grow private copies again.
+test('money/date formatting and email masking have a single implementation', () => {
+  const offenders = walk('src').filter((f) => /\.(ts|tsx)$/.test(f) && !f.includes(`shared${path.sep}internal${path.sep}display.ts`))
+    .filter((f) => /const ghs = \(|const when = \(v|function maskEmail\w*\(/.test(fs.readFileSync(f, 'utf8')));
+  assert.deepEqual(offenders, []);
+});

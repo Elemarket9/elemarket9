@@ -13,6 +13,7 @@ import {
   type AdminOrderDetail,
   type AdminOrderListRow,
 } from "@/modules/administration/public/transport/admin/orders.functions";
+import { formatGhs as ghs, formatDateTime as when } from "@/modules/shared/public/display";
 
 const VIEW = ["admin.orders.view", "admin.orders.manage"];
 
@@ -41,8 +42,6 @@ export const Route = createFileRoute("/admin/orders")({
 
 const STATUSES = ["payment_pending", "paid", "confirmed", "fulfilling", "shipped", "delivered", "completed", "cancelled", "disputed", "refund_pending", "refunded"];
 const label = (v: string) => v.replaceAll("_", " ").replace(/^\w/, (c) => c.toUpperCase());
-const ghs = (v: string | number) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const when = (v: string | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 const STATUS_STYLE: Record<string, string> = {
   payment_pending: "bg-amber-50 text-amber-900", cancelled: "bg-market-soft text-market-muted", refunded: "bg-market-soft text-market-muted",
   refund_pending: "bg-amber-50 text-amber-900", disputed: "bg-red-50 text-red-800", delivered: "bg-green-50 text-green-800", completed: "bg-green-50 text-green-800",

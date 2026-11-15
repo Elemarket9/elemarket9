@@ -65,3 +65,24 @@ Provider-held custody does not, by itself, settle which regulated payment activi
 5. **Growth:** track active available listings, qualified search-to-product, cart-to-paid, paid-to-delivered on-time, disputed/late cases, support resolution time, repeat customer orders, seller retention, customer acquisition costs, net contribution per completed order. Scale only when locally measured operations remain reliable.
 
 **Interpretation:** an eBay-grade marketplace is first a system that reliably completes and resolves actual orders. Advanced monetization and feature breadth come after trust, payment safety and fulfillment.
+
+## Addendum: code-reproduced findings from the second eBay benchmark (same day)
+
+A second, independent benchmark ran against the back-office branch (PR #33) and reproduced each item below on a migrated PostgreSQL 16 database. It is merged here so there is one eBay audit document, not two. Items already in the register above are cross-referenced rather than repeated.
+
+| ID | Severity | Finding (reproduced) | Relation to register above |
+|---|---|---|---|
+| EB-01 | Critical | A customer dispute can never be resolved or refunded: `prepare_provider_refund_for_dispute` has no caller, the admin refund path refuses any order past `confirmed`, and a return cannot be opened while a dispute is open. The order stays `disputed`. | New |
+| EB-02 | High | Default `provider_direct` settlement pays the seller at payment time; refunds then come from ELEMARKET's balance with no record of what the seller owes. | Extends the P1 "24-hour eligibility" row |
+| EB-03 | High | Returns after delivery (including the 7-day faulty-item guarantee) can never reach a refund: nothing creates a refund request for a delivered order. | Extends the P1 "return guarantee" row |
+| EB-04 | High | The seller alone can reject a `damaged` / not-as-described return; no escalation to ELEMARKET. | New |
+| EB-05 | Medium | Disputes have no opening window, type, evidence or seller response step (one was accepted 400 days after delivery). | New |
+| EB-06 | Medium | Public product Q&A answers are published unmoderated, so a seller can post "WhatsApp me and pay MoMo direct". | New |
+| EB-07 | Medium | `verified=true` is granted even when the business-registry check was rejected. | Same as the P1 "Verified seller" row (now reproduced) |
+| EB-08 | Medium | Brand authorization only runs when `brand_id` is set; the free-text `brand` field bypasses it. | New |
+| EB-09 | Medium | The merchant health score (shared with financing providers) counts abandoned unpaid checkouts as seller cancellations. | New |
+| EB-10 | Medium | A payout account in any name is accepted and can withdraw after the cooldown; no alert to the owner; no seller 2FA. | New |
+| EB-11 | Low | Seller service-quality inputs are partly constants (late-shipping and response rate stored as 0.5); `merchant_service_controls` is never applied. | Extends the P2 "seller-level case defects" row |
+| EB-12 | Low | Sellers receive the buyer's full delivery address although ELEMARKET riders deliver. | New |
+
+Launch blockers from this addendum, in order: a guarantee case system that can actually refund (EB-01, EB-03, EB-04, EB-05); paying sellers after delivery by default (EB-02); real seller identity checks (EB-07, EB-10). Ghana VAT / E-VAT invoicing on ELEMARKET's own fees also needs a tax adviser's confirmation before launch.
