@@ -48,7 +48,7 @@ export default function Checkout() {
       if (!intent.checkoutUrl) throw new Error("The payment provider did not return a secure checkout URL.");
       await savePaymentQueue(paymentIds.slice(1).map((paymentId) => ({ paymentId })));
       await clearCart();
-      router.replace({ pathname: "/payment", params: { url: intent.checkoutUrl, paymentId: intent.paymentId } });
+      router.replace({ pathname: "/payment", params: { paymentId: intent.paymentId } });
     } catch (e) { Alert.alert("Payment", e instanceof Error ? e.message : "Could not start payment"); }
     finally { setBusy(false); }
   }
