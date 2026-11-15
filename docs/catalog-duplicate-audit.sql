@@ -62,3 +62,19 @@ select p.id,p.merchant_id,p.name,p.stock as parent_stock,
  group by p.id,p.merchant_id,p.name,p.stock
 having p.stock=0 and coalesce(sum(v.stock) filter(where v.status='active'),0)>0
  order by active_variant_stock desc,p.id;
+
+-- E. Existing repeated merchant categories (historical data is not rewritten).
+select 'merchant' as record_type,m.id,m.category,m.catalog_categories
+  from merchants m
+ where cardinality(m.catalog_categories) is distinct from (
+   select count(distinct category)::integer
+   from unnest(m.catalog_categories) as categories(category)
+ )
+union all
+select 'application' as record_type,a.id,a.category,a.catalog_categories
+  from merchant_applications a
+ where cardinality(a.catalog_categories) is distinct from (
+   select count(distinct category)::integer
+   from unnest(a.catalog_categories) as categories(category)
+ )
+order by record_type,id;
