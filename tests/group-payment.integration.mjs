@@ -1,0 +1,107 @@
+// One actual marketplace group charge, two merchant orders, and a single
+// signed provider webhook through every real SQL migration on in-memory PG.
+import test, {before, after} from "node:test";
+import assert from "node:assert/strict";
+import {configureSimulationEnv,installPaymentProviderMock,seedOrder,startHarness} from "../scripts/helpers/server-harness.mjs";
+
+configureSimulationEnv({ELEMARKET_GROUP_SINGLE_CHARGE_ENABLED:"1"});
+const provider=installPaymentProviderMock();
+let harness,sql,startCustomerGroupPayment,getCustomerGroupPaymentStatus,handlePaymentWebhook;
+before(async()=>{
+  harness=await startHarness();sql=harness.sql;
+  ({startCustomerGroupPayment,getCustomerGroupPaymentStatus}=await harness.load("/src/modules/payments/public/group-checkout.server.ts"));
+  ({handlePaymentWebhook}=await harness.load("/src/application/payment-webhook.server.ts"));
+});
+after(async()=>{provider.restore();await harness?.close();});
+
+async function seedGroup(wallet=false){
+  const a=await seedOrder(sql), b=await seedOrder(sql);
+  const [g]=await sql.query("select group_id from orders where id=$1",[a.order]);
+  await sql.query("update orders set group_id=$1,user_id=$2 where id=$3",[g.group_id,a.user,b.order]);
+  await sql.query("update payments set user_id=$1 where id=$2",[a.user,b.payment]);
+  if(wallet){
+    await sql.query("update merchants set settlement_model='platform_wallet' where id=any($1::text[])",[[a.merchant,b.merchant]]);
+  }
+  return {a,b,groupId:g.group_id,userId:a.user};
+}
+async function groupState(g){
+  return sql.query(`select o.id,o.status as "orderStatus",p.status as "paymentStatus",p.settlement_model as "settlement"
+    from orders o join payments p on p.order_id=o.id where o.group_id=$1 order by o.id`,[g.groupId]);
+}
+async function sendSuccess(g){
+  const [grp]=await sql.query("select provider_reference,amount::text from checkout_group_charges where group_id=$1",[g.groupId]);
+  provider.pay(grp.provider_reference);
+  const raw=JSON.stringify({event:"charge.success",data:{id:100011+Number(grp.amount.replace(".",""))%10000,
+    reference:grp.provider_reference,amount:Math.round(Number(grp.amount)*100),currency:"GHS"}});
+  const answer=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  return {answer,raw,ref:grp.provider_reference};
+}
+test("two seller orders are paid with one charge and one signed webhook (duplicate-safe)",async()=>{
+  const g=await seedGroup();
+  const initialCount=provider.initializeBodies.length;
+  const intent=await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  assert.equal(intent.status,"pending");
+  assert.equal(intent.orders,2);
+  assert.match(intent.checkoutUrl,/^https:\/\/checkout\.paystack\.com\//);
+  assert.equal(provider.initializeBodies.length,initialCount+1);
+  const request=provider.initializeBodies.at(-1);
+  assert.equal(request.split.type,"flat");
+  assert.equal(request.split.subaccounts.length,2);
+  assert.equal(request.split.subaccounts.reduce((s,x)=>s+x.share,0) < Number(request.amount),true);
+  const repeat=await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  assert.equal(repeat.checkoutUrl,intent.checkoutUrl);
+  assert.equal(provider.initializeBodies.length,initialCount+1,"must never charge a group twice");
+  assert.equal((await groupState(g)).every(x=>x.paymentStatus==="initiated"&&x.orderStatus==="payment_pending"),true);
+  const {answer,raw}=await sendSuccess(g);
+  assert.equal(answer.status,"completed");
+  const states=await groupState(g);
+  assert.equal(states.length,2);
+  assert.equal(states.every(x=>x.paymentStatus==="completed"&&x.orderStatus==="paid"),true);
+  assert.equal((await getCustomerGroupPaymentStatus({groupId:g.groupId,userId:g.userId})).status,"completed");
+  const replay=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  assert.equal(replay.duplicate,true);
+  const moves=await sql.query(`select count(*)::int as n from payment_state_transitions
+    where payment_id=any($1::text[]) and to_status='completed'`,[[g.a.payment,g.b.payment]]);
+  assert.equal(moves[0].n,2,"one transition per merchant, not per callback");
+  // There may never be N provider references/charges on N merchant orders.
+  const attempts=await sql.query("select count(*)::int as n from payment_attempts where payment_id=any($1::text[])",[[g.a.payment,g.b.payment]]);
+  assert.equal(attempts[0].n,0);
+});
+
+test("individual seller refund against one shared provider reference leaves other merchant paid",async()=>{
+  const g=await seedGroup();
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  const {ref}=await sendSuccess(g);
+  const [{result}]=await sql.query("select prepare_provider_refund_for_payment($1,$2,'customer_order_cancellation') as result",
+    [g.a.payment,g.userId]);
+  const requestId=result.requestId;
+  const [row]=await sql.query("select amount::text,provider_reference from provider_refund_requests where id=$1",[requestId]);
+  assert.equal(row.provider_reference,ref);
+  const refundId="refund_sim_"+g.groupId;
+  await sql.query("update provider_refund_requests set status='processing',provider_refund_id=$1 where id=$2",[refundId,requestId]);
+  const raw=JSON.stringify({event:"refund.processed",data:{id:refundId,transaction_reference:ref,
+    amount:Math.round(Number(row.amount)*100),currency:"GHS"}});
+  const res=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  assert.equal(res.status,"processed");
+  const [a,b]=await sql.query("select o.id,o.status,p.status as payment_status from orders o join payments p on p.order_id=o.id where o.id=any($1::text[]) order by o.id",[[g.a.order,g.b.order]]);
+  const states={[a.id]:a,[b.id]:b};
+  assert.equal(states[g.a.order].status,"refunded");
+  assert.equal(states[g.a.order].payment_status,"refunded");
+  assert.equal(states[g.b.order].status,"paid");
+  assert.equal(states[g.b.order].payment_status,"completed");
+});
+
+test("one group wallet collection credits both merchants separately exactly once",async()=>{
+  const g=await seedGroup(true);
+  const n=provider.initializeBodies.length;
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  assert.equal(provider.initializeBodies.length,n+1);
+  assert.equal(provider.initializeBodies.at(-1).split,undefined,"wallet group must not also pay subaccounts");
+  const {raw}=await sendSuccess(g);
+  await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  const ledger=await sql.query(`select merchant_id, count(*)::int as n, sum(amount)::text as amount
+    from wallet_ledger_entries where merchant_id=any($1::text[]) and entry_type='sale'
+    group by merchant_id`,[[g.a.merchant,g.b.merchant]]);
+  assert.equal(ledger.length,2);
+  assert.equal(ledger.every(x=>x.n===1&&Number(x.amount)>0),true);
+});
