@@ -2,6 +2,8 @@
 // signed provider webhook through every real SQL migration on in-memory PG.
 import test, {before, after} from "node:test";
 import assert from "node:assert/strict";
+import {createHash,randomUUID} from "node:crypto";
+import {quoteCartCanonical} from "../src/lib/commerce-guards.mjs";
 import {configureSimulationEnv,installPaymentProviderMock,seedOrder,startHarness} from "../scripts/helpers/server-harness.mjs";
 
 configureSimulationEnv({ELEMARKET_GROUP_SINGLE_CHARGE_ENABLED:"1"});
@@ -15,14 +17,44 @@ before(async()=>{
 after(async()=>{provider.restore();await harness?.close();});
 
 async function seedGroup(wallet=false){
+  // Seed two genuine merchants, then release their unrelated fixture orders.
+  // Never change an order's customer or quote: DB integrity rightly forbids it.
   const a=await seedOrder(sql), b=await seedOrder(sql);
-  const [g]=await sql.query("select group_id from orders where id=$1",[a.order]);
-  await sql.query("update orders set group_id=$1,user_id=$2 where id=$3",[g.group_id,a.user,b.order]);
-  await sql.query("update payments set user_id=$1 where id=$2",[a.user,b.payment]);
-  if(wallet){
-    await sql.query("update merchants set settlement_model='platform_wallet' where id=any($1::text[])",[[a.merchant,b.merchant]]);
+  for(const s of [a,b]){
+    await sql.query("select elemarket_restore_reservation_stock($1,'reserved')",[s.order]);
+    await sql.query("update orders set status='cancelled' where id=$1",[s.order]);
+    await sql.query("update payments set status='failed' where id=$1",[s.payment]);
   }
-  return {a,b,groupId:g.group_id,userId:a.user};
+  if(wallet) await sql.query(
+    "update merchants set settlement_model='platform_wallet' where id=any($1::text[])",
+    [[a.merchant,b.merchant]]);
+  const address="1 Test Street",tier="same_day";
+  const lineA={productId:a.product,variantId:a.variant??null,quantity:1};
+  const lineB={productId:b.product,variantId:b.variant??null,quantity:1};
+  const quotes=[];
+  for(const [seller,line] of [[a,lineA],[b,lineB]]){
+    const quoteId="dquote_"+randomUUID().replaceAll("-","");
+    const fingerprint=createHash("sha256").update(quoteCartCanonical({
+      merchantId:seller.merchant,address,tier,items:[line],
+    })).digest("hex");
+    await sql.query(`insert into delivery_quotes
+      (id,user_id,merchant_id,fingerprint,tier,price,eta_minutes,distance_km,dest_address,expires_at)
+      values($1,$2,$3,$4,'same_day',15,60,1,$5,now()+interval '1 hour')`,
+      [quoteId,a.user,seller.merchant,fingerprint,address]);
+    quotes.push({merchantId:seller.merchant,quoteId});
+  }
+  const items=[lineA,lineB],idempotencyKey="group_checkout_"+randomUUID().replaceAll("-","");
+  const fingerprint=createHash("sha256").update(JSON.stringify({items,quotes,address,method:"mobile_money"})).digest("hex");
+  const [{result}]=await sql.query(`with identity as (select set_config('app.user_id',$1,true) u)
+    select create_pending_order($1,$2,$3,$4::jsonb,$5::jsonb,$6,'mobile_money',null) as result
+    from identity`,
+    [a.user,idempotencyKey,fingerprint,JSON.stringify(items),JSON.stringify(quotes),address]);
+  const orderA=result.orders.find(x=>x.merchantId===a.merchant);
+  const orderB=result.orders.find(x=>x.merchantId===b.merchant);
+  assert.ok(orderA&&orderB,"both merchants received one authoritative pending order");
+  return {a:{...a,order:orderA.orderId,payment:orderA.paymentId},
+    b:{...b,order:orderB.orderId,payment:orderB.paymentId},
+    groupId:result.groupId,userId:a.user};
 }
 async function groupState(g){
   return sql.query(`select o.id,o.status as "orderStatus",p.status as "paymentStatus",p.settlement_model as "settlement"
