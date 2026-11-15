@@ -297,3 +297,175 @@ begin
 end $$;
 revoke all on function apply_checkout_group_charge_event(text,text,text,text,text,numeric,text,text) from public;
 revoke all on function apply_checkout_group_refund_event(text,text,text,text,numeric,text,text,text) from public;
+
+
+-- Route existing customer and staff refund requests to the one real provider
+-- transaction reference, while keeping the individual refund amount and order.
+create or replace function prepare_provider_refund_for_payment(p_payment_id text, p_actor_id text, p_reason text DEFAULT 'customer_order_cancellation'::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+declare
+  v_payment record;
+  v_order record;
+  v_group_ref text;
+  v_existing record;
+  v_actor_role text;
+  v_request text := 'prr_'||replace(gen_random_uuid()::text,'-','');
+begin
+  if p_payment_id is null or length(trim(p_payment_id)) < 1 then raise exception 'payment required'; end if;
+  if p_actor_id is null or length(trim(p_actor_id)) < 1 then raise exception 'actor identity required'; end if;
+
+  select role into v_actor_role from "user" where id=p_actor_id;
+  if v_actor_role is null then raise exception 'actor not found'; end if;
+
+  select * into v_payment from payments where id=p_payment_id for update;
+  if not found then raise exception 'payment not found'; end if;
+  if v_payment.status <> 'completed' then raise exception 'only completed payments can be refunded'; end if;
+  v_group_ref := v_payment.provider_reference;
+  if v_group_ref is null then
+    select g.provider_reference into v_group_ref
+      from checkout_group_charge_members gm join checkout_group_charges g on g.id=gm.charge_id
+     where gm.payment_id=v_payment.id and g.status='completed';
+  end if;
+  if v_group_ref is null then raise exception 'payment has no verified provider transaction reference'; end if;
+
+  select * into v_order from orders where id=v_payment.order_id for update;
+  if not found then raise exception 'payment/order binding mismatch'; end if;
+
+  select * into v_existing
+    from provider_refund_requests
+   where payment_id=v_payment.id
+     and status in ('requested','processing','needs_attention','failed','processed')
+   order by requested_at desc
+   limit 1
+   for update;
+
+  if found then
+    if v_existing.requested_by is distinct from p_actor_id and v_actor_role <> 'admin' then
+      raise exception 'refund request is not owned by this customer';
+    end if;
+    if v_existing.status = 'failed' then
+      update provider_refund_requests
+         set status='requested', reason=coalesce(nullif(left(trim(coalesce(p_reason,'')),200),''),reason), updated_at=now()
+       where id=v_existing.id and status='failed';
+      return jsonb_build_object('requestId',v_existing.id,'status','requested','existing',true,'retry',true);
+    end if;
+    return jsonb_build_object('requestId',v_existing.id,'status',v_existing.status,'existing',true);
+  end if;
+
+  -- New customer cancellation requests are limited to early paid states.
+  if v_order.status not in ('paid','confirmed') then
+    raise exception 'order is not cancellable in its current state';
+  end if;
+
+  insert into provider_refund_requests(
+    id,payment_id,order_id,provider_key,provider_reference,amount,currency,status,reason,requested_by
+  ) values(
+    v_request,v_payment.id,v_payment.order_id,v_payment.provider_key,v_group_ref,
+    v_payment.amount,v_payment.currency,'requested',left(trim(coalesce(p_reason,'')),200),p_actor_id
+  );
+
+  update orders set status='refund_pending',updated_at=now()
+   where id=v_order.id and status in ('paid','confirmed');
+  if not found then raise exception 'order changed before refund request'; end if;
+
+  return jsonb_build_object('requestId',v_request,'status','requested','existing',false);
+end;
+$function$;
+
+-- A pending group provider charge must not expire only one of its members.
+create or replace function expire_payment_pending_orders(p_limit integer default 100)
+returns integer language plpgsql as $$
+declare
+  r record;
+  v_order record;
+  v_count integer := 0;
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 1000 then
+    raise exception 'invalid expiry batch size';
+  end if;
+  for r in
+    select o.id
+      from orders o
+     where o.status = 'payment_pending'
+       and (
+         (o.payment_deadline is not null and o.payment_deadline <= now())
+         or (o.payment_deadline is null and o.created_at <= now() - interval '15 minutes')
+       )
+       and not exists (
+         select 1 from checkout_group_charge_members gm
+         join checkout_group_charges g on g.id=gm.charge_id
+         where gm.order_id=o.id and g.status in ('initializing','pending','needs_attention')
+       )
+       and not exists (
+         select 1
+           from payments pay
+           join payment_attempts pa on pa.payment_id = pay.id
+          where pay.order_id = o.id
+            and pa.status in ('initiated','pending','authorized')
+       )
+     order by o.payment_deadline nulls first, o.id
+     limit p_limit
+  loop
+    perform pg_advisory_xact_lock(hashtextextended('elemarket:order:' || r.id, 0));
+    select id, status, payment_deadline, created_at
+      into v_order
+      from orders
+     where id = r.id
+     for update;
+    if not found
+       or v_order.status <> 'payment_pending'
+       or not (
+         (v_order.payment_deadline is not null and v_order.payment_deadline <= now())
+         or (v_order.payment_deadline is null and v_order.created_at <= now() - interval '15 minutes')
+       )
+       or exists (
+         select 1 from checkout_group_charge_members gm
+         join checkout_group_charges g on g.id=gm.charge_id
+         where gm.order_id=v_order.id and g.status in ('initializing','pending','needs_attention')
+       )
+       or exists (
+         select 1
+           from payments pay
+           join payment_attempts pa on pa.payment_id = pay.id
+          where pay.order_id = v_order.id
+            and pa.status in ('initiated','pending','authorized')
+       )
+    then
+      continue;
+    end if;
+    perform elemarket_restore_reservation_stock(r.id, 'reserved');
+    update orders
+       set status = 'cancelled', updated_at = now()
+     where id = r.id and status = 'payment_pending';
+    if found then
+      v_count := v_count + 1;
+    end if;
+  end loop;
+  return v_count;
+end;
+$$;
+
+-- Serialize direct per-merchant payment initiation against group membership.
+create or replace function elemarket_forbid_group_member_payment_attempt()
+returns trigger language plpgsql as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended('elemarket:payment-source:'||new.payment_id,0));
+  if exists(select 1 from checkout_group_charge_members where payment_id=new.payment_id) then
+    raise exception 'payment is owned by a single-charge merchant group';
+  end if;
+  return new;
+end $$;
+create or replace function elemarket_guard_group_charge_member()
+returns trigger language plpgsql as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended('elemarket:payment-source:'||new.payment_id,0));
+  if exists(select 1 from payment_attempts where payment_id=new.payment_id) then
+    raise exception 'per-merchant provider payment already initialized';
+  end if;
+  return new;
+end $$;
+drop trigger if exists group_member_separate_attempt_guard on checkout_group_charge_members;
+create trigger group_member_separate_attempt_guard before insert on checkout_group_charge_members
+for each row execute function elemarket_guard_group_charge_member();
