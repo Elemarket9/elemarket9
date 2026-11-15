@@ -7,15 +7,6 @@ export type CatalogGroup = {
 
 /** Canonical marketplace taxonomy. Product records store the stable keys, not display names. */
 export const CATALOG_GROUPS = [
-  { key: "food", name: "Food & Dining", blurb: "Prepared meals and food services", subcategories: [
-    { key: "prepared-meals", name: "Prepared Meals" }, { key: "fast-food", name: "Fast Food" },
-    { key: "bakery", name: "Bakery & Pastry" }, { key: "drinks", name: "Drinks & Beverages" },
-    { key: "catering", name: "Catering" },
-  ] },
-  { key: "restaurants", name: "Restaurants", blurb: "Restaurants, kitchens and dining", subcategories: [
-    { key: "ghanaian", name: "Ghanaian" }, { key: "continental", name: "Continental" },
-    { key: "african", name: "African" }, { key: "fast-casual", name: "Fast Casual" },
-  ] },
   { key: "groceries", name: "Groceries", blurb: "Staples, produce and household consumables", subcategories: [
     { key: "fresh-produce", name: "Fresh Produce" }, { key: "staples", name: "Staples" },
     { key: "meat-seafood", name: "Meat & Seafood" }, { key: "beverages", name: "Beverages" },
