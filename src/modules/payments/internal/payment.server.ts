@@ -16,6 +16,7 @@ import {
   PaymentWebhookError,
 } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
+import { isExactProviderSplit } from "@/modules/payments/internal/group-split-proof";
 import type { MobileMoneyNetwork } from "@/modules/payments/internal/adapters/payment";
 
 export type PaymentStatus = "initiated" | "authorized" | "completed" | "failed" | "refunded";
@@ -514,6 +515,31 @@ export async function handlePaymentWebhook(
 
   if (groupBinding[0]) {
     const isRefund = body.eventType.startsWith("refund.");
+    if (!isRefund && body.status === "completed") {
+      // A successful total does not prove each seller received their exact
+      // share. Require signed PSP split evidence before marking any order paid.
+      const [group] = await sql.query<{
+        id:string;settlement_model:string;split_snapshot:{split?:unknown};
+      }>(`select id,settlement_model,split_snapshot from checkout_group_charges
+          where id=$1`,[groupBinding[0].id]);
+      const correct = group && (group.settlement_model === "provider_split"
+        ? isExactProviderSplit(group.split_snapshot?.split,body.providerSplit)
+        : !body.providerSplit || body.providerSplit.subaccounts.length === 0);
+      if (!correct) {
+        await sql.query(`update checkout_group_charges set status='needs_attention',
+          failure_reason='provider did not prove the expected per-merchant allocation',updated_at=now()
+          where id=$1 and status in ('initializing','pending','needs_attention')`,[groupBinding[0].id]);
+        void emitSecurityAlert({
+          alertKey:`group-charge-split:${groupBinding[0].id}`,
+          severity:"error",
+          eventName:"security.group_charge_allocation_unverified",
+          message:"Provider transaction total succeeded but merchant allocation could not be verified.",
+          metadata:{groupChargeId:groupBinding[0].id,providerKey:normalizedProviderKey},
+          dedupeKey:`group-charge-split:${groupBinding[0].id}`,
+        });
+        return {reconciliationRequired:true,reason:"merchant_allocation_unverified"};
+      }
+    }
     const rows = isRefund
       ? await sql.query<{ result: unknown }>(
         `select apply_checkout_group_refund_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
