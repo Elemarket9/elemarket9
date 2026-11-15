@@ -23,7 +23,7 @@ test('Main Administrator holds every permission, including full control', () => 
 test('unknown permissions fail closed, even for the Main Administrator', () => {
   assert.equal(canGrantedAdminPerform('owner', [], 'admin.everything'), false);
   assert.equal(canGrantedAdminPerform('ops', ['admin.everything'], 'admin.everything'), false);
-  assert.deepEqual(expandAdminCapabilities(['admin.everything', 'admin.support']), ['admin.support']);
+  assert.deepEqual(expandAdminCapabilities(['admin.everything', 'admin.finance.view']), ['admin.finance.view']);
 });
 
 test('a sub-admin can never hold full control, even if it is stored against their role', () => {
@@ -33,8 +33,9 @@ test('a sub-admin can never hold full control, even if it is stored against thei
 
 test('a sub-admin gets exactly the permissions of their roles and nothing else', () => {
   const grants = ['admin.support', 'admin.finance.refunds'];
+  const effective = new Set([...grants, 'admin.support.view']); // replying to support implies reading it
   for (const capability of ADMIN_CAPABILITIES) {
-    assert.equal(canGrantedAdminPerform('custom', grants, capability), grants.includes(capability), capability);
+    assert.equal(canGrantedAdminPerform('custom', grants, capability), effective.has(capability), capability);
   }
   assert.equal(canGrantedAdminPerform('custom', [], 'admin.support'), false, 'no default permission');
 });
@@ -43,8 +44,11 @@ test('bundle permissions expand to their parts only', () => {
   assert.deepEqual(new Set(expandAdminCapabilities(['admin.operations'])), new Set([
     'admin.operations', 'admin.merchants.review', 'admin.merchants.moderate',
     'admin.customers.moderate', 'admin.products.moderate', 'admin.categories.manage',
+    'admin.reviews.moderate', 'admin.catalog.view',
   ]));
   assert.ok(expandAdminCapabilities(['admin.staff.manage']).includes('admin.staff.directory'));
+  assert.deepEqual(new Set(expandAdminCapabilities(['admin.orders.manage'])), new Set(['admin.orders.manage', 'admin.orders.view']));
+  assert.deepEqual(new Set(expandAdminCapabilities(['admin.support'])), new Set(['admin.support', 'admin.support.view']));
 });
 
 test('separation of duties: setting commission does not allow settling payouts', () => {
@@ -53,7 +57,10 @@ test('separation of duties: setting commission does not allow settling payouts',
   assert.ok(!policy.includes('admin.finance.payouts'));
   assert.ok(!expandAdminCapabilities(['admin.finance.view']).includes('admin.finance.payouts'));
   assert.ok(!expandAdminCapabilities(['admin.finance.payouts']).includes('admin.finance.policy'));
-  assert.ok(!expandAdminCapabilities(['admin.overview.view']).some((c) => c !== 'admin.overview.view'), 'overview is read-only');
+  for (const readOnly of ['admin.overview.view', 'admin.orders.view', 'admin.support.view', 'admin.catalog.view', 'admin.reports.view', 'admin.finance.view']) {
+    assert.deepEqual(expandAdminCapabilities([readOnly]), [readOnly], `${readOnly} grants nothing else`);
+  }
+  assert.ok(!expandAdminCapabilities(['admin.orders.manage']).includes('admin.finance.refunds'), 'order managers cannot refund on their own');
 });
 
 test('legacy fixed roles keep their original baseline', () => {

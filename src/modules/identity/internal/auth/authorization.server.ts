@@ -95,7 +95,9 @@ export type AdminCapability =
   | "admin.campaigns.manage" | "admin.audit.read" | "admin.staff.directory"
   | "admin.finance.refunds" | "admin.finance.policy" | "admin.finance.view"
   | "admin.staff.manage"
-  | "admin.overview.view" | "admin.finance.payouts";
+  | "admin.overview.view" | "admin.finance.payouts"
+  | "admin.orders.view" | "admin.orders.manage" | "admin.risk.review" | "admin.reviews.moderate"
+  | "admin.promotions.manage" | "admin.reports.view" | "admin.support.view" | "admin.catalog.view";
 
 
 export async function getAdminStaffRole(userId: string): Promise<AdminStaffRole | null> {
