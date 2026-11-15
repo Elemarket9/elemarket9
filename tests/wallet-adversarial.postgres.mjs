@@ -467,7 +467,13 @@ test("T23 a confirmed provider failure releases the reservation once", { skip },
   const r = await request(m, "40.00");
   await sim.finish(r.payoutId, "failed");
   const raw = JSON.stringify({ payoutId: r.payoutId });
-  await Promise.all([webhook(raw), webhook(raw), (async () => { await due(r.payoutId); await wallet.reconcilePayouts(); })()]);
+  const delivered = await Promise.allSettled([
+    webhook(raw), webhook(raw),
+    (async () => { await due(r.payoutId); await wallet.reconcilePayouts(); })(),
+  ]);
+  assert.ok(delivered.every((x) => x.status === "fulfilled" || x.reason?.status === 503),
+    "in-flight duplicate callbacks may receive a retriable 503, never a false acknowledgement");
+  assert.equal((await webhook(raw)).duplicate, true, "completed callbacks are idempotent");
   assert.equal((await payout(r.payoutId)).status, "failed");
   assert.equal(await ledgerCount(r.payoutId, "payout_returned"), 2, "one return pair");
   assert.deepEqual(await balances(m), before);
