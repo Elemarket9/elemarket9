@@ -24,7 +24,7 @@ const searchInputSchema=z.object({
   q:z.string().trim().max(120).default(""),category:z.string().trim().max(120).optional(),subcategory:z.string().trim().max(120).optional(),
   brand:z.string().trim().max(120).optional(),model:z.string().trim().max(120).optional(),merchantId:z.string().trim().max(128).optional(),
   lat:z.number().finite().min(-90).max(90).optional(),lon:z.number().finite().min(-180).max(180).optional(),radiusKm:z.number().finite().min(3).max(100).optional(),
-  listingType:z.enum(["product","food","stay"]).optional(),condition:z.enum(["new","refurbished","used","open_box"]).optional(),
+  listingType:z.enum(["product","stay"]).optional(),condition:z.enum(["new","refurbished","used","open_box"]).optional(),
   minPrice:z.number().finite().min(0).optional(),maxPrice:z.number().finite().min(0).optional(),inStock:z.boolean().default(true),
   sort:z.enum(["relevance","price_asc","price_desc","newest"]).default("relevance"),limit:z.number().int().min(1).max(MAX_LIMIT).default(40),
   cursor:z.string().max(2048).optional(),
@@ -78,7 +78,7 @@ export async function searchProducts(input:string|z.input<typeof searchInputSche
   const rankedAt=cursor?.rankedAt??Date.now();
   const values:unknown[]=[],types:string[]=[];
   const add=(v:unknown,type='text')=>{values.push(v);types.push(type);return `$${values.length}::${type}`;};
-  const where=["p.status='active'","m.status='active'","m.verified=true","exists(select 1 from category_taxonomy c where c.category_key=p.category and c.active=true)","(p.subcategory is null or exists(select 1 from category_subcategories s where s.category_key=p.category and s.subcategory_key=p.subcategory and s.active=true))","(p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections c on c.id=o.connection_id where o.product_id=p.id and o.status='active' and c.status='active' and o.last_seen_at>=now()-make_interval(secs=>c.stale_after_seconds)))"];
+  const where=["p.status='active'","p.category not in ('food','restaurants')","p.listing_type<>'food'","m.status='active'","m.verified=true","exists(select 1 from category_taxonomy c where c.category_key=p.category and c.active=true)","(p.subcategory is null or exists(select 1 from category_subcategories s where s.category_key=p.category and s.subcategory_key=p.subcategory and s.active=true))","(p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections c on c.id=o.connection_id where o.product_id=p.id and o.status='active' and c.status='active' and o.last_seen_at>=now()-make_interval(secs=>c.stale_after_seconds)))"];
   if(data.inStock||plan.availability)where.push("(p.stock>0 and (not exists(select 1 from product_variants pv0 where pv0.product_id=p.id and pv0.status='active') or exists(select 1 from product_variants pv1 where pv1.product_id=p.id and pv1.status='active' and pv1.stock>0)))");
   const original=normalizeDiscoveryQuery(plan.lexical);
   const query=add(original);
