@@ -20,7 +20,7 @@ import type { MobileMoneyNetwork } from "@/modules/payments/internal/adapters/pa
 
 export type PaymentStatus = "initiated" | "authorized" | "completed" | "failed" | "refunded";
 
-function validateProviderCheckoutUrl(
+export function validateProviderCheckoutUrl(
   value: string | undefined,
   providerKey: string,
 ): string | undefined {
@@ -69,6 +69,8 @@ export async function createExternalPaymentIntent(input: {
 }) {
   const prompt = input.mobileMoneyPrompt;
   const sql = await getSql();
+  const groupOwner = await sql.query<{charge_id:string}>(`select charge_id from checkout_group_charge_members where payment_id=$1 limit 1`, [input.paymentId]);
+  if (groupOwner[0]) throw new Error("This merchant belongs to a single-charge order group; use the combined checkout");
   const owned = await requireCustomerPayment(input.paymentId, input.userId);
   const payment = {
     payment_id: owned.id,
