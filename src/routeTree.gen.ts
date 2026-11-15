@@ -19,7 +19,6 @@ import { Route as DeliveryRecoveryReviewRouteImport } from './routes/delivery-re
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MerchantShipmentReturnsRouteImport } from './routes/merchant-shipment-returns'
-import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PickupSelectionRouteImport } from './routes/pickup-selection'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -61,6 +60,7 @@ import { Route as MerchantLoginRouteImport } from './routes/merchant/login'
 import { Route as MerchantRegisterRouteImport } from './routes/merchant/register'
 import { Route as MerchantStatusRouteImport } from './routes/merchant/status'
 import { Route as MerchantWalletRouteImport } from './routes/merchant/wallet'
+import { Route as OrdersIndexRouteImport } from './routes/orders.index'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as PartnerDeliveryRouteImport } from './routes/partner.delivery'
 import { Route as PartnerFinancingRouteImport } from './routes/partner.financing'
@@ -164,11 +164,6 @@ const LoginRoute = LoginRouteImport.update({
 const MerchantShipmentReturnsRoute = MerchantShipmentReturnsRouteImport.update({
   id: '/merchant-shipment-returns',
   path: '/merchant-shipment-returns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdersRoute = OrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PickupSelectionRoute = PickupSelectionRouteImport.update({
@@ -376,10 +371,15 @@ const MerchantWalletRoute = MerchantWalletRouteImport.update({
   path: '/merchant/wallet',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrdersIndexRoute = OrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => OrdersRoute,
+  id: '/orders/$id',
+  path: '/orders/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PartnerDeliveryRoute = PartnerDeliveryRouteImport.update({
   id: '/partner/delivery',
@@ -669,7 +669,6 @@ export interface FileRoutesByFullPath {
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -732,6 +731,7 @@ export interface FileRoutesByFullPath {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/provider/': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -776,7 +776,6 @@ export interface FileRoutesByTo {
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -839,6 +838,7 @@ export interface FileRoutesByTo {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin': typeof AdminIndexRoute
+  '/orders': typeof OrdersIndexRoute
   '/provider': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -884,7 +884,6 @@ export interface FileRoutesById {
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -947,6 +946,7 @@ export interface FileRoutesById {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/provider/': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -993,7 +993,6 @@ export interface FileRouteTypes {
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -1056,6 +1055,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin/'
+    | '/orders/'
     | '/provider/'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -1100,7 +1100,6 @@ export interface FileRouteTypes {
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -1163,6 +1162,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin'
+    | '/orders'
     | '/provider'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -1207,7 +1207,6 @@ export interface FileRouteTypes {
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -1270,6 +1269,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin/'
+    | '/orders/'
     | '/provider/'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -1315,7 +1315,6 @@ export interface RootRouteChildren {
   HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
   MerchantShipmentReturnsRoute: typeof MerchantShipmentReturnsRoute
-  OrdersRoute: typeof OrdersRouteWithChildren
   PickupSelectionRoute: typeof PickupSelectionRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -1356,6 +1355,7 @@ export interface RootRouteChildren {
   MerchantRegisterRoute: typeof MerchantRegisterRoute
   MerchantStatusRoute: typeof MerchantStatusRoute
   MerchantWalletRoute: typeof MerchantWalletRoute
+  OrdersIdRoute: typeof OrdersIdRoute
   PartnerDeliveryRoute: typeof PartnerDeliveryRoute
   PartnerFinancingRoute: typeof PartnerFinancingRoute
   PaymentPreviewRoute: typeof PaymentPreviewRoute
@@ -1377,6 +1377,7 @@ export interface RootRouteChildren {
   ProviderStatusRoute: typeof ProviderStatusRoute
   StoresIdRoute: typeof StoresIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  OrdersIndexRoute: typeof OrdersIndexRoute
   ProviderIndexRoute: typeof ProviderIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiDeliveryQuoteRoute: typeof ApiDeliveryQuoteRoute
@@ -1481,13 +1482,6 @@ declare module '@tanstack/react-router' {
       path: '/merchant-shipment-returns'
       fullPath: '/merchant-shipment-returns'
       preLoaderRoute: typeof MerchantShipmentReturnsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/orders': {
-      id: '/orders'
-      path: '/orders'
-      fullPath: '/orders'
-      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pickup-selection': {
@@ -1777,12 +1771,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MerchantWalletRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/orders/': {
+      id: '/orders/'
+      path: '/orders'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof OrdersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders/$id': {
       id: '/orders/$id'
-      path: '/$id'
+      path: '/orders/$id'
       fullPath: '/orders/$id'
       preLoaderRoute: typeof OrdersIdRouteImport
-      parentRoute: typeof OrdersRoute
+      parentRoute: typeof rootRouteImport
     }
     '/partner/delivery': {
       id: '/partner/delivery'
@@ -2151,17 +2152,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface OrdersRouteChildren {
-  OrdersIdRoute: typeof OrdersIdRoute
-}
-
-const OrdersRouteChildren: OrdersRouteChildren = {
-  OrdersIdRoute: OrdersIdRoute,
-}
-
-const OrdersRouteWithChildren =
-  OrdersRoute._addFileChildren(OrdersRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartRoute: CartRoute,
@@ -2173,7 +2163,6 @@ const rootRouteChildren: RootRouteChildren = {
   HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
   MerchantShipmentReturnsRoute: MerchantShipmentReturnsRoute,
-  OrdersRoute: OrdersRouteWithChildren,
   PickupSelectionRoute: PickupSelectionRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
@@ -2214,6 +2203,7 @@ const rootRouteChildren: RootRouteChildren = {
   MerchantRegisterRoute: MerchantRegisterRoute,
   MerchantStatusRoute: MerchantStatusRoute,
   MerchantWalletRoute: MerchantWalletRoute,
+  OrdersIdRoute: OrdersIdRoute,
   PartnerDeliveryRoute: PartnerDeliveryRoute,
   PartnerFinancingRoute: PartnerFinancingRoute,
   PaymentPreviewRoute: PaymentPreviewRoute,
@@ -2235,6 +2225,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProviderStatusRoute: ProviderStatusRoute,
   StoresIdRoute: StoresIdRoute,
   AdminIndexRoute: AdminIndexRoute,
+  OrdersIndexRoute: OrdersIndexRoute,
   ProviderIndexRoute: ProviderIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiDeliveryQuoteRoute: ApiDeliveryQuoteRoute,

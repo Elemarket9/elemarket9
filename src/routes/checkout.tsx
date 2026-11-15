@@ -395,10 +395,10 @@ function CheckoutForm() {
                       {financingProviders.map((provider) => (
                         <label key={provider.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border bg-white p-3 ${selectedFinancingProvider === provider.id ? "border-market-green" : "border-market-line"}`}>
                           <input type="radio" name="financing-provider" value={provider.id} checked={selectedFinancingProvider === provider.id} onChange={() => setSelectedFinancingProvider(provider.id)} />
-                          <span className="min-w-0 flex-1"><span className="block text-sm font-black">{provider.name}</span><span className="block text-[11px] font-semibold text-market-muted">{provider.productType === "bnpl" ? "BNPL" : "Installment financing"} · Provider approval required</span>{provider.providerLegalName ? <span className="block text-[10px] text-market-muted">Offered by {provider.providerLegalName}</span> : null}<span className="mt-1 block text-[10px]">{provider.termsUrl ? <a className="underline" href={provider.termsUrl} target="_blank" rel="noopener noreferrer">Terms</a> : <span>Terms: ask provider</span>}{" · "}{provider.privacyUrl ? <a className="underline" href={provider.privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a> : <span>Privacy: ask provider</span>}</span></span>
+                          <span className="min-w-0 flex-1"><span className="block text-sm font-black">{provider.name}</span><span className="block text-xs font-semibold text-market-muted">{provider.productType === "bnpl" ? "BNPL" : "Installment financing"} · Provider approval required</span>{provider.providerLegalName ? <span className="block text-xs text-market-muted">Offered by {provider.providerLegalName}</span> : null}<span className="mt-1 block text-xs">{provider.termsUrl ? <a className="underline" href={provider.termsUrl} target="_blank" rel="noopener noreferrer">Terms</a> : <span>Terms: ask provider</span>}{" · "}{provider.privacyUrl ? <a className="underline" href={provider.privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a> : <span>Privacy: ask provider</span>}</span></span>
                         </label>
                       ))}
-                      <p className="text-[11px] leading-5 text-market-muted">Indicative application amount: {formatGhs(financingQuote.amount)}. This is not an approved credit limit. Final approval, fees, schedule and terms come only from the financing provider.</p>
+                      <p className="text-xs leading-5 text-market-muted">Indicative application amount: {formatGhs(financingQuote.amount)}. This is not an approved credit limit. Final approval, fees, schedule and terms come only from the financing provider.</p>
                       {selectedFinancingProvider ? <FinancingProviderApplicationForm
                         providerId={selectedFinancingProvider}
                         quoteId={financingQuote.quoteId}
@@ -407,7 +407,7 @@ function CheckoutForm() {
                     </div>
                   ) : null}
                   {financingStatus && <p role="status" className="mt-3 rounded-xl border border-market-line bg-white p-3 text-xs font-semibold text-market-muted">{financingStatus}</p>}
-                  {!financingProviders.length && financingQuote && <div className="mt-3 rounded-xl border border-dashed border-market-line bg-white p-3 text-[11px] leading-5 text-market-muted"><b className="text-market-ink">Financing unavailable:</b> no enabled financing partner currently supports this purchase amount. Availability, pricing, terms and approval always come from the provider.</div>}
+                  {!financingProviders.length && financingQuote && <div className="mt-3 rounded-xl border border-dashed border-market-line bg-white p-3 text-xs leading-5 text-market-muted"><b className="text-market-ink">Financing unavailable:</b> no enabled financing partner currently supports this purchase amount. Availability, pricing, terms and approval always come from the provider.</div>}
                 </div>
               </div>
             </div>
@@ -465,7 +465,7 @@ function CheckoutForm() {
             {quotes.length > 0 && fulfillment === "pickup" && pickupLocation && (
               <p className="mt-2 text-xs text-market-muted">Collect at {pickupLocation.name}, {pickupLocation.address}.{doorDeliveryTotal ? ` Door delivery would cost ${formatGhs(doorDeliveryTotal)}${toPesewas(doorDeliveryTotal) > toPesewas(deliveryTotal) ? `, so you save ${formatGhs(fromPesewas(toPesewas(doorDeliveryTotal) - toPesewas(deliveryTotal)))}` : ""}.` : ""}</p>
             )}
-            <p className="mt-3 text-xs text-market-muted">Delivery is quoted separately and must be live, unexpired and tied to this address before an order is created.</p>{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL && import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL ? <p className="mt-2 text-[11px] text-market-muted">Location lookup powered by <a href={import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL} target="_blank" rel="noreferrer" className="underline">{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL}</a>.</p> : null}
+            <p className="mt-3 text-xs text-market-muted">Delivery is quoted separately and must be live, unexpired and tied to this address before an order is created.</p>{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL && import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL ? <p className="mt-2 text-xs text-market-muted">Location lookup powered by <a href={import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_URL} target="_blank" rel="noreferrer" className="underline">{import.meta.env.VITE_ELEMARKET_LOCATION_ATTRIBUTION_LABEL}</a>.</p> : null}
             <div className="mt-5 flex items-center gap-2 text-xs font-bold"><LockKeyhole size={14} /> Protected checkout</div>
           </aside>
         </div>
