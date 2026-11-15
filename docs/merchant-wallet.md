@@ -69,6 +69,27 @@ destination never changes in place (database-enforced); a different destination
 is a new account with its own cooling period. Each withdrawal stores the
 destination authorized when it was requested, and every attempt pays that one.
 
+## Seller financial records
+
+The merchant wallet offers two separately paginated histories: ungrouped ledger
+entries and provider payout attempts. Sellers may filter by UTC date and
+download a merchant-scoped CSV of ledger entries over a period of up to 93 days.
+CSV results are capped at 5,000 entries; oversized statements fail explicitly
+rather than silently omitting transactions. No raw recipient account numbers
+are included. These are marketplace ledger extracts, not a bank statement or
+evidence that an external provider has paid.
+
+The landing page's activity list is intentionally a bounded preview of the
+newest 100 ledger rows. Each full-history ledger row represents one signed
+bucket movement; debits and credits should not be collapsed across pagination
+boundaries. A payout history is a separate view of transfer status, net amount,
+fee and provider reference.
+
+Signed payout notifications are persisted as an inbox, with a short-lived
+processing lease. Unprocessed entries can be reclaimed and retried after a
+failure or crash. A concurrent duplicate that is still processing receives
+a retriable response, never a false successful acknowledgement.
+
 ## Withdrawal states
 
 | State | Merchant sees | Meaning |
