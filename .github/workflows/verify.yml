@@ -50,6 +50,10 @@ jobs:
       - run: npm run check:architecture
       - run: npm run validate:deployment-package
       - run: npm test
+      - name: Simulated payment recovery and settlement regressions
+        run: npm run test:payment:simulation
+      - name: Simulated merchant wallet transaction regressions
+        run: npm run test:wallet:simulation
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build

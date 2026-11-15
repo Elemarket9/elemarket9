@@ -281,7 +281,10 @@ export async function createExternalPaymentIntent(input: {
   });
   return {
     ...result,
-    status: external.status === "completed" ? "completed" as const : initializedStatus,
+    // A provider read-back can report a successful charge while the local order
+    // is still unpaid. Only the verified webhook/reconciliation transaction may
+    // transition the authoritative payment and order records to completed.
+    status: initializedStatus,
     providerReference: external.providerReference,
     checkoutUrl: safeCheckoutUrl,
     recovered,
