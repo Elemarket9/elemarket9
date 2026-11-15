@@ -65,6 +65,57 @@ test("paid order: checkout, retry, signed webhook, replay", async () => {
   assert.deepEqual(await state(ids.order), before);
 });
 
+// Preserve the provider's server-side charge but lose the HTTP initialize result.
+// A verify read-back can already say success while the marketplace ledger is unpaid.
+async function loseInitializeResponse(changeProviderRecord, run) {
+  const providerFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    const uri = new URL(String(url));
+    if (uri.hostname === "api.paystack.co" && uri.pathname === "/transaction/initialize") {
+      await providerFetch(url, init);
+      changeProviderRecord(JSON.parse(init.body).reference);
+      return new Response(JSON.stringify({ status: false }), {
+        status: 503, headers: { "content-type": "application/json" },
+      });
+    }
+    return providerFetch(url, init);
+  };
+  try { return await run(); } finally { globalThis.fetch = providerFetch; }
+}
+
+test("recovered provider success cannot mark the local order paid before webhook", async () => {
+  const ids = await seedOrder(sql);
+  const result = await loseInitializeResponse(
+    (reference) => provider.pay(reference),
+    () => createExternalPaymentIntent({ paymentId: ids.payment, userId: ids.user }),
+  );
+  assert.equal(result.recovered, true, "provider lookup recovered the existing reference");
+  assert.equal(result.status, "pending", "payment intent must reflect authoritative local settlement");
+  assert.equal((await state(ids.order)).payment, "initiated", "order has not been settled in PostgreSQL");
+
+  const confirmed = await webhook("charge.success", {
+    id: 9021, reference: result.providerReference, amount: 11500, currency: "GHS",
+  });
+  assert.ok(confirmed.ok, confirmed.message);
+  assert.equal((await state(ids.order)).payment, "completed", "verified webhook may settle the payment");
+});
+
+test("recovery rejects same-reference provider charges with mismatched amount", async () => {
+  const ids = await seedOrder(sql);
+  await assert.rejects(
+    loseInitializeResponse(
+      (reference) => {
+        const record = provider.ledger.get(reference);
+        record.amount = 100;
+        record.status = "success";
+      },
+      () => createExternalPaymentIntent({ paymentId: ids.payment, userId: ids.user }),
+    ),
+    /initialization failed/,
+  );
+  assert.equal((await state(ids.order)).payment, "initiated");
+});
+
 test("webhook attacks are rejected and leave the order unpaid", async () => {
   const ids = await seedOrder(sql);
   const intent = await createExternalPaymentIntent({ paymentId: ids.payment, userId: ids.user });
