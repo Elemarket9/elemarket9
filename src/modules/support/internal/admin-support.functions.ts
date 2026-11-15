@@ -10,7 +10,7 @@ import { maskEmail } from "@/modules/shared/public/display";
 
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
 export type SupportStatus = "open" | "waiting_customer" | "waiting_support" | "resolved" | "closed";
-export type SupportInboxRow = { id:string; customerId:string; customerName:string|null; customerEmail:string|null; orderId:string|null; status:SupportStatus; priority:SupportPriority; assignedAdminId:string|null; assignedAdminName:string|null; assignedToMe:boolean; updatedAt:string; lastMessage:string|null };
+export type SupportInboxRow = { id:string; customerId:string; customerName:string|null; customerEmail:string|null; orderId:string|null; status:SupportStatus; priority:SupportPriority; assignedAdminId:string|null; assignedAdminName:string|null; assignedToMe:boolean; updatedAt:string; waitingSince?:string|null; lastMessage:string|null };
 export type SupportThreadMessage = { id:string; senderType:"customer"|"support"; body:string; createdAt:string };
 export type SupportInternalNote = { id:string; adminId:string; adminName:string|null; body:string; createdAt:string };
 export type SupportThread = { conversation:Omit<SupportInboxRow,"lastMessage">; messages:SupportThreadMessage[]; notes:SupportInternalNote[] };
@@ -40,11 +40,11 @@ export const listSupportInbox=createServerFn({method:"GET"}).middleware([authMid
   const adminId=getAuthenticatedUserId(context); const caps=await getAdminCapabilitiesForUserId(adminId); assertSupportReader(caps);
   await enforceRateLimit("admin-support-read",{windowSeconds:60,maxRequests:60,subject:adminId, identity: "subject" });
   const sql=await getSql();
-  const inbox=await sql.query<SupportInboxRow>(`select c.id,c.customer_id as "customerId",u.name as "customerName",u.email as "customerEmail",c.order_id as "orderId",c.status,c.priority,c.assigned_admin_id as "assignedAdminId",au.name as "assignedAdminName",(c.assigned_admin_id=$1) as "assignedToMe",c.updated_at as "updatedAt",
+  const inbox=await sql.query<SupportInboxRow>(`select c.id,c.customer_id as "customerId",u.name as "customerName",u.email as "customerEmail",c.order_id as "orderId",c.status,c.priority,c.assigned_admin_id as "assignedAdminId",au.name as "assignedAdminName",(c.assigned_admin_id=$1) as "assignedToMe",c.updated_at as "updatedAt",c.waiting_since as "waitingSince",
     (select left(m.body,240) from support_messages m where m.conversation_id=c.id order by m.created_at desc,m.id desc limit 1) as "lastMessage"
     from support_conversations c join "user" u on u.id=c.customer_id left join "user" au on au.id=c.assigned_admin_id
     where c.status in ('open','waiting_support','waiting_customer','resolved')
-    order by case c.priority when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end,c.updated_at desc limit 100`,[adminId]);
+    order by (c.waiting_since is null),case c.priority when 'urgent' then 0 when 'high' then 1 when 'normal' then 2 else 3 end,c.waiting_since asc nulls last,c.updated_at desc limit 100`,[adminId]);
   return inbox.map((row)=>({...row,customerEmail:supportEmailFor(caps,row.customerEmail)}));
 });
 

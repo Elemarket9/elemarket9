@@ -44,8 +44,25 @@ async function loadOwnedConversation(userId: string, conversationId: string): Pr
         and d.status='pending' and d.expires_at>now()
       order by d.updated_at desc limit 1`, [userId,conversationId],
   );
+  // Opening or refreshing the thread is reading it: clears the unread badge.
+  await sql.query(
+    `with identity as (select set_config('app.user_id',$1,true)) select mark_support_conversation_read($1,$2) from identity`,
+    [userId, conversationId],
+  );
   return { id: conversation.id, status: conversation.status, messages, draft: draftRows[0]?.result ?? null };
 }
+
+/** Lightweight poll for the chat button's unread badge (support replies not yet seen). */
+export const getSupportUnreadCount = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = getAuthenticatedUserId(context);
+    await requireRoleForUserId(["customer", "merchant"], userId);
+    await enforceRateLimit("support-unread", { windowSeconds: 60, maxRequests: 10, subject: userId });
+    const sql = await getSql();
+    const rows = await sql.query<{ unread: number }>(`select support_unread_count($1) as unread`, [userId]);
+    return { unread: Number(rows[0]?.unread ?? 0) };
+  });
 
 export const getSupportConversation = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
