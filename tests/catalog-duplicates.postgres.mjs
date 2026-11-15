@@ -78,6 +78,25 @@ test("simultaneous duplicate submissions result in at most one new listing", { s
   assert.equal(rows.rows[0].n, 1);
 });
 
+test("bulk CSV insert is atomic when a row duplicates an earlier row", { skip }, async () => {
+  const merchantId = await merchant();
+  const userId = id("dup_user");
+  await pool.query(`insert into "user"(id,name,email,"emailVerified")
+    values($1,'CSV Merchant',$2,true)`, [userId, userId + "@integration.test"]);
+  await pool.query(`insert into merchant_accounts(merchant_id,user_id,status)
+    values($1,$2,'active')`, [merchantId,userId]);
+  const rows = [
+    { name:"CSV One",category:"electronics",listingType:"product",price:100,stock:2,sku:"CSV-001" },
+    { name:"CSV Duplicate",category:"electronics",listingType:"product",price:120,stock:2,sku:"csv-001" },
+  ];
+  await rejectedDuplicate(pool.query(
+    "select merchant_bulk_create_products($1,$2,$3::jsonb)",
+    [merchantId,userId,JSON.stringify(rows)],
+  ));
+  const result = await pool.query("select count(*)::int n from products where merchant_id=$1", [merchantId]);
+  assert.equal(result.rows[0].n, 0, "entire invalid batch must roll back");
+});
+
 test("non-identity updates to historical duplicates remain possible", { skip }, async () => {
   const merchantId = await merchant();
   const product = await listing(merchantId, "Stable Item", "STABLE-SKU");
