@@ -12,10 +12,17 @@ export type AdminModerationData = {
   products: Array<{ id:string; name:string; merchantId:string; merchantName:string; status:string; price:string; createdAt:string }>;
 };
 
+/** Read access for one operations section: its own write permission, or the
+ * read-only `admin.catalog.view` (implied by `admin.operations`). Loads only;
+ * every mutation below requires its exact write permission. */
+export function operationsSectionReader(perms: readonly string[]) {
+  return (sectionCapability: string) => perms.includes("admin.full") || perms.includes(sectionCapability) || perms.includes("admin.catalog.view");
+}
+
 export const loadAdminModeration = createServerFn({ method:"GET" }).middleware([authMiddleware]).handler(async ({context}):Promise<AdminModerationData> => {
   const adminId=getAuthenticatedUserId(context);
   const perms=await getAdminCapabilitiesForUserId(adminId);
-  const can=(cap:string)=>perms.includes('admin.full')||perms.includes(cap as typeof perms[number]);
+  const can=operationsSectionReader(perms);
   if (!['admin.merchants.moderate','admin.customers.moderate','admin.products.moderate'].some(can)) throw new Error('Forbidden');
   const sql=await getSql();
   const [merchants,customers,products]=await Promise.all([
@@ -57,7 +64,7 @@ export const loadAdminOperationsQueues = createServerFn({ method: "GET" })
   .middleware([authMiddleware]).handler(async ({ context }): Promise<AdminOperationsQueues> => {
     const adminId = getAuthenticatedUserId(context);
     const perms = await getAdminCapabilitiesForUserId(adminId);
-    const can=(cap:string)=>perms.includes('admin.full')||perms.includes(cap as typeof perms[number]);
+    const can=operationsSectionReader(perms);
     if (!can('admin.merchants.review') && !can('admin.categories.manage')) throw new Error('Forbidden');
     const sql = await getSql();
     const [applications, categories, subcategories] = await Promise.all([
