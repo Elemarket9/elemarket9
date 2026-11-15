@@ -108,7 +108,20 @@ export const createPendingCheckoutServer = createServerOnlyFn(async (data: Pendi
       data.promoCode ?? null,
       data.assistedDraftId ?? null,
     ],
-  );
+  ).catch(async (error: unknown) => {
+    // A risk block aborts the checkout transaction, which also rolls back its
+    // risk assessment. Record it separately so it reaches the fraud review queue
+    // (migration 0236). Never let this bookkeeping mask the original refusal.
+    const detail = (error as { detail?: unknown } | null)?.detail;
+    if (error instanceof Error && error.message.includes("checkout blocked by ELEMARKET risk controls") && typeof detail === "string") {
+      try {
+        await sql.query(
+          `with identity as (select set_config('app.user_id', $1, true) as user_id)
+           select record_blocked_checkout_attempt($1, $2::jsonb) from identity`, [userId, detail]);
+      } catch { /* best effort */ }
+    }
+    throw error;
+  });
   const result = rows[0]?.result;
   if (
     !result ||

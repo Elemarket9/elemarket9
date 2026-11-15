@@ -57,7 +57,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
               pp.status as participation_status,pp.terms_version
          from promotions p cross join unnest($1::text[]) as m(id)
          left join promotion_participations pp on pp.promotion_id=p.id and pp.merchant_id=m.id
-        where p.merchant_id is null and p.status in ('active','draft') and p.ends_at>now()
+        where p.merchant_id is null and p.funding_source='merchant' and p.status in ('active','draft') and p.ends_at>now()
         order by p.starts_at asc`,
       [merchantIds],
     );

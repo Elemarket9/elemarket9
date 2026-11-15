@@ -50,7 +50,7 @@ export const decideFinanceApproval = createServerFn({ method: "POST" })
     const { requireAdminForUserId, requireFreshSession, enforceRateLimit } = await guards();
     await requireAdminForUserId(userId, request.required_capability);
     await requireFreshSession();
-    await enforceRateLimit("admin-dual-approval-decision", { windowSeconds: 600, maxRequests: 30, subject: userId });
+    await enforceRateLimit("admin-dual-approval-decision", { windowSeconds: 600, maxRequests: 30, subject: userId, identity: "subject" });
 
     const { decideDualApproval, recordDualApprovalOutcome } = await import("../../dual-approval.server");
     const row = await decideDualApproval({ approvalId: data.approvalId, deciderId: userId, decision: data.decision, note: data.note });
@@ -114,7 +114,7 @@ export const requestPayoutResolution = createServerFn({ method: "POST" })
     const { requireAdminForUserId, requireFreshSession, enforceRateLimit } = await guards();
     await requireAdminForUserId(userId, "admin.finance.payouts");
     await requireFreshSession();
-    await enforceRateLimit("admin-payout-resolution", { windowSeconds: 600, maxRequests: 20, subject: userId });
+    await enforceRateLimit("admin-payout-resolution", { windowSeconds: 600, maxRequests: 20, subject: userId, identity: "subject" });
     const { withTransaction } = await import("@/lib/db");
     const { requiresDualApproval, createDualApproval } = await import("../../dual-approval.server");
     const queued = await withTransaction(async (sql) => {

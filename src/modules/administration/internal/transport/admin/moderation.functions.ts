@@ -5,6 +5,7 @@ import { getSql } from "@/lib/db";
 import { authMiddleware, getAuthenticatedUserId } from "@/modules/identity/public/auth/middleware";
 import { requireAdminForUserId, getAdminCapabilitiesForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { requireFreshSession } from "@/modules/identity/public/auth/verify.server";
+import { maskEmail } from "@/modules/shared/public/display";
 
 export type AdminModerationData = {
   merchants: Array<{ id:string; name:string; status:string; tier:string; settlementModel:string; catalogSource:string; ownerId:string|null; ownerEmail:string|null }>;
@@ -12,10 +13,20 @@ export type AdminModerationData = {
   products: Array<{ id:string; name:string; merchantId:string; merchantName:string; status:string; price:string; createdAt:string }>;
 };
 
+/** Read access for one operations section: its own write permission, or the
+ * read-only `admin.catalog.view` (implied by `admin.operations`). Loads only;
+ * every mutation below requires its exact write permission. */
+export function operationsSectionReader(perms: readonly string[]) {
+  return (sectionCapability: string) => perms.includes("admin.full") || perms.includes(sectionCapability)
+    // Catalogue read-only never includes customer personal data (security audit M3).
+    || (perms.includes("admin.catalog.view") && sectionCapability !== "admin.customers.moderate");
+}
+
+
 export const loadAdminModeration = createServerFn({ method:"GET" }).middleware([authMiddleware]).handler(async ({context}):Promise<AdminModerationData> => {
   const adminId=getAuthenticatedUserId(context);
   const perms=await getAdminCapabilitiesForUserId(adminId);
-  const can=(cap:string)=>perms.includes('admin.full')||perms.includes(cap as typeof perms[number]);
+  const can=operationsSectionReader(perms);
   if (!['admin.merchants.moderate','admin.customers.moderate','admin.products.moderate'].some(can)) throw new Error('Forbidden');
   const sql=await getSql();
   const [merchants,customers,products]=await Promise.all([
@@ -23,7 +34,8 @@ export const loadAdminModeration = createServerFn({ method:"GET" }).middleware([
     can('admin.customers.moderate') ? sql.query<any>(`select id,name,email,"moderationStatus" as status,to_char("createdAt" at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') as "createdAt" from "user" where role='customer' order by case when "moderationStatus"='blacklisted' then 0 else 1 end,"createdAt" desc limit 100`) : Promise.resolve([]),
     can('admin.products.moderate') ? sql.query<any>(`select p.id,p.name,p.merchant_id,p.status,p.price::text,to_char(p.created_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') as created_at,m.name as merchant_name from products p join merchants m on m.id=p.merchant_id where p.status in ('pending_review','suspended','active') order by case p.status when 'pending_review' then 0 when 'suspended' then 1 else 2 end,p.created_at desc limit 100`) : Promise.resolve([]),
   ]);
-  return { merchants:merchants.map((r:any)=>({id:r.id,name:r.name,status:r.status,tier:r.tier,settlementModel:r.settlement_model,catalogSource:r.catalog_source,ownerId:r.owner_id??null,ownerEmail:r.owner_email??null})), customers:customers.map((r:any)=>({id:r.id,name:r.name,email:r.email,status:r.status,createdAt:r.createdAt})), products:products.map((r:any)=>({id:r.id,name:r.name,merchantId:r.merchant_id,merchantName:r.merchant_name,status:r.status,price:r.price,createdAt:r.created_at})) };
+  const fullOwnerEmail = perms.includes("admin.full") || perms.includes("admin.merchants.moderate");
+  return { merchants:merchants.map((r:any)=>({id:r.id,name:r.name,status:r.status,tier:r.tier,settlementModel:r.settlement_model,catalogSource:r.catalog_source,ownerId:r.owner_id??null,ownerEmail:fullOwnerEmail ? (r.owner_email??null) : maskEmail(r.owner_email??null)})), customers:customers.map((r:any)=>({id:r.id,name:r.name,email:r.email,status:r.status,createdAt:r.createdAt})), products:products.map((r:any)=>({id:r.id,name:r.name,merchantId:r.merchant_id,merchantName:r.merchant_name,status:r.status,price:r.price,createdAt:r.created_at})) };
 });
 
 const merchantAction=z.object({merchantId:z.string().min(1).max(128),action:z.enum(["suspend","reinstate"]),reason:z.string().trim().min(10).max(2000)});
@@ -57,7 +69,7 @@ export const loadAdminOperationsQueues = createServerFn({ method: "GET" })
   .middleware([authMiddleware]).handler(async ({ context }): Promise<AdminOperationsQueues> => {
     const adminId = getAuthenticatedUserId(context);
     const perms = await getAdminCapabilitiesForUserId(adminId);
-    const can=(cap:string)=>perms.includes('admin.full')||perms.includes(cap as typeof perms[number]);
+    const can=operationsSectionReader(perms);
     if (!can('admin.merchants.review') && !can('admin.categories.manage')) throw new Error('Forbidden');
     const sql = await getSql();
     const [applications, categories, subcategories] = await Promise.all([

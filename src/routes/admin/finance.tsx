@@ -13,6 +13,7 @@ import {
   listWalletReconciliation,
   resolveWalletReconciliationException,
 } from "@/modules/wallet/public/transport/merchant/wallet.functions";
+import { formatGhs as ghs, formatDateTime as when } from "@/modules/shared/public/display";
 
 const APPROVER = ["admin.finance.refunds", "admin.finance.payouts"];
 const WALLET_VIEW = ["admin.finance.view", "admin.finance.payouts"];
@@ -46,8 +47,6 @@ export const Route = createFileRoute("/admin/finance")({
   ),
 });
 
-const ghs = (v: string | number) => `GH₵ ${Number(v).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const when = (v: string | null) => (v ? new Date(v).toLocaleString("en-GH", { dateStyle: "medium", timeStyle: "short" }) : "—");
 const ACTION_LABEL: Record<string, string> = { order_refund: "Customer refund", wallet_payout_resolution: "Payout settlement" };
 const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-50 text-amber-900", approved: "bg-green-50 text-green-800", executed: "bg-green-50 text-green-800",

@@ -87,7 +87,8 @@ test("checkout empty-order guard uses this merchant's delivery fee", () => {
     .sort()
     .filter((name) => /function\s+public\.create_pending_order\s*\(/i.test(readFileSync(new URL(name, dir), "utf8")))
     .at(-1);
-  assert.equal(latest, "0215_checkout_empty_order_guard.sql");
+  // 0234 redefined it (marketplace promotions) from the live 0215 definition.
+  assert.equal(latest, "0234_marketplace_promotions.sql");
   const sql = readFileSync(new URL(latest, dir), "utf8");
   const assigned = sql.indexOf("v_delivery:=v_quote.price;");
   const guard = sql.indexOf("v_product_total + v_delivery <= 0");

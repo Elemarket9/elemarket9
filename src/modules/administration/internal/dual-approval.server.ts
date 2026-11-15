@@ -61,6 +61,14 @@ export async function createDualApproval(sql: Sql, input: {
     `update admin_dual_approvals set status='expired' where action=$1 and subject_id=$2 and status='pending' and expires_at<=now()`,
     [input.action, input.subjectId],
   );
+  // An approval whose execution never recorded an outcome (process died between
+  // "approved" and the money call) must not block the subject forever. Retrying
+  // is safe: refund preparation and payout resolution are idempotent per subject.
+  await sql.query(
+    `update admin_dual_approvals set status='failed', execution_error='Execution did not complete; superseded by a new request'
+      where action=$1 and subject_id=$2 and status='approved' and decided_at <= now() - interval '1 hour'`,
+    [input.action, input.subjectId],
+  );
   const open = await sql.query<{ id: string }>(
     `select id from admin_dual_approvals where action=$1 and subject_id=$2 and status in ('pending','approved') limit 1`,
     [input.action, input.subjectId],
@@ -104,6 +112,14 @@ export async function decideDualApproval(input: {
       throw new Error("This request expired; ask for it to be submitted again");
     }
     if (row.requested_by === input.deciderId) throw new Error("A second administrator must approve this; you submitted it");
+    if (input.decision === "approve") {
+      // Also enforced by trigger admin_dual_approvals_independence (migration 0236).
+      const [independent] = await sql.query<{ ok: boolean }>(
+        `select admin_approver_is_independent($1,$2,$3) as ok`, [input.deciderId, row.requested_by, row.required_capability]);
+      if (!independent?.ok) {
+        throw new Error("You can't approve this: your approval role was given to you by the requester, or less than 7 days ago. Ask another administrator.");
+      }
+    }
     await sql.query(
       `update admin_dual_approvals set status=$2, decided_by=$3, decision_note=$4, decided_at=now() where id=$1`,
       [row.id, input.decision === "approve" ? "approved" : "rejected", input.deciderId, input.note],

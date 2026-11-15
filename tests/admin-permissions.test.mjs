@@ -23,7 +23,7 @@ test('Main Administrator holds every permission, including full control', () => 
 test('unknown permissions fail closed, even for the Main Administrator', () => {
   assert.equal(canGrantedAdminPerform('owner', [], 'admin.everything'), false);
   assert.equal(canGrantedAdminPerform('ops', ['admin.everything'], 'admin.everything'), false);
-  assert.deepEqual(expandAdminCapabilities(['admin.everything', 'admin.support']), ['admin.support']);
+  assert.deepEqual(expandAdminCapabilities(['admin.everything', 'admin.finance.view']), ['admin.finance.view']);
 });
 
 test('a sub-admin can never hold full control, even if it is stored against their role', () => {
@@ -33,8 +33,9 @@ test('a sub-admin can never hold full control, even if it is stored against thei
 
 test('a sub-admin gets exactly the permissions of their roles and nothing else', () => {
   const grants = ['admin.support', 'admin.finance.refunds'];
+  const effective = new Set([...grants, 'admin.support.view']); // replying to support implies reading it
   for (const capability of ADMIN_CAPABILITIES) {
-    assert.equal(canGrantedAdminPerform('custom', grants, capability), grants.includes(capability), capability);
+    assert.equal(canGrantedAdminPerform('custom', grants, capability), effective.has(capability), capability);
   }
   assert.equal(canGrantedAdminPerform('custom', [], 'admin.support'), false, 'no default permission');
 });
@@ -43,8 +44,11 @@ test('bundle permissions expand to their parts only', () => {
   assert.deepEqual(new Set(expandAdminCapabilities(['admin.operations'])), new Set([
     'admin.operations', 'admin.merchants.review', 'admin.merchants.moderate',
     'admin.customers.moderate', 'admin.products.moderate', 'admin.categories.manage',
+    'admin.reviews.moderate', 'admin.catalog.view',
   ]));
   assert.ok(expandAdminCapabilities(['admin.staff.manage']).includes('admin.staff.directory'));
+  assert.deepEqual(new Set(expandAdminCapabilities(['admin.orders.manage'])), new Set(['admin.orders.manage', 'admin.orders.view']));
+  assert.deepEqual(new Set(expandAdminCapabilities(['admin.support'])), new Set(['admin.support', 'admin.support.view']));
 });
 
 test('separation of duties: setting commission does not allow settling payouts', () => {
@@ -53,7 +57,10 @@ test('separation of duties: setting commission does not allow settling payouts',
   assert.ok(!policy.includes('admin.finance.payouts'));
   assert.ok(!expandAdminCapabilities(['admin.finance.view']).includes('admin.finance.payouts'));
   assert.ok(!expandAdminCapabilities(['admin.finance.payouts']).includes('admin.finance.policy'));
-  assert.ok(!expandAdminCapabilities(['admin.overview.view']).some((c) => c !== 'admin.overview.view'), 'overview is read-only');
+  for (const readOnly of ['admin.overview.view', 'admin.orders.view', 'admin.support.view', 'admin.catalog.view', 'admin.reports.view', 'admin.finance.view']) {
+    assert.deepEqual(expandAdminCapabilities([readOnly]), [readOnly], `${readOnly} grants nothing else`);
+  }
+  assert.ok(!expandAdminCapabilities(['admin.orders.manage']).includes('admin.finance.refunds'), 'order managers cannot refund on their own');
 });
 
 test('legacy fixed roles keep their original baseline', () => {
@@ -72,6 +79,16 @@ test('HR managers can only hand out permissions they hold, and never Main Admin'
   assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hr, nextPrimaryRole: 'owner' }), false, 'cannot create a Main Admin');
   assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hr, oldPrimaryRole: 'owner' }), false, 'cannot touch a Main Admin');
   assert.equal(canDelegatedAdminManageRoles({ ...base, actorOwner: true, actorCapabilities: [], nextPrimaryRole: 'owner' }), true);
+});
+
+test('money-approval powers can only be granted by the Main Administrator (security audit H1)', () => {
+  const base = { actorOwner: false, oldPrimaryRole: 'support', nextPrimaryRole: 'support', nextCapabilities: [] };
+  const hrWithFinance = ['admin.staff.manage', 'admin.finance.refunds', 'admin.finance.payouts', 'admin.support'];
+  for (const power of ['admin.finance.refunds', 'admin.finance.payouts', 'admin.staff.manage']) {
+    assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hrWithFinance, oldCapabilities: [power] }), false, power);
+    assert.equal(canDelegatedAdminManageRoles({ ...base, actorOwner: true, actorCapabilities: [], oldCapabilities: [power] }), true, `owner may grant ${power}`);
+  }
+  assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hrWithFinance, oldCapabilities: ['admin.support'] }), true, 'ordinary grants still delegable');
 });
 
 test('permission catalogue matches the database allow-list, the TypeScript type and the labels', () => {
@@ -197,4 +214,12 @@ test('two-person threshold: default, boundary, override and fail-closed', () => 
     if (saved === undefined) delete process.env.ELEMARKET_DUAL_APPROVAL_THRESHOLD_GHS;
     else process.env.ELEMARKET_DUAL_APPROVAL_THRESHOLD_GHS = saved;
   }
+});
+
+// Duplicate-removal guard: one implementation of money/date formatting and
+// email masking. Pages must not grow private copies again.
+test('money/date formatting and email masking have a single implementation', () => {
+  const offenders = walk('src').filter((f) => /\.(ts|tsx)$/.test(f) && !f.includes(`shared${path.sep}internal${path.sep}display.ts`))
+    .filter((f) => /const ghs = \(|const when = \(v|function maskEmail\w*\(/.test(fs.readFileSync(f, 'utf8')));
+  assert.deepEqual(offenders, []);
 });
