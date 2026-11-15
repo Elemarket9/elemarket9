@@ -7,6 +7,7 @@ import { choosePayOnDelivery, createPendingCheckout, getPayOnDeliveryOption, lis
 import { getAssistedOrderDraft } from "@/modules/support/public/support.functions";
 import { fingerprintCheckout } from "@/modules/ordering/public/checkout-fingerprint";
 import { createPaymentIntent } from "@/modules/payments/public/payment";
+import { createGroupPaymentIntent } from "@/modules/payments/public/group-payment";
 import { listCheckoutPickupLocations, requestDeliveryQuote } from "@/modules/logistics/public/adapters/delivery";
 import { resolveProductMerchants } from "@/modules/catalog/public/catalog";
 import { formatGhs, fromPesewas, lineTotal, sumMoney, toPesewas } from "@/modules/shared/public/money";
@@ -231,8 +232,24 @@ function CheckoutForm() {
     if(!prepared||operation.current)return;
     operation.current=true;setBusy(true);setError(null);
     try {
-      // Only initialize the first merchant payment. Remaining payments are
-      // fetched from the authenticated server-side checkout group after return.
+      if (prepared.orders.length > 1) {
+        // One customer charge, with immutable provider-side merchant allocations.
+        // A group intent cannot coexist with separate merchant payment attempts.
+        const grouped=await createGroupPaymentIntent({data:{groupId:prepared.groupId}});
+        if(grouped.checkoutUrl){
+          writeCart([]);
+          window.location.assign(grouped.checkoutUrl);
+          return;
+        }
+        if(grouped.status==="completed" || grouped.awaitingConfirmation) {
+          // A delayed or lost provider response must not generate a second charge.
+          writeCart([]);
+          window.location.assign(`/payment/return?groupId=${encodeURIComponent(prepared.groupId)}`);
+          return;
+        }
+        throw new Error("Group checkout is not ready; verify this payment status before retrying.");
+      }
+      // Single merchant keeps its normal idempotent hosted checkout.
       const first=prepared.orders[0];
       const intent=await createPaymentIntent({data:{paymentId:first.paymentId}});
       localStorage.setItem(PAYMENT_QUEUE_KEY,JSON.stringify(prepared.orders.map(({paymentId})=>({paymentId}))));

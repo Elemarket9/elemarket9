@@ -9,7 +9,8 @@ import { requireServerCheckoutUrl } from "../src/payment-url";
 export default function Payment() {
   // The route can be opened by an untrusted elemarket:// deep link. A URL
   // passed through router parameters is never financial authority.
-  const { paymentId } = useLocalSearchParams<{ paymentId: string }>();
+  const { paymentId, groupId } = useLocalSearchParams<{ paymentId?: string; groupId?: string }>();
+  const paymentKey = groupId ?? paymentId;
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -17,51 +18,56 @@ export default function Payment() {
   const inFlight = useRef(false);
   const handledPaymentId = useRef<string | null>(null);
   const mounted = useRef(true);
-  const currentPaymentId = useRef(paymentId);
-  currentPaymentId.current = paymentId;
+  const currentPaymentId = useRef(paymentKey);
+  currentPaymentId.current = paymentKey;
 
   const checkPayment = useCallback(async () => {
-    if (!mounted.current || !paymentId || inFlight.current || handledPaymentId.current === paymentId) return;
+    if (!mounted.current || !paymentKey || inFlight.current || handledPaymentId.current === paymentKey) return;
     inFlight.current = true;
     setChecking(true);
     try {
-      const result = await apiJson<{ status: string }>("/api/mobile/payment-status", { method: "POST", body: JSON.stringify({ paymentId }) });
-      if (!mounted.current || currentPaymentId.current !== paymentId) return;
+      const result = await apiJson<{ status: string }>("/api/mobile/payment-status", { method: "POST", body: JSON.stringify(groupId ? { groupId } : { paymentId }) });
+      if (!mounted.current || currentPaymentId.current !== paymentKey) return;
       setStatus(result.status);
       if (result.status === "completed") {
+        if (groupId) {
+          handledPaymentId.current = paymentKey;
+          router.replace({pathname:"/order-success",params:{groupId}});
+          return;
+        }
         const queue = await loadPaymentQueue();
-        if (!mounted.current || currentPaymentId.current !== paymentId) return;
+        if (!mounted.current || currentPaymentId.current !== paymentKey) return;
         if (queue.length) {
           const [next, ...rest] = queue;
           const intent = await apiJson<{ paymentId: string; checkoutUrl?: string }>("/api/mobile/payment-intent", { method: "POST", body: JSON.stringify({ paymentId: next.paymentId }) });
-          if (!mounted.current || currentPaymentId.current !== paymentId) return;
+          if (!mounted.current || currentPaymentId.current !== paymentKey) return;
           if (!intent.checkoutUrl) throw new Error("The next payment provider did not return a secure checkout URL.");
           await savePaymentQueue(rest);
-          if (!mounted.current || currentPaymentId.current !== paymentId) return;
-          handledPaymentId.current = paymentId;
+          if (!mounted.current || currentPaymentId.current !== paymentKey) return;
+          handledPaymentId.current = paymentKey;
           router.replace({ pathname: "/payment", params: { paymentId: intent.paymentId } });
         } else {
           await clearPaymentQueue();
-          if (!mounted.current || currentPaymentId.current !== paymentId) return;
-          handledPaymentId.current = paymentId;
-          setTimeout(() => { if (mounted.current && currentPaymentId.current === paymentId) router.replace({ pathname: "/order-success", params: { paymentId } }); }, 250);
+          if (!mounted.current || currentPaymentId.current !== paymentKey) return;
+          handledPaymentId.current = paymentKey;
+          setTimeout(() => { if (mounted.current && currentPaymentId.current === paymentKey) router.replace({ pathname: "/order-success", params: { paymentId } }); }, 250);
         }
       }
-    } catch (e) { if (mounted.current && currentPaymentId.current === paymentId) setStatus(e instanceof Error ? e.message : "Unable to verify payment"); }
-    finally { inFlight.current = false; if (mounted.current && currentPaymentId.current === paymentId) setChecking(false); }
-  }, [paymentId]);
+    } catch (e) { if (mounted.current && currentPaymentId.current === paymentKey) setStatus(e instanceof Error ? e.message : "Unable to verify payment"); }
+    finally { inFlight.current = false; if (mounted.current && currentPaymentId.current === paymentKey) setChecking(false); }
+  }, [paymentKey, groupId, paymentId]);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  useEffect(() => { setStatus(null); setChecking(false); }, [paymentId]);
+  useEffect(() => { setStatus(null); setChecking(false); }, [paymentKey]);
   useEffect(() => {
     let active = true;
     setCheckoutUrl(null);
     setCheckoutError(null);
-    if (!paymentId) { setCheckoutError("Missing payment reference."); return () => { active = false; }; }
+    if (!paymentKey) { setCheckoutError("Missing payment reference."); return () => { active = false; }; }
     // Re-read the checkout address from the authenticated backend. Its provider
     // host allowlist and ownership checks are authoritative, even after a reload.
     void apiJson<{ checkoutUrl?: unknown }>("/api/mobile/payment-intent", {
-      method: "POST", body: JSON.stringify({ paymentId }),
+      method: "POST", body: JSON.stringify(groupId ? { groupId } : { paymentId }),
     }).then((result) => {
       const verified = requireServerCheckoutUrl(result.checkoutUrl);
       if (active) setCheckoutUrl(verified);
@@ -69,7 +75,7 @@ export default function Payment() {
       if (active) setCheckoutError("Secure checkout is unavailable. Check your order payment status or try again.");
     });
     return () => { active = false; };
-  }, [paymentId]);
+  }, [paymentKey, groupId, paymentId]);
   useEffect(() => { if (status === "completed") return; const timer = setInterval(() => void checkPayment(), 5000); return () => clearInterval(timer); }, [checkPayment, status]);
   if (!checkoutUrl) return <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
     {checkoutError ? <><Text accessibilityRole="alert" style={{ textAlign: "center", color: "#991b1b" }}>{checkoutError}</Text>
@@ -84,7 +90,7 @@ export default function Payment() {
         const target = new URL(nav.url);
         const origin = new URL(process.env.EXPO_PUBLIC_API_BASE_URL ?? "").origin;
         if (target.origin === origin && target.pathname === "/payment/return"
-            && target.searchParams.get("paymentId") === paymentId) void checkPayment();
+            && target.searchParams.get(groupId ? "groupId" : "paymentId") === paymentKey) void checkPayment();
       } catch { /* Not a marketplace payment callback. */ }
     }} />
     {status && status !== "completed" && <View style={{ padding: 10 }}><Text style={{ textAlign: "center", color: "#667085" }}>Payment status: {status}. We verify payment with the provider before marking the order paid.</Text></View>}

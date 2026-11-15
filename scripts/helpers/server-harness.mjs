@@ -43,7 +43,13 @@ export function installPaymentProviderMock() {
     if (u.pathname === "/transaction/initialize") {
       const b = JSON.parse(init.body);
       initializeBodies.push(b);
-      if (!ledger.has(b.reference)) ledger.set(b.reference, { amount: Number(b.amount), currency: b.currency, status: "abandoned" });
+      // Mirror Paystack's published signed/read-back split evidence. The
+      // main account bears fees, so subaccount shares remain exact pesewas.
+      const split = b.split ? {
+        formula:{type:b.split.type,subaccounts:b.split.subaccounts.map((s)=>({subaccount_code:s.subaccount,share:s.share}))},
+        shares:{subaccounts:b.split.subaccounts.map((s)=>({subaccount_code:s.subaccount,amount:s.share}))},
+      } : undefined;
+      if (!ledger.has(b.reference)) ledger.set(b.reference, { amount: Number(b.amount), currency: b.currency, status: "abandoned", split });
       return json(200, { status: true, data: { reference: b.reference, authorization_url: `https://checkout.paystack.com/${b.reference.slice(0, 12)}`, access_code: "ac_sim" } });
     }
     // Mobile money prompts (pay on delivery). Telecel ("vod") needs a voucher first.
@@ -65,7 +71,7 @@ export function installPaymentProviderMock() {
       const ref = decodeURIComponent(m[1]);
       const t = ledger.get(ref);
       if (!t) return json(404, { status: false });
-      return json(200, { status: true, data: { status: t.status, reference: ref, amount: t.amount, currency: t.currency } });
+      return json(200, { status: true, data: { status: t.status, reference: ref, amount: t.amount, currency: t.currency, split: t.split } });
     }
     return json(404, { status: false });
   };

@@ -41,7 +41,37 @@ export default function Checkout() {
     try {
       const payload = { items: items.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })), quotes: quotes.map(({ merchantId, quoteId }) => ({ merchantId, quoteId })), address: address.trim(), method, promoCode: null };
       const fingerprint = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, JSON.stringify(payload), { encoding: Crypto.CryptoEncoding.HEX });
-      const orderResult = await apiJson<{ orders?: Array<{ paymentId?: string }> } | null>("/api/mobile/checkout", { method: "POST", body: JSON.stringify({ ...payload, fingerprint, idempotencyKey: Crypto.randomUUID() }) });
+      const orderResult = await apiJson<{ groupId?: string; orders?: Array<{ paymentId?: string; grandTotal?: string }> } | null>("/api/mobile/checkout", { method: "POST", body: JSON.stringify({ ...payload, fingerprint, idempotencyKey: Crypto.randomUUID() }) });
+      // Do not authorize a PSP amount that is different from the total the
+      // buyer reviewed. Checkout SQL is authoritative, not cached item prices.
+      const chargedOrders=orderResult?.orders ?? [];
+      if (!chargedOrders.length) throw new Error("Checkout did not create an order");
+      const authoritativeMinor=chargedOrders.reduce((sum,order)=>{
+        const price=order.grandTotal;
+        if (!price || !/^\d+(?:\.\d{1,2})?$/.test(price)) {
+          throw new Error("The order amount could not be verified. Refresh checkout.");
+        }
+        const [cedis,pesewas=""]=price.split(".");
+        return sum+Number(cedis)*100+Number(pesewas.padEnd(2,"0"));
+      },0);
+      const displayedMinor=Math.round((subtotal+delivery)*100);
+      if (!Number.isSafeInteger(authoritativeMinor)||authoritativeMinor<=0||
+          authoritativeMinor!==displayedMinor) {
+        throw new Error("Order prices or delivery fees changed. Review the total and refresh your quotes before paying.");
+      }
+      // A multi-merchant cart gets one hosted provider checkout, not a queue
+      // of merchant charges. The group ID is resolved and owned server-side.
+      if ((orderResult?.orders?.length ?? 0) > 1) {
+        if (!orderResult?.groupId) throw new Error("Checkout group reference is missing");
+        const intent = await apiJson<{ groupId:string;status:string;checkoutUrl?:string|null;awaitingConfirmation?:boolean }>(
+          "/api/mobile/payment-intent", {method:"POST",body:JSON.stringify({groupId:orderResult.groupId})});
+        if (!intent.checkoutUrl && intent.status!=="completed" && !intent.awaitingConfirmation) {
+          throw new Error("Combined payment could not be initialized; check your orders");
+        }
+        await clearCart();
+        router.replace({pathname:"/payment",params:{groupId:orderResult.groupId}});
+        return;
+      }
       const paymentIds = (orderResult?.orders ?? []).map((x) => x.paymentId).filter((x): x is string => Boolean(x));
       if (!paymentIds.length) throw new Error("No payable order was created.");
       const intent = await apiJson<{ paymentId: string; checkoutUrl?: string }>("/api/mobile/payment-intent", { method: "POST", body: JSON.stringify({ paymentId: paymentIds[0] }) });
@@ -55,7 +85,7 @@ export default function Checkout() {
 
   return <SafeAreaView style={{ flex: 1, backgroundColor: "#f5f7f4" }}><ScrollView contentContainerStyle={{ padding: 20, gap: 14 }}>
     <Text style={{ fontSize: 28, fontWeight: "900", color: "#14532d" }}>Secure checkout</Text>
-    <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16 }}><Text style={{ fontWeight: "900", fontSize: 18 }}>Delivery address</Text><TextInput value={address} onChangeText={setAddress} placeholder="House number, street, area, city" multiline style={{ borderWidth: 1, borderColor: "#ddd", borderRadius: 12, padding: 12, marginTop: 10, minHeight: 80 }} /><View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>{(["same_day", "next_day", "three_day"] as const).map((x) => <Pressable key={x} onPress={() => setTier(x)} style={{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: tier === x ? "#14532d" : "#eee" }}><Text style={{ color: tier === x ? "white" : "#111", textAlign: "center", fontSize: 12, fontWeight: "800" }}>{x.replace("_", " ")}</Text></Pressable>)}</View><Pressable disabled={busy} onPress={getQuote} style={{ marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: "#eee", alignItems: "center" }}><Text style={{ fontWeight: "900" }}>{busy ? "Working…" : "Get live delivery quote"}</Text></Pressable>{quotes.map((q) => <Text key={q.quoteId} style={{ marginTop: 8, color: "#667085" }}>Delivery: GHS {q.price} · {q.etaMinutes} min</Text>)}</View>
+    <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16 }}><Text style={{ fontWeight: "900", fontSize: 18 }}>Delivery address</Text><TextInput value={address} onChangeText={next=>{setAddress(next);setQuotes([]);}} placeholder="House number, street, area, city" multiline style={{ borderWidth: 1, borderColor: "#ddd", borderRadius: 12, padding: 12, marginTop: 10, minHeight: 80 }} /><View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>{(["same_day", "next_day", "three_day"] as const).map((x) => <Pressable key={x} onPress={() => {setTier(x);setQuotes([]);}} style={{ flex: 1, padding: 10, borderRadius: 10, backgroundColor: tier === x ? "#14532d" : "#eee" }}><Text style={{ color: tier === x ? "white" : "#111", textAlign: "center", fontSize: 12, fontWeight: "800" }}>{x.replace("_", " ")}</Text></Pressable>)}</View><Pressable disabled={busy} onPress={getQuote} style={{ marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: "#eee", alignItems: "center" }}><Text style={{ fontWeight: "900" }}>{busy ? "Working…" : "Get live delivery quote"}</Text></Pressable>{quotes.map((q) => <Text key={q.quoteId} style={{ marginTop: 8, color: "#667085" }}>Delivery: GHS {q.price} · {q.etaMinutes} min</Text>)}</View>
     <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16 }}><Text style={{ fontWeight: "900", fontSize: 18 }}>Payment method</Text><View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>{(["mobile_money", "card", "bank_transfer"] as const).map((x) => <Pressable key={x} onPress={() => setMethod(x)} style={{ flex: 1, padding: 11, borderRadius: 10, backgroundColor: method === x ? "#14532d" : "#eee" }}><Text style={{ color: method === x ? "white" : "#111", textAlign: "center", fontSize: 12, fontWeight: "800" }}>{x.replaceAll("_", " ")}</Text></Pressable>)}</View></View>
     <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, gap: 8 }}><Text>Items: GHS {subtotal.toFixed(2)}</Text><Text>Delivery: GHS {delivery.toFixed(2)}</Text><Text style={{ fontSize: 20, fontWeight: "900" }}>Total: GHS {(subtotal + delivery).toFixed(2)}</Text><Pressable disabled={busy} onPress={pay} style={{ marginTop: 8, backgroundColor: "#14532d", padding: 16, borderRadius: 12, alignItems: "center" }}><Text style={{ color: "white", fontWeight: "900" }}>{busy ? "Starting secure payment…" : "Pay securely"}</Text></Pressable></View>
   </ScrollView></SafeAreaView>;

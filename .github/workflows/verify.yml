@@ -52,6 +52,8 @@ jobs:
       - run: npm test
       - name: Simulated payment recovery and settlement regressions
         run: npm run test:payment:simulation
+      - name: One-charge multi-merchant checkout, refund and wallet simulation
+        run: npm run test:group:simulation
       - name: Simulated merchant wallet transaction regressions
         run: npm run test:wallet:simulation
       - run: npm run typecheck
