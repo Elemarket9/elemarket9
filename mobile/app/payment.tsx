@@ -89,7 +89,7 @@ export default function Payment() {
       try {
         const target = new URL(nav.url);
         const origin = new URL(process.env.EXPO_PUBLIC_API_BASE_URL ?? "").origin;
-        if (target.origin === origin && target.pathname === (groupId ? "/payment/group-return" : "/payment/return")
+        if (target.origin === origin && target.pathname === "/payment/return"
             && target.searchParams.get(groupId ? "groupId" : "paymentId") === paymentKey) void checkPayment();
       } catch { /* Not a marketplace payment callback. */ }
     }} />
