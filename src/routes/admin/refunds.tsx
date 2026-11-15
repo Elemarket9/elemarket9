@@ -1,10 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
+import { z } from "zod";
 import { AdminWorkspaceNav } from "@/components/admin-workspace-nav";
 import { getAdminAccessState } from "@/modules/administration/public/transport/admin/access.functions";
 import { requestAdminProviderRefund } from "@/modules/administration/public/transport/admin/dashboard.functions";
 
 export const Route = createFileRoute("/admin/refunds")({
+  // ?order=<id> prefills the order (link from the Orders workspace); it is never submitted automatically.
+  validateSearch: z.object({ order: z.string().trim().max(128).optional().catch(undefined) }),
   head: () => ({ meta: [{ title: "Authorized refund operations | ELEMARKET" }, { name: "robots", content: "noindex,nofollow,noarchive" }] }),
   loader: async () => {
     const access = await getAdminAccessState();
@@ -18,7 +21,8 @@ export const Route = createFileRoute("/admin/refunds")({
 
 function RefundWorkspace() {
   const { access } = Route.useLoaderData();
-  const [orderId, setOrderId] = useState("");
+  const { order } = Route.useSearch();
+  const [orderId, setOrderId] = useState(order ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
