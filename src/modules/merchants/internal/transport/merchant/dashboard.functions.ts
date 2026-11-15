@@ -43,7 +43,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
     }>(
       `select m.id as merchant_id,m.name,m.category,m.catalog_categories,m.city,m.neighborhood,m.address,m.description,m.verified,m.tier,
               m.settlement_model,m.catalog_source,
-              (select count(*) from products p where p.merchant_id=m.id)::int as products,
+              (select count(*) from products p where p.merchant_id=m.id and p.category not in ('food','restaurants') and p.listing_type<>'food')::int as products,
               (select count(*) from orders o where o.merchant_id=m.id)::int as orders
          from merchants m where m.id = any($1::text[]) order by m.name`,
       [merchantIds],
@@ -67,7 +67,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
       const [products, orders, catalogRows, inventoryHistory, applicationRows] = await Promise.all([
         sql.query<{id:string;name:string;category:string;subcategory:string|null;brand:string|null;model:string|null;sku:string|null;status:string;price:string;stock:number;listing_type:string;attributes:JsonObject;returnable:boolean;return_window_days:number|null;warranty_months:number|null;fulfillment_type:FulfillmentType;created_at:string}>(
           `select id,name,category,subcategory,brand,model,sku,status,price::text,stock,listing_type,attributes,returnable,return_window_days,warranty_months,fulfillment_type,created_at
-             from products where merchant_id=$1 order by created_at desc limit 50`,[merchant.merchant_id]),
+             from products where merchant_id=$1 and category not in ('food','restaurants') and listing_type<>'food' order by created_at desc limit 50`,[merchant.merchant_id]),
         sql.query<{id:string;status:string;grand_total:string;product_total:string;delivery_total:string;address:string;created_at:string;updated_at:string;delivered_at:string|null;eligible_at:string|null;withdrawal_reason:string;withdrawal_eligible:boolean;dispute_filed_at:string|null}>(
           `select o.id,o.status,o.grand_total::text,o.product_total::text,o.delivery_total::text,o.address,o.created_at,o.updated_at,
                   delivered.delivered_at,
@@ -108,7 +108,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
         [merchant.merchant_id, products.map(p=>p.id)]);
       const profile = {name:merchant.name,description:merchant.description,category:merchant.category,categories:merchant.catalog_categories?.length?merchant.catalog_categories:[merchant.category],address:merchant.address,city:merchant.city,neighborhood:merchant.neighborhood};
       const variants = await sql.query<{id:string;product_id:string;sku:string;name:string|null;price:string;stock:number;status:string;attributes:JsonObject}>(
-        `select pv.id,pv.product_id,pv.sku,pv.name,pv.price::text,pv.stock,pv.status,pv.attributes from product_variants pv join products p on p.id=pv.product_id where p.merchant_id=$1 order by pv.created_at desc limit 100`,[merchant.merchant_id]);
+        `select pv.id,pv.product_id,pv.sku,pv.name,pv.price::text,pv.stock,pv.status,pv.attributes from product_variants pv join products p on p.id=pv.product_id where p.merchant_id=$1 and p.category not in ('food','restaurants') and p.listing_type<>'food' order by pv.created_at desc limit 100`,[merchant.merchant_id]);
       const financeSnapshot = await finance.getSnapshot(merchant.merchant_id);
       const merchantHealthRows = await sql.query<{ score: number | string | null; band: string | null; model_version: string; methodology_version: string; components: JsonObject; calculated_at: string | null; data_period_start: string | null; data_period_end: string | null; sample_size: number; freshness_status: string; fresh_until: string | null }>(
         `select score,band,model_version,methodology_version,components,calculated_at::text,data_period_start::text,data_period_end::text,sample_size,case when fresh_until is not null and fresh_until <= now() then 'stale' else freshness_status end as freshness_status,fresh_until::text
