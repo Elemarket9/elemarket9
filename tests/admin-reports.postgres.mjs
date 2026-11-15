@@ -127,8 +127,16 @@ before(async () => {
     `insert into risk_flags(id,subject_type,subject_id,flag_code,severity,status) values
        ('rf_rep_1','merchant',$1,'refund_spike','high','open'),
        ('rf_rep_2','merchant',$1,'chargeback','medium','open'),
-       ('rf_rep_3','merchant',$1,'old_issue','low','resolved'),
+       ('rf_rep_3','merchant',$1,'old_issue','low','open'),
        ('rf_rep_4','customer',$1,'not_a_merchant','low','open')`, [B.merchant]);
+  // A historical, already-decided flag. Flags are always created open (migration
+  // 0225); this one is closed the way a reviewer's decision closes it.
+  await sql.query(`insert into "user"(id,name,email,"emailVerified",role) values('rep_risk_reviewer','Reviewer','rep_risk_reviewer@example.test',true,'admin') on conflict do nothing`);
+  await sql.query(`alter table risk_flags disable trigger risk_flags_guard`);
+  await sql.query(
+    `update risk_flags set status='dismissed', decision='dismissed_false_positive', resolution_note='Seeded historical flag, reviewed earlier',
+            resolved_at=now(), resolved_by='rep_risk_reviewer' where id='rf_rep_3'`);
+  await sql.query(`alter table risk_flags enable trigger risk_flags_guard`);
 
   // Returns: one requested, one approved.
   for (const [o, approve] of [[a1, false], [a2, true]]) {
