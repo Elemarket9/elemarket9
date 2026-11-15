@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { readResponseBodyWithLimit } from "@/lib/security/body.server";
 import type {
   MobileMoneyNetwork,
@@ -48,6 +49,7 @@ const verifyResponse = z.object({
       reference: z.string().min(1).max(256),
       amount: z.number().int().positive().safe(),
       currency: z.string().regex(/^[A-Z]{3}$/),
+      split: z.unknown().optional(),
     })
     .nullable()
     .optional(),
@@ -116,6 +118,42 @@ function asProviderId(value: unknown): string | null {
   if (typeof value === "number")
     return Number.isSafeInteger(value) && value >= 0 ? String(value) : null;
   return asString(value);
+}
+
+/** Paystack's signed charge.success split includes immutable formula and
+ * applied subaccount shares. Require BOTH to agree to avoid mistaking a
+ * transaction amount for evidence of merchant settlement allocation. */
+function flatProviderSplit(value: unknown): ProviderSplitProof | undefined {
+  const parsed = z.object({
+    formula: z.object({
+      type: z.literal("flat"),
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        share:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+    shares: z.object({
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        amount:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+  }).safeParse(value);
+  if (!parsed.success) return undefined;
+  const formula = new Map<string,number>();
+  for (const sub of parsed.data.formula.subaccounts) {
+    if (formula.has(sub.subaccount_code)) return undefined;
+    formula.set(sub.subaccount_code,sub.share);
+  }
+  const observed: ProviderSplitProof["subaccounts"]=[];
+  const seen = new Set<string>();
+  for (const sub of parsed.data.shares.subaccounts) {
+    if (seen.has(sub.subaccount_code) || formula.get(sub.subaccount_code)!==sub.amount) return undefined;
+    seen.add(sub.subaccount_code);
+    observed.push({subaccount:sub.subaccount_code,share:sub.amount});
+  }
+  if (seen.size!==formula.size) return undefined;
+  return {type:"flat",subaccounts:observed};
 }
 
 export class PaystackPaymentAdapter implements PaymentProviderAdapter {
@@ -342,6 +380,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: normalized.status,
       amount: amountMinor / 100,
       currency,
+      providerSplit: !isRefund && event==="charge.success" ? flatProviderSplit(data.split) : undefined,
       providerRefundId: isRefund
         ? (asProviderId(data.id) ?? asString(data.refund_reference) ?? undefined)
         : undefined,
@@ -437,6 +476,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference: parsed.data.data.reference,
       amount: parsed.data.data.amount / 100,
       currency: parsed.data.data.currency,
+      providerSplit: flatProviderSplit(parsed.data.data.split),
     };
   }
 }
