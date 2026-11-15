@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { isExactProviderSplit } from "@/modules/payments/internal/group-split-proof";
 import { recordMetric } from "@/lib/observability/logger.server";
 import { emitSecurityAlert } from "@/lib/observability/security-alert.server";
 import { getPaymentAdapter } from "@/modules/payments/internal/adapters/registry";
@@ -269,6 +270,7 @@ export async function reconcileStalePayments(limit = 50): Promise<Reconciliation
 type UnsettledGroup = {
   id:string; group_id:string; provider_key:string; driver_key:string|null;
   provider_reference:string; currency:string; amount:string;
+  settlement_model:string;split_snapshot:{split?:unknown};
 };
 export async function reconcileStaleGroupCharges(limit=20) {
   if (!Number.isInteger(limit) || limit<1 || limit>100) throw new Error("Invalid group reconciliation limit");
@@ -276,7 +278,7 @@ export async function reconcileStaleGroupCharges(limit=20) {
   const counters={scanned:0,settled:0,failed:0,mismatches:0,pending:0,providerErrors:0};
   const groups=await sql.query<UnsettledGroup>(
     `select g.id,g.group_id,g.provider_key,p.driver_key,g.provider_reference,g.currency,
-        g.amount::text as amount
+        g.amount::text as amount,g.settlement_model,g.split_snapshot
        from checkout_group_charges g
        join payment_providers p on p.provider_key=g.provider_key and p.status='active'
       where g.status in ('initializing','pending','needs_attention')
@@ -310,6 +312,25 @@ export async function reconcileStaleGroupCharges(limit=20) {
       const resultStatus=state.status==="completed"||state.status==="success"?"completed":
         state.status==="failed"?"failed":null;
       if (!resultStatus) {counters.pending++;continue;}
+      if (resultStatus==="completed") {
+        const proofOk = g.settlement_model==="provider_split"
+          ? isExactProviderSplit(g.split_snapshot?.split,state.providerSplit)
+          : !state.providerSplit || state.providerSplit.subaccounts.length===0;
+        if (!proofOk) {
+          counters.mismatches++;
+          await sql.query(`update checkout_group_charges set status='needs_attention',
+            failure_reason='provider read-back lacks the frozen merchant payout allocation',
+            updated_at=now() where id=$1 and status in ('initializing','pending','needs_attention')`,[g.id]);
+          await emitSecurityAlert({
+            alertKey:`group-charge-split:${g.id}`,
+            severity:"error",eventName:"security.group_charge_allocation_unverified",
+            message:"Provider group charge cannot be settled without verified per-seller allocation.",
+            metadata:{groupId:g.group_id,chargeId:g.id,providerKey:g.provider_key},
+            dedupeKey:`group-charge-split:${g.id}`,
+          });
+          continue;
+        }
+      }
       const payloadHash=await canonicalPayloadHash({
         paymentId:g.id,providerReference:g.provider_reference,
         amount:state.amount,currency:state.currency,
