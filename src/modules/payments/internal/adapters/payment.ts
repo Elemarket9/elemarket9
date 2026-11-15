@@ -11,6 +11,8 @@ export type PaymentAdapterInput = {
   customerReference?: string;
   customerEmail?: string;
   merchantSubaccount?: string;
+  /** Immutable, server-authorized atomic multi-seller settlement in minor units. */
+  multiMerchantSplit?: { amountMinor: number; platformMinor: number; subaccounts: Array<{ subaccount: string; share: number }> };
   idempotencyKey?: string;
   callbackUrl?: string;
   /** Merchandise commission retained by the platform account, in major units. */
@@ -49,6 +51,8 @@ export interface PaymentProviderAdapter {
   readonly supportsIdempotentInitialization: boolean;
   /** True only when the adapter can route a payment directly to a supplied provider/subaccount reference. */
   readonly supportsDirectSubaccountSettlement: boolean;
+  /** True only after the adapter can issue one provider charge with atomic subaccount allocation. */
+  readonly supportsMultiMerchantSplit?: boolean;
   /** Provider-specific webhook signature headers belong to the adapter boundary. */
   readonly webhookSignatureHeaders?: readonly string[];
   createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult>;
