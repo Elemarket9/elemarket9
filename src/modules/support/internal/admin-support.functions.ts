@@ -5,6 +5,7 @@ import { requireAdminForUserId, getAdminCapabilitiesForUserId } from "@/modules/
 import { getSql } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import type { JsonObject, JsonValue } from "@/lib/db-types";
+import { applyOrderDeliveryHold } from "./delivery-hold.server";
 
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
 export type SupportStatus = "open" | "waiting_customer" | "waiting_support" | "resolved" | "closed";
@@ -91,21 +92,5 @@ export const manageOrderDeliveryHold = createServerFn({ method:"POST" })
     await requireAdminForUserId(actor,"admin.support");
     if(data.action==="release") { const {requireFreshSession}=await import("@/modules/identity/public/auth/verify.server"); if(await requireFreshSession() !== actor) throw new Error("Fresh administrator authentication required"); }
     await enforceRateLimit("support-delivery-hold",{windowSeconds:300,maxRequests:20,subject:actor});
-    const {withTransaction}=await import("@/lib/db");
-    return withTransaction(async tx=>{
-      const orders=await tx.query<{id:string;status:string}>(`select id,status from orders where id=$1 for update`,[data.orderId]);
-      if(!orders[0]) throw new Error("Order not found");
-      if(data.action==="hold"){
-        if(!["paid","confirmed","fulfilling","shipped"].includes(orders[0].status)) throw new Error("Shipment is not eligible for a delivery hold");
-        await tx.query(`insert into order_delivery_holds(order_id,reason,placed_by,active)
-          values($1,$2,$3,true) on conflict(order_id) do update set active=true,reason=excluded.reason,placed_by=excluded.placed_by,placed_at=now(),released_at=null,released_by=null,release_reason=null,updated_at=now()`,[data.orderId,data.reason,actor]);
-      } else {
-        const changed=await tx.query<{order_id:string}>(`update order_delivery_holds set active=false,released_by=$2,released_at=now(),release_reason=$3,updated_at=now()
-          where order_id=$1 and active=true returning order_id`,[data.orderId,actor,data.reason]);
-        if(!changed[0]) throw new Error("No active delivery hold");
-      }
-      await tx.query(`select record_audit_event($1,'order',$2,$3,'admin',null,'success',$4::jsonb)`,
-        [`support.delivery.${data.action}`,data.orderId,actor,JSON.stringify({reason:data.reason})]);
-      return {action:data.action,orderId:data.orderId};
-    });
+    return applyOrderDeliveryHold({orderId:data.orderId,action:data.action,reason:data.reason,actorId:actor,auditEventType:`support.delivery.${data.action}`});
   });
