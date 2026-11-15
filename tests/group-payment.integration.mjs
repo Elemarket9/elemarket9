@@ -216,3 +216,16 @@ test("a provider read-back that confirms gross but omits seller shares stays und
   assert.ok(status.mismatches>=1);
   assert.equal((await groupState(g)).every(x=>x.paymentStatus==="initiated"&&x.orderStatus==="payment_pending"),true);
 });
+
+
+test("group provider reference and merchant split rows cannot be changed after initiation",async()=>{
+  const g=await seedGroup();
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  const [charge]=await sql.query("select id,provider_reference from checkout_group_charges where group_id=$1",[g.groupId]);
+  await assert.rejects(sql.query("update checkout_group_charges set amount=amount+0.01 where id=$1",[charge.id]),/immutable/);
+  await assert.rejects(sql.query("update checkout_group_charges set provider_reference=provider_reference||'altered' where id=$1",[charge.id]),/immutable/);
+  await assert.rejects(sql.query("update checkout_group_charge_members set merchant_net=merchant_net+0.01 where charge_id=$1",[charge.id]),/immutable/);
+  await assert.rejects(sql.query("delete from checkout_group_charge_members where charge_id=$1",[charge.id]),/immutable/);
+  const [updated]=await sql.query("select provider_reference from checkout_group_charges where id=$1",[charge.id]);
+  assert.equal(updated.provider_reference,charge.provider_reference);
+});
