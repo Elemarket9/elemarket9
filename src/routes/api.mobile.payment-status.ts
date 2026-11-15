@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/mobile/payment-status")({
     if (!parsed.success) return Response.json({ error: "Invalid payment request" }, { status: 400 });
     try {
       if ("groupId" in parsed.data) {
-        const {getCustomerGroupPaymentStatus}=await import("@/modules/payments/internal/group-checkout.server");
+        const {getCustomerGroupPaymentStatus}=await import("@/modules/payments/public/group-checkout.server");
         const grouped=await getCustomerGroupPaymentStatus({groupId:parsed.data.groupId,userId:current.user.id});
         return Response.json(grouped,{headers:{"cache-control":"no-store"}});
       }
