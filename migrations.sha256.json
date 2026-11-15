@@ -220,5 +220,6 @@
   "0220_pay_on_delivery.sql": "2d6e64114a3d8f2e3a59c3f71543d4ae3194e4c8a9e77639c98288d8f2c431f7",
   "0221_admin_separation_of_duties.sql": "2518b71dc62e7645bb5c5176df27241718d134f3a88ff553902f69232e1eb0f2",
   "0222_fix_refund_preparation_order_binding.sql": "f182902d393682e32d3b7b0aec20b57ebf52a9771aa4b66fa1135e812026cc2f",
-  "0223_wallet_webhook_retry_lease.sql": "ab7ff1399c6416d131c70a249e9a51d92e58d5d8e020dbe1e5cc776ef7ca8783"
+  "0223_wallet_webhook_retry_lease.sql": "ab7ff1399c6416d131c70a249e9a51d92e58d5d8e020dbe1e5cc776ef7ca8783",
+  "0224_atomic_group_checkout.sql": "6bc85f74e1519fb41293a5b966bd9d221919c09a531bf784964a85c4a9291591"
 }
