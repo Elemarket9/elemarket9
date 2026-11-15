@@ -78,6 +78,20 @@ test("simultaneous duplicate submissions result in at most one new listing", { s
   assert.equal(rows.rows[0].n, 1);
 });
 
+test("merchant categories cannot repeat the same catalogue key", { skip }, async () => {
+  const merchantId = await merchant();
+  await assert.rejects(
+    pool.query("update merchants set catalog_categories=array['electronics','electronics']::text[] where id=$1", [merchantId]),
+    (error) => {
+      assert.equal(error.code, "23514");
+      assert.match(error.message, /Merchant catalog categories must be unique/);
+      return true;
+    },
+  );
+  const result = await pool.query("select catalog_categories from merchants where id=$1", [merchantId]);
+  assert.deepEqual(result.rows[0].catalog_categories, ["electronics"]);
+});
+
 test("bulk CSV insert is atomic when a row duplicates an earlier row", { skip }, async () => {
   const merchantId = await merchant();
   const userId = id("dup_user");
