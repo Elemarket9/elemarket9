@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as DealsRouteImport } from './routes/deals'
 import { Route as DeliveryAllocationReviewRouteImport } from './routes/delivery-allocation-review'
 import { Route as DeliveryContactRecoveryRouteImport } from './routes/delivery-contact-recovery'
 import { Route as DeliveryRecoveryReviewRouteImport } from './routes/delivery-recovery-review'
@@ -40,9 +41,14 @@ import { Route as AdminExecutiveFaceRouteImport } from './routes/admin/executive
 import { Route as AdminFinanceRouteImport } from './routes/admin/finance'
 import { Route as AdminFinancingRouteImport } from './routes/admin/financing'
 import { Route as AdminOperationsRouteImport } from './routes/admin/operations'
+import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
 import { Route as AdminOverviewRouteImport } from './routes/admin/overview'
 import { Route as AdminPartnersRouteImport } from './routes/admin/partners'
+import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminRefundsRouteImport } from './routes/admin/refunds'
+import { Route as AdminReportsRouteImport } from './routes/admin/reports'
+import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
+import { Route as AdminRiskRouteImport } from './routes/admin/risk'
 import { Route as AdminSecurityRouteImport } from './routes/admin/security'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminTeamRouteImport } from './routes/admin/team'
@@ -122,6 +128,11 @@ const CartRoute = CartRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsRoute = DealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeliveryAllocationReviewRoute =
@@ -265,6 +276,11 @@ const AdminOperationsRoute = AdminOperationsRouteImport.update({
   path: '/admin/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOrdersRoute = AdminOrdersRouteImport.update({
+  id: '/admin/orders',
+  path: '/admin/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminOverviewRoute = AdminOverviewRouteImport.update({
   id: '/admin/overview',
   path: '/admin/overview',
@@ -275,9 +291,29 @@ const AdminPartnersRoute = AdminPartnersRouteImport.update({
   path: '/admin/partners',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
+  id: '/admin/promotions',
+  path: '/admin/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRefundsRoute = AdminRefundsRouteImport.update({
   id: '/admin/refunds',
   path: '/admin/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/admin/reviews',
+  path: '/admin/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRiskRoute = AdminRiskRouteImport.update({
+  id: '/admin/risk',
+  path: '/admin/risk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSecurityRoute = AdminSecurityRouteImport.update({
@@ -626,6 +662,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
@@ -653,9 +690,14 @@ export interface FileRoutesByFullPath {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -727,6 +769,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
@@ -754,9 +797,14 @@ export interface FileRoutesByTo {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -829,6 +877,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
@@ -856,9 +905,14 @@ export interface FileRoutesById {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
   '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -932,6 +986,7 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
@@ -959,9 +1014,14 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
     | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -1033,6 +1093,7 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
@@ -1060,9 +1121,14 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
     | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -1134,6 +1200,7 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
@@ -1161,9 +1228,14 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
     | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -1236,6 +1308,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
+  DealsRoute: typeof DealsRoute
   DeliveryAllocationReviewRoute: typeof DeliveryAllocationReviewRoute
   DeliveryContactRecoveryRoute: typeof DeliveryContactRecoveryRoute
   DeliveryRecoveryReviewRoute: typeof DeliveryRecoveryReviewRoute
@@ -1263,9 +1336,14 @@ export interface RootRouteChildren {
   AdminFinanceRoute: typeof AdminFinanceRoute
   AdminFinancingRoute: typeof AdminFinancingRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
+  AdminOrdersRoute: typeof AdminOrdersRoute
   AdminOverviewRoute: typeof AdminOverviewRoute
   AdminPartnersRoute: typeof AdminPartnersRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRoute
   AdminRefundsRoute: typeof AdminRefundsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminReviewsRoute: typeof AdminReviewsRoute
+  AdminRiskRoute: typeof AdminRiskRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminTeamRoute: typeof AdminTeamRoute
@@ -1354,6 +1432,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals': {
+      id: '/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof DealsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/delivery-allocation-review': {
@@ -1552,6 +1637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/orders': {
+      id: '/admin/orders'
+      path: '/admin/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/overview': {
       id: '/admin/overview'
       path: '/admin/overview'
@@ -1566,11 +1658,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPartnersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/promotions': {
+      id: '/admin/promotions'
+      path: '/admin/promotions'
+      fullPath: '/admin/promotions'
+      preLoaderRoute: typeof AdminPromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/refunds': {
       id: '/admin/refunds'
       path: '/admin/refunds'
       fullPath: '/admin/refunds'
       preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/admin/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/risk': {
+      id: '/admin/risk'
+      path: '/admin/risk'
+      fullPath: '/admin/risk'
+      preLoaderRoute: typeof AdminRiskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/security': {
@@ -2046,6 +2166,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
+  DealsRoute: DealsRoute,
   DeliveryAllocationReviewRoute: DeliveryAllocationReviewRoute,
   DeliveryContactRecoveryRoute: DeliveryContactRecoveryRoute,
   DeliveryRecoveryReviewRoute: DeliveryRecoveryReviewRoute,
@@ -2073,9 +2194,14 @@ const rootRouteChildren: RootRouteChildren = {
   AdminFinanceRoute: AdminFinanceRoute,
   AdminFinancingRoute: AdminFinancingRoute,
   AdminOperationsRoute: AdminOperationsRoute,
+  AdminOrdersRoute: AdminOrdersRoute,
   AdminOverviewRoute: AdminOverviewRoute,
   AdminPartnersRoute: AdminPartnersRoute,
+  AdminPromotionsRoute: AdminPromotionsRoute,
   AdminRefundsRoute: AdminRefundsRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminReviewsRoute: AdminReviewsRoute,
+  AdminRiskRoute: AdminRiskRoute,
   AdminSecurityRoute: AdminSecurityRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminTeamRoute: AdminTeamRoute,
