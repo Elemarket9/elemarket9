@@ -50,11 +50,11 @@ export default function Payment() {
           await clearPaymentQueue();
           if (!mounted.current || currentPaymentId.current !== paymentKey) return;
           handledPaymentId.current = paymentKey;
-          setTimeout(() => { if (mounted.current && currentPaymentId.current === paymentId) router.replace({ pathname: "/order-success", params: { paymentId } }); }, 250);
+          setTimeout(() => { if (mounted.current && currentPaymentId.current === paymentKey) router.replace({ pathname: "/order-success", params: { paymentId } }); }, 250);
         }
       }
-    } catch (e) { if (mounted.current && currentPaymentId.current === paymentId) setStatus(e instanceof Error ? e.message : "Unable to verify payment"); }
-    finally { inFlight.current = false; if (mounted.current && currentPaymentId.current === paymentId) setChecking(false); }
+    } catch (e) { if (mounted.current && currentPaymentId.current === paymentKey) setStatus(e instanceof Error ? e.message : "Unable to verify payment"); }
+    finally { inFlight.current = false; if (mounted.current && currentPaymentId.current === paymentKey) setChecking(false); }
   }, [paymentKey, groupId, paymentId]);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
