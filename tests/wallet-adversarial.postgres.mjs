@@ -302,9 +302,9 @@ test("T10 conflicting callbacks are reconciled, never silently applied", { skip 
   const r = await request(m, "30.00");
   assert.equal(r.status, "processing");
   const ref = (await sim.transfers(r.payoutId))[0].reference;
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "failed" }));
-  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "processing" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "29.00", currency: "GHS" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "failed", amount: "29.00", currency: "GHS" }));
+  await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "processing", amount: "29.00", currency: "GHS" }));
   assert.equal((await payout(r.payoutId)).status, "paid", "a final state is never reversed by a later message");
   assert.deepEqual(await exceptions(r.payoutId), ["failure_after_success"]);
   assert.equal(await ledgerCount(r.payoutId, "payout_returned"), 0, "no funds released on the conflicting report");
@@ -551,7 +551,7 @@ test("T30 the same guarantees hold for every provider adapter, with no core chan
     const r = await request(m, "20.00");
     const ref = (await sim.transfers(r.payoutId))[0].reference;
     await sim.finish(r.payoutId, "paid");
-    if (drv === "mockc") await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid" }));
+    if (drv === "mockc") await webhook(JSON.stringify({ payoutId: r.payoutId, providerReference: ref, status: "paid", amount: "19.00", currency: "GHS" }));
     else { await due(r.payoutId); await wallet.reconcilePayouts(); }
     assert.equal((await payout(r.payoutId)).status, "paid", drv);
     // Uncertainty is handled per declared capability, never by a blind resend.
