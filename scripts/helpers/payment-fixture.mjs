@@ -47,11 +47,14 @@ export async function createPaymentFixture(query) {
       sql: `
         insert into merchants(
           id, name, category, status, verified, tier, address, city,
-          neighborhood, lat, lon, catalog_categories
+          neighborhood, lat, lon, catalog_categories, settlement_model
         )
         values(
           $1, 'Integration Merchant', 'electronics', 'active', true,
-          'merchant', '1 Test Street', 'Accra', 'Test', 5.6037, -0.1870, ARRAY['electronics']
+          'merchant', '1 Test Street', 'Accra', 'Test', 5.6037, -0.1870, ARRAY['electronics'],
+          -- Explicit: these fixtures exercise the Paystack-split route and the move
+          -- to the wallet. New real merchants default to the wallet (migration 0240).
+          'provider_direct'
         )
       `,
       params: [ids.merchant],

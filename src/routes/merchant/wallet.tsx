@@ -112,7 +112,7 @@ function WalletPage() {
       <div className="mt-5 grid gap-5 lg:grid-cols-2">
         <Withdraw wallet={wallet} />
         <Destinations wallet={wallet} />
-        <Withheld wallet={wallet} />
+        {wallet.instantRelease ? null : <Withheld wallet={wallet} />}
         <Payouts wallet={wallet} />
         <Ledger wallet={wallet} />
         <WalletHistory wallet={wallet} />
@@ -123,15 +123,19 @@ function WalletPage() {
 
 function Balances({ wallet }: { wallet: Snapshot }) {
   const b = wallet.balances;
-  const tiles: Array<[string, string, string]> = [
+  const tiles: Array<[string, string, string]> = wallet.instantRelease ? [
+    ["Available to withdraw", b.available, "Enterprise: each sale is available as soon as the customer pays."],
+  ] : [
     ["Available to withdraw", b.available, "Released earnings you can withdraw now."],
     ["Pending", b.pending, "Paid orders waiting for delivery confirmation."],
     ["On hold", b.onHold, "Delivered; held until the return window closes and nothing is disputed."],
+  ];
+  tiles.push(
     ["Withdrawals in progress", (Number(b.reserved) + Number(b.processing)).toFixed(2), "Reserved or being sent to your account."],
     ["Paid out", b.paidOut, "Sent to your account, after transfer fees."],
-  ];
+  );
   return (
-    <section className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Wallet balances">
+    <section className={`mt-5 grid gap-3 sm:grid-cols-2 ${wallet.instantRelease ? "lg:grid-cols-3" : "lg:grid-cols-5"}`} aria-label="Wallet balances">
       {tiles.map(([label, value, hint], i) => (
         <div key={label} className={`rounded-2xl border border-market-line p-4 shadow-market ${i === 0 ? "bg-market-mint" : "bg-white"}`}>
           <p className="text-xs font-black uppercase tracking-wide text-market-muted">{label}</p>

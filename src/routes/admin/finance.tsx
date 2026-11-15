@@ -257,7 +257,7 @@ function MoveToWallet({ busy, run }: { busy: string | null; run: Run }) {
   const [merchantId, setMerchantId] = useState("");
   return (
     <Panel title="Move a merchant to wallet payouts"
-      intro="Their future sales are held in the ELEMARKET wallet and paid out on request, instead of being split to them at checkout. Refused while the merchant has unpaid checkouts.">
+      intro="New merchants already start on the wallet. Use this for merchants still paid by Paystack split. Their future sales go to the ELEMARKET wallet: held until delivery and the return window for ordinary merchants, available as soon as the customer pays for enterprise merchants. Refused while the merchant has unpaid checkouts.">
       <div className="mt-4 flex flex-wrap gap-2">
         <input value={merchantId} onChange={(e) => setMerchantId(e.target.value)} maxLength={128} placeholder="Merchant ID" aria-label="Merchant ID" className="min-w-0 flex-1 rounded-xl border border-market-line p-2 text-sm" />
         <button type="button" disabled={busy !== null || !merchantId.trim()} className="rounded-xl bg-market-green px-4 py-2 text-sm font-black text-white disabled:opacity-50"

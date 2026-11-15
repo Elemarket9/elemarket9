@@ -90,8 +90,8 @@ export function withdrawalLimits(env: Record<string, string | undefined> = proce
 
 export async function getWalletSnapshot(merchantId: string) {
   const sql = await getSql();
-  const [merchant] = await sql.query<{ settlement_model: string }>(
-    `select settlement_model from merchants where id=$1`, [merchantId]);
+  const [merchant] = await sql.query<{ settlement_model: string; tier: string }>(
+    `select settlement_model, tier from merchants where id=$1`, [merchantId]);
   if (!merchant) throw new Error("Merchant not found");
   const [b] = await sql.query<Record<string, string>>(
     `select total_sales::text, refunded::text, withheld::text, available::text, processing::text,
@@ -163,6 +163,8 @@ export async function getWalletSnapshot(merchantId: string) {
   return {
     merchantId,
     walletEnabled: merchant.settlement_model === "platform_wallet",
+    /** Enterprise merchants handle their own returns: sales are released as soon as the customer pays. */
+    instantRelease: merchant.tier === "enterprise",
     payoutsConfigured,
     limits: { minAmount: limits.minAmount.toFixed(2), maxAmount: limits.maxAmount.toFixed(2), dailyCount: limits.dailyCount },
     balances,
