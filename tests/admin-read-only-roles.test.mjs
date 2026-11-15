@@ -140,9 +140,9 @@ test('opening a thread is read-only: no insert/update/delete and no state-changi
 
 // ---- Operations reads ---------------------------------------------------------
 
-test('catalog viewers receive every operations section; section holders receive only theirs', async () => {
+test('catalog viewers receive merchant and product sections (never customers); section holders receive only theirs', async () => {
   const cases = [
-    [expandAdminCapabilities(['admin.catalog.view']), 3, 3],
+    [expandAdminCapabilities(['admin.catalog.view']), 2, 3],
     [['admin.full'], 3, 3],
     [expandAdminCapabilities(['admin.operations']), 3, 3],
     [['admin.products.moderate'], 1, null],
@@ -216,4 +216,15 @@ test('operations page shows actions only for their exact permission', () => {
       assert.ok(gate !== -1 && before.lastIndexOf('</>}') < gate, `${action} button is not wrapped in can('${capability}')`);
     }
   }
+});
+
+test('catalog read-only never exposes customer data and masks merchant owner emails (security audit M3)', () => {
+  const { operationsSectionReader, maskEmailForViewer } = loadTypeScript(MODERATION, harness([]).deps);
+  const can = operationsSectionReader(['admin.catalog.view']);
+  assert.equal(can('admin.customers.moderate'), false);
+  assert.equal(can('admin.merchants.moderate'), true);
+  assert.equal(can('admin.products.moderate'), true);
+  assert.equal(maskEmailForViewer('ama@example.com'), 'a••@example.com');
+  assert.equal(maskEmailForViewer(null), null);
+  assert.equal(operationsSectionReader(['admin.customers.moderate'])('admin.customers.moderate'), true);
 });

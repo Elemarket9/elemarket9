@@ -106,7 +106,7 @@ function OrdersWorkspace() {
         <p className="text-xs font-black uppercase tracking-widest text-market-muted">Customer operations</p>
         <h1 className="mt-2 text-3xl font-black">Orders</h1>
         <p className="mt-2 text-sm text-market-muted">
-          Find any order and see everything that happened to it. Customer email and phone are hidden unless you reveal them; every reveal and action is recorded in the audit history.
+          Find any order and see everything that happened to it. Customer email, phone and full delivery address are hidden unless you reveal them. Searches without filters show the last 7 days; every reveal and action is recorded in the audit history.
         </p>
       </header>
 
@@ -196,7 +196,7 @@ function OrderDetail({ detail, canManage }: { detail: AdminOrderDetail; canManag
   const { order, customer, merchant, items, payment, hold, timeline } = detail;
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [contact, setContact] = useState<{ email: string | null; phone: string | null; accountPhone: string | null } | null>(null);
+  const [contact, setContact] = useState<{ email: string | null; phone: string | null; accountPhone: string | null; address?: string | null } | null>(null);
   const act = async (key: string, fn: () => Promise<string>, refresh = true) => {
     setBusy(key); setMessage(null);
     try { setMessage({ kind: "ok", text: await fn() }); if (refresh) await router.invalidate(); }
@@ -241,7 +241,7 @@ function OrderDetail({ detail, canManage }: { detail: AdminOrderDetail; canManag
             return "Contact details shown. This was recorded in the audit history.";
           }, false)} /> : null}
           <h3 className="mt-4 font-black">Delivery address</h3>
-          <p className="mt-1 whitespace-pre-line text-sm">{order.address}</p>
+          <p className="mt-1 whitespace-pre-line text-sm">{contact?.address ?? order.address}</p>
         </div>
         <div className="rounded-2xl border border-market-line bg-white p-5">
           <h3 className="font-black">Merchant</h3>

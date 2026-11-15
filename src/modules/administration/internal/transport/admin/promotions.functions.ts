@@ -38,7 +38,7 @@ async function guards() {
 /** After the permission check, every promotion mutation needs a recent sign-in and passes a shared rate limit. */
 async function freshAndRateLimited(g: Awaited<ReturnType<typeof guards>>, userId: string) {
   await g.requireFreshSession();
-  await g.enforceRateLimit("admin-promotions-write", { windowSeconds: 600, maxRequests: 60, subject: userId });
+  await g.enforceRateLimit("admin-promotions-write", { windowSeconds: 600, maxRequests: 60, subject: userId, identity: "subject" });
 }
 
 /** Marketplace promotions, merchant promotions and scope options for /admin/promotions. */

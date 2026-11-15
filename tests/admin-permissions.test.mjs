@@ -81,6 +81,16 @@ test('HR managers can only hand out permissions they hold, and never Main Admin'
   assert.equal(canDelegatedAdminManageRoles({ ...base, actorOwner: true, actorCapabilities: [], nextPrimaryRole: 'owner' }), true);
 });
 
+test('money-approval powers can only be granted by the Main Administrator (security audit H1)', () => {
+  const base = { actorOwner: false, oldPrimaryRole: 'support', nextPrimaryRole: 'support', nextCapabilities: [] };
+  const hrWithFinance = ['admin.staff.manage', 'admin.finance.refunds', 'admin.finance.payouts', 'admin.support'];
+  for (const power of ['admin.finance.refunds', 'admin.finance.payouts', 'admin.staff.manage']) {
+    assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hrWithFinance, oldCapabilities: [power] }), false, power);
+    assert.equal(canDelegatedAdminManageRoles({ ...base, actorOwner: true, actorCapabilities: [], oldCapabilities: [power] }), true, `owner may grant ${power}`);
+  }
+  assert.equal(canDelegatedAdminManageRoles({ ...base, actorCapabilities: hrWithFinance, oldCapabilities: ['admin.support'] }), true, 'ordinary grants still delegable');
+});
+
 test('permission catalogue matches the database allow-list, the TypeScript type and the labels', () => {
   const dir = 'migrations';
   const latest = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()

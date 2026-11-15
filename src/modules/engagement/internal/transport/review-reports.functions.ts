@@ -21,7 +21,7 @@ export const reportReview = createServerFn({ method: "POST" })
       import("../review-moderation.server"),
     ]);
     await requireCustomerForUserId(userId);
-    await enforceRateLimit("review-report", { windowSeconds: 3600, maxRequests: 10, subject: userId });
+    await enforceRateLimit("review-report", { windowSeconds: 3600, maxRequests: 10, subject: userId, identity: "subject" });
     const result = await submitReviewReport({ reporterId: userId, reviewId: data.reviewId, reason: data.reason, note: data.note });
     return { reported: true as const, alreadyReported: result.alreadyReported };
   });

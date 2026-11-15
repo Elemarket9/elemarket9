@@ -20,7 +20,7 @@ export const loadAdminReports = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<AdminReport> => {
     const userId = getAuthenticatedUserId(context);
     await requireAdminForUserId(userId, "admin.reports.view");
-    await enforceRateLimit("admin-reports-view", { windowSeconds: 60, maxRequests: 30, subject: userId });
+    await enforceRateLimit("admin-reports-view", { windowSeconds: 60, maxRequests: 30, subject: userId, identity: "subject" });
     const sql = await getSql();
     return loadAdminReport(sql, { from: data.from, to: data.to, search: data.search || null });
   });
@@ -36,7 +36,7 @@ export const exportAdminReportCsv = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ filename: string; csv: string }> => {
     const userId = getAuthenticatedUserId(context);
     await requireAdminForUserId(userId, "admin.reports.view");
-    await enforceRateLimit("admin-reports-export", { windowSeconds: 3600, maxRequests: 20, subject: userId });
+    await enforceRateLimit("admin-reports-export", { windowSeconds: 3600, maxRequests: 20, subject: userId, identity: "subject" });
     const sql = await getSql();
     return buildReportExport(sql, { from: data.from, to: data.to, section: data.section, search: data.search || null, actorId: userId });
   });

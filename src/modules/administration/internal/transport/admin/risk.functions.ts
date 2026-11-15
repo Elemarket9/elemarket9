@@ -29,7 +29,7 @@ async function viewerIsOwner(userId: string) {
 async function mutationGuards(userId: string, bucket: string, maxRequests: number) {
   const { requireFreshSession, enforceRateLimit } = await guards();
   await requireFreshSession();
-  await enforceRateLimit(bucket, { windowSeconds: 600, maxRequests, subject: userId });
+  await enforceRateLimit(bucket, { windowSeconds: 600, maxRequests, subject: userId, identity: "subject" });
 }
 
 export const listRiskQueue = createServerFn({ method: "GET" })

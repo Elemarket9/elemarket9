@@ -41,7 +41,7 @@ test('only the admin moderation module can change moderation state', () => {
 test('customer report endpoint is customer-only and rate limited to 10 per hour', () => {
   const src = fs.readFileSync('src/modules/engagement/internal/transport/review-reports.functions.ts', 'utf8');
   assert.match(src, /requireCustomerForUserId\(userId\)/);
-  assert.match(src, /enforceRateLimit\("review-report", \{ windowSeconds: 3600, maxRequests: 10, subject: userId \}\)/);
+  assert.match(src, /enforceRateLimit\("review-report", \{ windowSeconds: 3600, maxRequests: 10, subject: userId, identity: "subject" \}\)/);
 });
 
 test('reason list matches both CHECK constraints in the migration', () => {

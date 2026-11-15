@@ -15,7 +15,8 @@ export const Route = createFileRoute("/admin/operations")({
     const access=await getAdminAccessState();
     const can=(permission:string)=>access.staffRole === "owner" || access.capabilities.includes(permission);
     // A section is visible with its own permission or read-only admin.catalog.view.
-    const canSee=(permission:string)=>can(permission) || can("admin.catalog.view");
+    // Catalogue read-only never opens the customer section (personal data).
+    const canSee=(permission:string)=>can(permission) || (can("admin.catalog.view") && permission!=="admin.customers.moderate");
     const seeModeration=['admin.merchants.moderate','admin.customers.moderate','admin.products.moderate'].some(canSee);
     const seeQueues=['admin.merchants.review','admin.categories.manage'].some(canSee);
     if (!access.authenticated || !access.isAdmin || (!seeModeration && !seeQueues)) throw redirect({to:"/admin"});
@@ -31,7 +32,7 @@ function Operations(){
   const {moderation,queues,staffRole,capabilities}=Route.useLoaderData();
   // Buttons need the exact write permission; sections also open for admin.catalog.view.
   const can=(cap:string)=>staffRole === 'owner' || capabilities.includes(cap);
-  const canSee=(cap:string)=>can(cap) || can('admin.catalog.view');
+  const canSee=(cap:string)=>can(cap) || (can('admin.catalog.view') && cap!=='admin.customers.moderate');
   const canActAtAll=OPERATIONS_WRITE_CAPABILITIES.some(can);
   const [locations,setLocations]=useState<Record<string,{enabled:boolean;latitude:string;longitude:string;city:string;neighborhood:string;justification:string}>>({});
   const [categoryReasons,setCategoryReasons]=useState<Record<string,string>>({});

@@ -131,9 +131,14 @@ export function normalizeAdminOrderSearch(raw: AdminOrderSearchInput): Normalize
     cursor = { at, id };
   }
 
+  // An unfiltered search is the "recent orders" queue: last 7 days only, so the
+  // whole order history can't be paged through without a reason (audit M5).
+  const unfiltered = !orderId && !orderSuffix && !email && !phone && !merchantId && !status && !from && !to;
+  const defaultFrom = unfiltered ? new Date(Date.now() - 7 * 86_400_000) : null;
+
   return {
     orderId, orderSuffix, email, phone, merchantId, merchantNameLike, status,
-    createdFrom: from ? from.toISOString() : null,
+    createdFrom: from ? from.toISOString() : defaultFrom ? defaultFrom.toISOString() : null,
     createdBefore: before ? before.toISOString() : null,
     cursor,
     limit: Math.min(input.limit ?? ADMIN_ORDER_PAGE_DEFAULT, ADMIN_ORDER_PAGE_MAX),
@@ -152,6 +157,18 @@ export function maskEmail(email: string | null | undefined): string | null {
 }
 
 /** +233•••••4567 : country code and last 4 digits only. */
+/**
+ * Delivery address for read-only staff: only the last two comma-separated parts
+ * (typically area and city). The full address leaves the server only through
+ * the audited reveal (security audit M5).
+ */
+export function maskAddress(address: string | null | undefined): string | null {
+  if (!address) return null;
+  const parts = address.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 2) return "Address hidden · reveal to see it";
+  return `•••, ${parts.slice(-2).join(", ")}`;
+}
+
 export function maskPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   const digits = phone.replace(/\s+/g, "");

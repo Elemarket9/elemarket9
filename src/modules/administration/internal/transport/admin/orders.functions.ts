@@ -33,7 +33,7 @@ export const searchAdminOrderList = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const actor = getAuthenticatedUserId(context);
     await assertOrderReader(await getAdminCapabilitiesForUserId(actor));
-    await enforceRateLimit("admin-orders-search", { windowSeconds: 60, maxRequests: 60, subject: actor });
+    await enforceRateLimit("admin-orders-search", { windowSeconds: 60, maxRequests: 60, subject: actor, identity: "subject" });
     try {
       return { ...(await searchAdminOrders(normalizeAdminOrderSearch(data))), error: null as string | null };
     } catch (e) {
@@ -50,8 +50,10 @@ export const loadAdminOrderDetail = createServerFn({ method: "GET" })
     const actor = getAuthenticatedUserId(context);
     const capabilities = await getAdminCapabilitiesForUserId(actor);
     await assertOrderReader(capabilities);
-    await enforceRateLimit("admin-orders-detail", { windowSeconds: 60, maxRequests: 120, subject: actor });
+    await enforceRateLimit("admin-orders-detail", { windowSeconds: 60, maxRequests: 120, subject: actor, identity: "subject" });
     const detail = await getAdminOrderDetail(data.orderId);
+    const { recordAdminOrderViewed } = await import("../../admin-orders.server");
+    await recordAdminOrderViewed(data.orderId, actor);
     return { detail, canManage: capabilities.includes("admin.full") || capabilities.includes("admin.orders.manage") };
   });
 
@@ -62,7 +64,7 @@ export const addAdminOrderInternalNote = createServerFn({ method: "POST" })
     const actor = getAuthenticatedUserId(context);
     await requireAdminForUserId(actor, "admin.orders.manage");
     await assertFreshActor(actor);
-    await enforceRateLimit("admin-orders-note", { windowSeconds: 60, maxRequests: 30, subject: actor });
+    await enforceRateLimit("admin-orders-note", { windowSeconds: 60, maxRequests: 30, subject: actor, identity: "subject" });
     return addAdminOrderNote({ orderId: data.orderId, adminId: actor, body: data.body });
   });
 
@@ -73,7 +75,7 @@ export const setAdminOrderDeliveryHold = createServerFn({ method: "POST" })
     const actor = getAuthenticatedUserId(context);
     await requireAdminForUserId(actor, "admin.orders.manage");
     await assertFreshActor(actor);
-    await enforceRateLimit("admin-orders-delivery-hold", { windowSeconds: 300, maxRequests: 20, subject: actor });
+    await enforceRateLimit("admin-orders-delivery-hold", { windowSeconds: 300, maxRequests: 20, subject: actor, identity: "subject" });
     return setOrderDeliveryHoldAsAdmin({ orderId: data.orderId, adminId: actor, action: data.action, reason: data.reason });
   });
 
@@ -84,7 +86,7 @@ export const cancelUnpaidAdminOrder = createServerFn({ method: "POST" })
     const actor = getAuthenticatedUserId(context);
     await requireAdminForUserId(actor, "admin.orders.manage");
     await assertFreshActor(actor);
-    await enforceRateLimit("admin-orders-cancel", { windowSeconds: 300, maxRequests: 10, subject: actor });
+    await enforceRateLimit("admin-orders-cancel", { windowSeconds: 300, maxRequests: 10, subject: actor, identity: "subject" });
     return cancelUnpaidOrderAsAdmin({ orderId: data.orderId, adminId: actor, reason: data.reason });
   });
 
@@ -95,6 +97,6 @@ export const revealAdminOrderCustomerContact = createServerFn({ method: "POST" }
     const actor = getAuthenticatedUserId(context);
     await requireAdminForUserId(actor, "admin.orders.manage");
     await assertFreshActor(actor);
-    await enforceRateLimit("admin-orders-contact-reveal", { windowSeconds: 3600, maxRequests: 30, subject: actor });
+    await enforceRateLimit("admin-orders-contact-reveal", { windowSeconds: 3600, maxRequests: 30, subject: actor, identity: "subject" });
     return revealAdminOrderContact({ orderId: data.orderId, adminId: actor, reason: data.reason });
   });

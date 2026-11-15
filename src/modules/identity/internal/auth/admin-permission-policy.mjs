@@ -45,7 +45,7 @@ export const ADMIN_CAPABILITY_LABELS = Object.freeze({
   'admin.promotions.manage': 'Run marketplace-wide deals and approve merchant promotions',
   'admin.reports.view': 'Sales, refund, delivery and merchant performance reports; CSV export',
   'admin.support.view': 'Read the support inbox without replying (trainees, QA)',
-  'admin.catalog.view': 'Read merchant, product and category queues without changing them',
+  'admin.catalog.view': 'Read merchant, product and category queues without changing them (no customer data; owner emails masked)',
 });
 
 /** A few legacy/managerial bundle grants expand into explicit backend capabilities. */
@@ -86,8 +86,16 @@ export function canDelegatedAdminManageRoles({ actorOwner, actorCapabilities, ol
   if (actorOwner) return true;
   const actor = new Set(expandAdminCapabilities(actorCapabilities));
   if (!actor.has('admin.staff.manage') || oldPrimaryRole === 'owner' || nextPrimaryRole === 'owner') return false;
-  return [...oldCapabilities, ...nextCapabilities].every(p => actor.has(p));
+  const affected = [...oldCapabilities, ...nextCapabilities];
+  // Money-approval powers are never delegated by non-owners: otherwise one
+  // person holding staff.manage + finance.refunds could mint their own second
+  // approver and defeat the two-person rule (security audit H1).
+  if (affected.some(p => OWNER_ONLY_GRANTS.has(p))) return false;
+  return affected.every(p => actor.has(p));
 }
+
+/** Permissions only the Main Administrator may grant or revoke. */
+export const OWNER_ONLY_GRANTS = new Set(['admin.finance.refunds', 'admin.finance.payouts', 'admin.staff.manage']);
 
 /** Retain the original pure compatibility policy for existing verifications. */
 /** @param {string | null | undefined} staffRole @param {string} capability */

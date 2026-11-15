@@ -252,3 +252,40 @@ test("a failed decision leaves no audit row and no change (same transaction)", {
   const [row] = await sql.query(`select status from risk_flags where id=$1`, [flagId]);
   assert.equal(row.status, "open");
 });
+
+// Audit finding (security M4 / money M1): a BLOCKED checkout rolled back its own
+// assessment and flag, so the most serious cases never reached the queue.
+test("a blocked checkout is recorded outside the aborted transaction and reaches the queue as critical", { skip }, async () => {
+  const seed = await seedOrder(sql);
+  await sql.query(`update product_variants set stock=50 where id=$1`, [seed.variant]);
+  await sql.query(`update products set stock=50 where id=$1`, [seed.product]);
+  for (let i = 1; i <= 8; i++) {
+    await sql.query(
+      `insert into payment_attempts(id,payment_id,attempt_no,provider_key,amount,currency,status)
+       select $1,$2,$3,'paystack',p.amount,'GHS','failed' from payments p where p.id=$2`, [`rk_blk_${tag}_${i}`, seed.payment, i]);
+  }
+  await sql.query(`update orders set status='cancelled' where id=$1`, [seed.order]);
+  let blocked;
+  for (let i = 0; i < 8 && !blocked; i++) {
+    try {
+      const order = await checkout(sql, seed);
+      await sql.query(`update orders set status='cancelled' where id=$1`, [order.orderId]);
+    } catch (error) { blocked = error; }
+  }
+  assert.ok(blocked, "the risk engine blocked a checkout");
+  assert.match(blocked.message, /checkout blocked by ELEMARKET risk controls/);
+  const detail = JSON.parse(blocked.detail);
+  assert.equal(detail.kind, "elemarket_checkout_block");
+  // Nothing survived the rollback:
+  const before = await sql.query(`select 1 from risk_flags where subject_id=$1 and flag_code='checkout_blocked'`, [seed.user]);
+  assert.equal(before.length, 0);
+  // Only the session user may record it.
+  await assert.rejects(sql.query(`select record_blocked_checkout_attempt($1,$2::jsonb)`, [seed.user, blocked.detail]), /session user/);
+  await sql.query(
+    `with identity as (select set_config('app.user_id', $1, true)) select record_blocked_checkout_attempt($1,$2::jsonb) from identity`,
+    [seed.user, blocked.detail]);
+  const [flag] = await sql.query(`select severity,status from risk_flags where subject_id=$1 and flag_code='checkout_blocked'`, [seed.user]);
+  assert.deepEqual(flag, { severity: "critical", status: "open" });
+  const src = (await import("node:fs")).readFileSync("src/modules/ordering/internal/checkout.ts", "utf8");
+  assert.match(src, /record_blocked_checkout_attempt/, "checkout records blocks");
+});

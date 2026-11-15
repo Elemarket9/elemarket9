@@ -24,7 +24,7 @@ async function deps() {
 async function guardMutation(d: Awaited<ReturnType<typeof deps>>, adminId: string) {
   const sessionUser = await d.requireFreshSession();
   if (sessionUser !== adminId) throw new Error("Fresh authentication required");
-  await d.enforceRateLimit("admin-review-moderation", { windowSeconds: 600, maxRequests: 120, subject: adminId });
+  await d.enforceRateLimit("admin-review-moderation", { windowSeconds: 600, maxRequests: 120, subject: adminId, identity: "subject" });
 }
 
 const queueSchema = z.object({

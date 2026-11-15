@@ -13,6 +13,7 @@ const skip = !enabled && "PostgreSQL integration not enabled (RUN_DB_INTEGRATION
 let db, harness, sql, dual, provider, payments, handlePaymentWebhook;
 const alice = `dap_alice_${randomBytes(4).toString("hex")}`;
 const bob = `dap_bob_${randomBytes(4).toString("hex")}`;
+const owner = `dap_owner_${randomBytes(4).toString("hex")}`;
 
 before(async () => {
   if (!enabled) return;
@@ -24,9 +25,16 @@ before(async () => {
   dual = await harness.load("/src/modules/administration/internal/dual-approval.server.ts");
   payments = await harness.load("/src/modules/payments/public/payment.server.ts");
   ({ handlePaymentWebhook } = await harness.load("/src/application/payment-webhook.server.ts"));
-  for (const id of [alice, bob]) {
+  for (const id of [alice, bob, owner]) {
     await sql.query(`insert into "user"(id,name,email,"emailVerified",role) values($1,$1,$2,true,'admin')`, [id, `${id}@example.test`]);
   }
+  // Long-standing finance approvers, appointed by the Main Administrator weeks ago.
+  await sql.query(`insert into admin_roles(role_key,display_name) values('refund_approver','Refund approver') on conflict do nothing`);
+  await sql.query(`insert into admin_role_permissions(role_key,capability) values('refund_approver','admin.finance.refunds'),('refund_approver','admin.staff.manage') on conflict do nothing`);
+  await sql.query(`insert into admin_staff_roles(user_id,staff_role,status,assigned_by,assigned_reason,assigned_at)
+     values($1,'owner','active',null,'bootstrap',now()-interval '90 days'),
+           ($2,'refund_approver','active',$1,'finance team',now()-interval '30 days'),
+           ($3,'refund_approver','active',$1,'finance team',now()-interval '30 days')`, [owner, alice, bob]);
 });
 after(async () => {
   if (!enabled) return;
@@ -125,4 +133,52 @@ test("a paid order can be prepared for refund", { skip }, async () => {
   assert.equal(after.status, "refund_pending");
   const [again] = await sql.query(`select prepare_provider_refund_for_payment($1,$2,'customer_order_cancellation') as result`, [order.paymentId, seed.user]);
   assert.equal(again.result.requestId, result.requestId, "idempotent: no second refund");
+});
+
+// Security audit H1: one person holding staff.manage + finance.refunds made an
+// account they control into an approver and approved their own request.
+test("an approver appointed by the requester cannot approve (H1)", { skip }, async () => {
+  const puppet = `dap_puppet_${randomBytes(4).toString("hex")}`;
+  await sql.query(`insert into "user"(id,name,email,"emailVerified",role) values($1,$1,$2,true,'admin')`, [puppet, `${puppet}@example.test`]);
+  // Even backdated so the 7-day rule alone would not stop it:
+  await sql.query(`insert into admin_staff_roles(user_id,staff_role,status,assigned_by,assigned_reason,assigned_at)
+     values($1,'refund_approver','active',$2,'my helper',now()-interval '30 days')`, [puppet, alice]);
+  const { approvalId } = await request("order_puppet");
+  await assert.rejects(dual.decideDualApproval({ approvalId, deciderId: puppet, decision: "approve", note: "Looks fine to me, approving" }), /given to you by the requester/);
+  await assert.rejects(
+    sql.query(`update admin_dual_approvals set status='approved', decided_by=$2, decided_at=now() where id=$1`, [approvalId, puppet]),
+    /not independent/, "the database refuses it even if the app check is bypassed");
+});
+
+test("a brand-new approver must wait 7 days, even if appointed by someone else", { skip }, async () => {
+  const fresh = `dap_fresh_${randomBytes(4).toString("hex")}`;
+  await sql.query(`insert into "user"(id,name,email,"emailVerified",role) values($1,$1,$2,true,'admin')`, [fresh, `${fresh}@example.test`]);
+  await sql.query(`insert into admin_staff_roles(user_id,staff_role,status,assigned_by,assigned_reason) values($1,'refund_approver','active',$2,'new hire')`, [fresh, owner]);
+  const { approvalId } = await request("order_fresh");
+  await assert.rejects(dual.decideDualApproval({ approvalId, deciderId: fresh, decision: "approve", note: "First day on the job, approving" }), /less than 7 days/);
+  const row = await dual.decideDualApproval({ approvalId, deciderId: bob, decision: "approve", note: "Long-standing approver checks it" });
+  assert.equal(row.status, "approved");
+});
+
+test("approvals cannot be inserted pre-approved and append-only tables cannot be truncated (M1)", { skip }, async () => {
+  await assert.rejects(sql.query(
+    `insert into admin_dual_approvals(id,action,subject_id,amount,required_capability,requested_by,request_reason,status,decided_by,decided_at)
+     values('dap_${"a".repeat(32)}','order_refund','order_forged',99999,'admin.finance.refunds',$1,'Forged approved refund request','approved',$2,now())`, [alice, bob]),
+    /created pending/);
+  for (const table of ["admin_dual_approvals", "risk_flags", "audit_events", "wallet_ledger_entries"]) {
+    await assert.rejects(sql.query(`truncate ${table}`), /append-only and cannot be truncated/, table);
+  }
+});
+
+test("an approval interrupted before recording its outcome does not block the order forever (L4)", { skip }, async () => {
+  const { approvalId } = await request("order_stuck");
+  await dual.decideDualApproval({ approvalId, deciderId: bob, decision: "approve", note: "Approved, then the server crashed" });
+  await assert.rejects(request("order_stuck"), /already waiting/, "still protected while it may be running");
+  await sql.query(`alter table admin_dual_approvals disable trigger admin_dual_approvals_guard`);
+  await sql.query(`update admin_dual_approvals set decided_at=now()-interval '2 hours' where id=$1`, [approvalId]);
+  await sql.query(`alter table admin_dual_approvals enable trigger admin_dual_approvals_guard`);
+  const again = await request("order_stuck");
+  assert.notEqual(again.approvalId, approvalId);
+  const [old] = await sql.query(`select status, execution_error from admin_dual_approvals where id=$1`, [approvalId]);
+  assert.equal(old.status, "failed");
 });

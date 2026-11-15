@@ -8,12 +8,24 @@ import { loadTypeScript } from '../scripts/helpers/load-typescript.mjs';
 const orders = loadTypeScript('src/modules/administration/internal/admin-orders.ts');
 const { normalizeAdminOrderSearch: normalize, maskEmail, maskPhone, buildOrderTimeline, orderActionAvailability, escapeLike } = orders;
 
-test('an empty search lists the newest orders with the default page size', () => {
+test('an empty search is the recent-orders queue: last 7 days, default page size (audit M5)', () => {
+  const before = Date.now();
   const n = normalize({});
-  assert.deepEqual(n, {
+  const { createdFrom, ...rest } = n;
+  assert.deepEqual(rest, {
     orderId: null, orderSuffix: null, email: null, phone: null, merchantId: null, merchantNameLike: null,
-    status: null, createdFrom: null, createdBefore: null, cursor: null, limit: 25,
+    status: null, createdBefore: null, cursor: null, limit: 25,
   });
+  const ageDays = (before - Date.parse(createdFrom)) / 86_400_000;
+  assert.ok(ageDays > 6.99 && ageDays < 7.01, `createdFrom is ${ageDays} days ago`);
+  assert.equal(normalize({ status: 'paid' }).createdFrom, null, 'any filter lifts the 7-day window');
+});
+
+test('delivery address is masked to its last two parts (audit M5)', () => {
+  const { maskAddress } = loadTypeScript('src/modules/administration/internal/admin-orders.ts');
+  assert.equal(maskAddress('House 12, Oxford Street, Osu, Accra'), '•••, Osu, Accra');
+  assert.equal(maskAddress('Osu, Accra'), 'Address hidden · reveal to see it');
+  assert.equal(maskAddress(null), null);
 });
 
 test('order ID: 8 characters search the suffix, longer is an exact ID, shorter is refused', () => {

@@ -1,7 +1,7 @@
 import { getSql, withTransaction } from "@/lib/db";
 import { applyOrderDeliveryHold, type OrderDeliveryHoldAction } from "@/modules/support/public/delivery-hold.server";
 import {
-  buildOrderTimeline, maskEmail, maskPhone, orderActionAvailability,
+  buildOrderTimeline, maskAddress, maskEmail, maskPhone, orderActionAvailability,
   type NormalizedAdminOrderSearch, type OrderTimelineEntry, type OrderTimelineSources,
 } from "./admin-orders";
 
@@ -85,7 +85,7 @@ export type AdminOrderDetail = {
   order: {
     id: string; status: string; currency: string; paymentTiming: string; createdAt: string; updatedAt: string;
     productTotal: string; promoDiscount: string; deliveryTotal: string; platformFee: string; merchantNet: string; grandTotal: string;
-    deliveryTier: string; address: string;
+    deliveryTier: string; address: string | null;
   };
   customer: { id: string; name: string | null; emailMasked: string | null; phoneMasked: string | null };
   merchant: { id: string; name: string; status: string; city: string | null };
@@ -206,7 +206,7 @@ export async function getAdminOrderDetail(orderId: string): Promise<AdminOrderDe
       createdAt: toIso(order.created_at), updatedAt: toIso(order.updated_at),
       productTotal: order.product_total, promoDiscount: order.promo_discount, deliveryTotal: order.delivery_total,
       platformFee: order.platform_fee, merchantNet: order.merchant_net, grandTotal: order.grand_total,
-      deliveryTier: order.delivery_tier, address: order.address,
+      deliveryTier: order.delivery_tier, address: maskAddress(order.address),
     },
     customer: { id: order.user_id, name: order.profile_name ?? order.customer_name, emailMasked: maskEmail(order.email), phoneMasked: maskPhone(order.phone) },
     merchant: { id: order.merchant_id, name: order.merchant_name, status: order.merchant_status, city: order.merchant_city },
@@ -247,17 +247,25 @@ export async function setOrderDeliveryHoldAsAdmin(input: { orderId: string; admi
 }
 
 /** Returns the unmasked contact once, audited in the same transaction. */
+/** Read audit: who opened which order (customer name, masked contact, area). */
+export async function recordAdminOrderViewed(orderId: string, adminId: string) {
+  const sql = await getSql();
+  await sql.query(`select record_audit_event($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`, [
+    "admin.order.viewed", "order", orderId, adminId, "admin", null, "success", "{}",
+  ]);
+}
+
 export async function revealAdminOrderContact(input: { orderId: string; adminId: string; reason: string }) {
   return withTransaction(async (tx) => {
-    const [row] = await tx.query<{ email: string | null; phone: string | null; delivery_phone: string | null }>(
-      `select u.email, pr.phone, o.delivery_contact_phone as delivery_phone
+    const [row] = await tx.query<{ email: string | null; phone: string | null; delivery_phone: string | null; address: string | null }>(
+      `select u.email, pr.phone, o.delivery_contact_phone as delivery_phone, o.address
          from orders o left join "user" u on u.id = o.user_id left join profiles pr on pr.user_id = o.user_id
         where o.id = $1`, [input.orderId]);
     if (!row) throw new Error("Order not found");
     await tx.query(`select record_audit_event($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`, [
       "admin.order.contact_revealed", "order", input.orderId, input.adminId, "admin", null, "success",
-      JSON.stringify({ reason: input.reason, fields: ["email", "phone"] }),
+      JSON.stringify({ reason: input.reason, fields: ["email", "phone", "address"] }),
     ]);
-    return { email: row.email, phone: row.delivery_phone ?? row.phone, accountPhone: row.phone };
+    return { email: row.email, phone: row.delivery_phone ?? row.phone, accountPhone: row.phone, address: row.address };
   });
 }
