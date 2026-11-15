@@ -553,25 +553,58 @@ export async function handlePayoutWebhook(input: { rawBody: string; headers: Hea
   const driver = verified[0];
   const notice = await driver.parseWebhook!(input.rawBody).catch(() => null);
   if (!notice || !/^wpo_[a-f0-9]{32}$/.test(notice.payoutId)) throw new PayoutWebhookError("Invalid webhook payload", 400);
-  const digest = createHash("sha256").update(input.rawBody).digest("hex");
-  const inserted = await sql.query<{ id: string }>(
-    `insert into wallet_payout_events(driver_key, payload_sha256, payout_id, reported_status) values($1,$2,$3,$4)
-     on conflict (driver_key, payload_sha256) do nothing returning id::text`,
-    [driver.key, digest, notice.payoutId, notice.status ?? null]);
   const [payout] = await sql.query<{ id: string; driver_key: string; provider_reference: string | null; status: string }>(
     `select id, driver_key, provider_reference, status from wallet_payouts where id=$1`, [notice.payoutId]);
   if (!payout || payout.driver_key !== driver.key) throw new PayoutWebhookError("Unknown payout", 404);
-  if (!inserted[0]) return { payoutId: payout.id, status: payout.status, duplicate: true };
-  let state: PayoutState | null = null;
-  if (declaredCapabilities(driver).statusLookup && driver.getPayout) {
-    state = await driver.getPayout(payout.id, payout.provider_reference ?? notice.providerReference);
-  } else if (notice.status && notice.providerReference) {
-    state = { providerReference: notice.providerReference, status: notice.status, amount: notice.amount };
+
+  const digest = createHash("sha256").update(input.rawBody).digest("hex");
+  const claimToken = crypto.randomUUID();
+  // Insert once, or reclaim an UNPROCESSED event whose lease expired. A
+  // duplicate in flight must receive 503 so the provider retries rather than
+  // treating an unfinished event as successfully acknowledged.
+  const [claimed] = await sql.query<{ id: string }>(
+    `insert into wallet_payout_events(driver_key, payload_sha256, payout_id, reported_status, processing_token, processing_until)
+     values($1,$2,$3,$4,$5,now()+interval '2 minutes')
+     on conflict (driver_key, payload_sha256) do update
+       set processing_token=excluded.processing_token, processing_until=excluded.processing_until
+       where wallet_payout_events.processed_at is null
+         and (wallet_payout_events.processing_until is null or wallet_payout_events.processing_until <= now())
+     returning id::text`,
+    [driver.key, digest, notice.payoutId, notice.status ?? null, claimToken]);
+  if (!claimed) {
+    const [existing] = await sql.query<{ processed_at: string | null; outcome: string | null }>(
+      `select processed_at::text, outcome from wallet_payout_events where driver_key=$1 and payload_sha256=$2`,
+      [driver.key, digest]);
+    if (existing?.processed_at) return { payoutId: payout.id, status: existing.outcome ?? payout.status, duplicate: true };
+    throw new PayoutWebhookError("Webhook processing is in progress; retry", 503);
   }
-  const status = state ? await applyProviderState(payout.id, state, "webhook") : payout.status;
-  await sql.query(`update wallet_payout_events set processed_at=now(), outcome=$3 where driver_key=$1 and payload_sha256=$2`,
-    [driver.key, digest, status]);
-  return { payoutId: payout.id, status };
+
+  try {
+    let state: PayoutState | null = null;
+    if (declaredCapabilities(driver).statusLookup && driver.getPayout) {
+      state = await driver.getPayout(payout.id, payout.provider_reference ?? notice.providerReference);
+    } else if (notice.status && notice.providerReference) {
+      state = { providerReference: notice.providerReference, status: notice.status, amount: notice.amount };
+    }
+    if (!state) throw new PayoutWebhookError("Provider payout status is not available yet", 503);
+    const status = await applyProviderState(payout.id, state, "webhook");
+    const [completed] = await sql.query<{ id: string }>(
+      `update wallet_payout_events
+          set processed_at=now(), outcome=$3, processing_token=null, processing_until=null
+        where driver_key=$1 and payload_sha256=$2 and processing_token=$4 and processed_at is null
+        returning id::text`,
+      [driver.key, digest, status, claimToken]);
+    if (!completed) throw new PayoutWebhookError("Webhook processing lease expired; retry", 503);
+    return { payoutId: payout.id, status };
+  } catch (error) {
+    // Do not lose a signed financial notification on a provider outage, crash,
+    // or database error. Release this claim for the next delivery attempt.
+    await sql.query(
+      `update wallet_payout_events set processing_token=null, processing_until=null
+       where driver_key=$1 and payload_sha256=$2 and processing_token=$3 and processed_at is null`,
+      [driver.key, digest, claimToken]).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function runWalletSettlement() {
