@@ -88,7 +88,7 @@ test("a real checkout flagged by the risk engine appears in the review queue", {
   assert.ok(item, "flag is listed");
   assert.equal(item.severity, "high");
   assert.equal(item.subject.name, "Integration Customer");
-  assert.match(item.subject.maskedEmail, /^i\*+[a-z0-9]@i\*+n\.test$/);
+  assert.match(item.subject.maskedEmail, /^i•••[a-z0-9]@integration\.test$/);
   assert.ok(!item.subject.maskedEmail.includes(seed.user), "email is masked");
   assert.equal(item.related.openOrders, 2, "the two unpaid orders still open");
 
