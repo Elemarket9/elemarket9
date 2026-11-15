@@ -29,8 +29,8 @@ begin
 
   -- Don't break inventory, price, moderation or suspension updates on historical
   -- duplicates. However, re-activating an archived row must pass the guard.
-  if tg_op='UPDATE'
-     and old.status<>'archived'
+  if tg_op='UPDATE' then
+    if old.status<>'archived'
      and old.merchant_id is not distinct from new.merchant_id
      and old.catalog_source is not distinct from new.catalog_source
      and old.sku is not distinct from new.sku
@@ -41,7 +41,8 @@ begin
      and old.model is not distinct from new.model
      and old.condition is not distinct from new.condition
      and old.listing_type is not distinct from new.listing_type then
-    return new;
+      return new;
+    end if;
   end if;
 
   -- Serialize all native identity writes for this merchant, including bulk uploads.
