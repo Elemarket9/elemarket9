@@ -200,7 +200,7 @@ export const getProduct = createServerFn({ method: "GET" })
     const sql = await getSql();
     const rows = await sql.query<ProductRow>(
       `select p.id, p.merchant_id, m.name as merchant_name, m.neighborhood, m.city, concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) as merchant_address,
-              p.name, p.category, p.subcategory, p.brand, p.model, p.sku, p.condition, p.warranty_months, p.fulfillment_type, p.status, p.returnable, coalesce(p.return_window_days,(elemarket_return_policy()).default_window_days) as return_window_days, p.attributes, p.financing_eligible, p.financing_min_amount, p.financing_max_amount, p.listing_type, p.price::text as price, p.stock, p.description, p.image_path,
+              p.name, p.category, p.subcategory, p.brand, p.model, p.sku, p.condition, p.warranty_months, p.fulfillment_type, p.status, p.returnable, coalesce(p.return_window_days,(elemarket_return_policy()).default_window_days) as return_window_days, p.attributes, p.financing_eligible, p.financing_min_amount, p.financing_max_amount, p.listing_type, coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price)::text as price, p.stock, p.description, p.image_path,
               p.meal_type, p.cuisine, p.prep_minutes, p.guests, m.verified, m.lat, m.lon,
                 (select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,
                 (select count(*)::int from reviews r where r.product_id=p.id) as review_count
