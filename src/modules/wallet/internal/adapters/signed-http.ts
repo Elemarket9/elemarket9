@@ -34,6 +34,8 @@ const stateSchema = z.object({
   amount: z.string().regex(/^\d{1,9}\.\d{2}$/),
   currency: z.literal("GHS"),
   failureReason: z.string().max(500).optional(),
+}).refine((state) => state.status === "failed" || Boolean(state.amount && state.currency), {
+  message: "Paid and processing payouts require provider-confirmed amount and currency",
 });
 const destinationSchema = z.object({
   destinationRef: z.string().min(1).max(256),
