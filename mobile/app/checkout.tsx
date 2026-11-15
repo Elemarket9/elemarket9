@@ -41,7 +41,20 @@ export default function Checkout() {
     try {
       const payload = { items: items.map(({ productId, variantId, quantity }) => ({ productId, variantId, quantity })), quotes: quotes.map(({ merchantId, quoteId }) => ({ merchantId, quoteId })), address: address.trim(), method, promoCode: null };
       const fingerprint = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, JSON.stringify(payload), { encoding: Crypto.CryptoEncoding.HEX });
-      const orderResult = await apiJson<{ orders?: Array<{ paymentId?: string }> } | null>("/api/mobile/checkout", { method: "POST", body: JSON.stringify({ ...payload, fingerprint, idempotencyKey: Crypto.randomUUID() }) });
+      const orderResult = await apiJson<{ groupId?: string; orders?: Array<{ paymentId?: string }> } | null>("/api/mobile/checkout", { method: "POST", body: JSON.stringify({ ...payload, fingerprint, idempotencyKey: Crypto.randomUUID() }) });
+      // A multi-merchant cart gets one hosted provider checkout, not a queue
+      // of merchant charges. The group ID is resolved and owned server-side.
+      if ((orderResult?.orders?.length ?? 0) > 1) {
+        if (!orderResult?.groupId) throw new Error("Checkout group reference is missing");
+        const intent = await apiJson<{ groupId:string;status:string;checkoutUrl?:string|null;awaitingConfirmation?:boolean }>(
+          "/api/mobile/payment-intent", {method:"POST",body:JSON.stringify({groupId:orderResult.groupId})});
+        if (!intent.checkoutUrl && intent.status!=="completed" && !intent.awaitingConfirmation) {
+          throw new Error("Combined payment could not be initialized; check your orders");
+        }
+        await clearCart();
+        router.replace({pathname:"/payment",params:{groupId:orderResult.groupId}});
+        return;
+      }
       const paymentIds = (orderResult?.orders ?? []).map((x) => x.paymentId).filter((x): x is string => Boolean(x));
       if (!paymentIds.length) throw new Error("No payable order was created.");
       const intent = await apiJson<{ paymentId: string; checkoutUrl?: string }>("/api/mobile/payment-intent", { method: "POST", body: JSON.stringify({ paymentId: paymentIds[0] }) });
