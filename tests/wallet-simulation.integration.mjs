@@ -240,3 +240,32 @@ test("provider-direct merchants are never credited (no double payment)", async (
   const [row] = await sql.query(`select count(*)::int as n from wallet_ledger_entries where merchant_id=$1`, [other.merchant]);
   assert.equal(row.n, 0);
 });
+
+test("wallet history is merchant-scoped and CSV exports are complete within bounded dates", async () => {
+  const { loadWalletHistory, exportWalletLedger } = await harness.load("/src/modules/wallet/internal/history.server.ts");
+  const page = await loadWalletHistory({ merchantId: seed.merchant, kind: "ledger", page: 1 });
+  assert.equal(page.kind, "ledger");
+  assert.ok(page.rows.length > 0, "wallet history includes actual recorded ledger entries");
+  assert.ok(page.rows.every((row) => typeof row.amount === "string"));
+  const payouts = await loadWalletHistory({ merchantId: seed.merchant, kind: "payouts", page: 1 });
+  assert.equal(payouts.kind, "payouts");
+  assert.ok(payouts.rows.length > 0, "seller can see past withdrawal statuses");
+
+  const isolated = await seedOrder(sql);
+  const empty = await loadWalletHistory({ merchantId: isolated.merchant, kind: "ledger", page: 1 });
+  assert.deepEqual(empty.rows, [], "another merchant's records must not appear");
+
+  const from = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10);
+  const to = new Date().toISOString().slice(0, 10);
+  const extract = await exportWalletLedger({ merchantId: seed.merchant, dateFrom: from, dateTo: to });
+  assert.ok(extract.csv.includes("Signed amount GHS"));
+  assert.ok(extract.count > 0);
+  assert.equal(extract.csv.trim().split(/\r?\n/).length, extract.count + 1, "no silent truncation");
+  assert.ok(!extract.csv.includes("+233241112222"), "raw payout account must not be present");
+  const otherExtract = await exportWalletLedger({ merchantId: isolated.merchant, dateFrom: from, dateTo: to });
+  assert.equal(otherExtract.count, 0, "exports must be merchant-scoped");
+  await assert.rejects(
+    exportWalletLedger({ merchantId: seed.merchant, dateFrom: "2026-01-01", dateTo: "2026-12-31" }),
+    /93 days/,
+  );
+});

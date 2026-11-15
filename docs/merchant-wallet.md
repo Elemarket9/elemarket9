@@ -69,6 +69,27 @@ destination never changes in place (database-enforced); a different destination
 is a new account with its own cooling period. Each withdrawal stores the
 destination authorized when it was requested, and every attempt pays that one.
 
+## Seller financial records
+
+The merchant wallet offers two separately paginated histories: ungrouped ledger
+entries and provider payout attempts. Sellers may filter by UTC date and
+download a merchant-scoped CSV of ledger entries over a period of up to 93 days.
+CSV results are capped at 5,000 entries; oversized statements fail explicitly
+rather than silently omitting transactions. No raw recipient account numbers
+are included. These are marketplace ledger extracts, not a bank statement or
+evidence that an external provider has paid.
+
+The landing page's activity list is intentionally a bounded preview of the
+newest 100 ledger rows. Each full-history ledger row represents one signed
+bucket movement; debits and credits should not be collapsed across pagination
+boundaries. A payout history is a separate view of transfer status, net amount,
+fee and provider reference.
+
+Signed payout notifications are persisted as an inbox, with a short-lived
+processing lease. Unprocessed entries can be reclaimed and retried after a
+failure or crash. A concurrent duplicate that is still processing receives
+a retriable response, never a false successful acknowledgement.
+
 ## Withdrawal states
 
 | State | Merchant sees | Meaning |
@@ -139,7 +160,7 @@ Reject requests whose timestamp is more than 5 minutes off.
 | Call | Body | Response |
 | --- | --- | --- |
 | `POST {endpoint}/destinations` | `{rail: "mobile_money"\|"bank", accountNumber, institutionCode, accountName}` | `{destinationRef, resolvedAccountName?, verified}` |
-| `POST {endpoint}/payouts` | `{payoutId, amount: "98.50", currency: "GHS", rail, destinationRef, narration}` | `{providerReference, status: "processing"\|"paid"\|"failed", amount?, currency?, failureReason?}` |
+| `POST {endpoint}/payouts` | `{payoutId, amount: "98.50", currency: "GHS", rail, destinationRef, narration}` | `{providerReference, status: "processing"\|"paid"\|"failed", amount: "98.50", currency: "GHS", failureReason?}` |
 | `GET {endpoint}/payouts/{payoutId}` | — | same as above, or `404` if unknown |
 | `POST {endpoint}/fees` (only with `ELEMARKET_PAYOUT_HTTP_REMOTE_FEES=1`) | `{amount, currency, rail}` | `{fee: "1.00"}` |
 | `GET {endpoint}/payouts?since=<ISO time>` (only with `ELEMARKET_PAYOUT_HTTP_LISTING=1`) | — | `[{payoutId, providerReference, status, amount, currency}]`, every transfer since then |
@@ -153,6 +174,7 @@ Rules for the provider side:
   ELEMARKET then returns the money to the merchant's available balance. Any
   other error is treated as "may have been sent" and retried with the same key.
 - `amount` is what the merchant receives (the fee is already deducted).
+- Every payout creation and read-back response must include the transfer's `amount` and `currency`. Missing financial details are treated as uncertain, not as confirmation.
 - Only `destinationRef` (an opaque token) and the last 4 digits are stored by
   ELEMARKET. Raw account numbers pass through once and are not kept.
 

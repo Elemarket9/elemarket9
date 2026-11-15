@@ -262,11 +262,38 @@ test("T09 duplicate success callbacks settle the ledger once", { skip }, async (
   const raw = JSON.stringify({ payoutId: r.payoutId, providerReference: (await sim.transfers(r.payoutId))[0].reference });
   const raw2 = JSON.stringify({ providerReference: (await sim.transfers(r.payoutId))[0].reference, payoutId: r.payoutId });
   const results = await Promise.allSettled([...Array(10)].map(() => webhook(raw)).concat([...Array(10)].map(() => webhook(raw2))));
-  assert.ok(results.every((x) => x.status === "fulfilled"), JSON.stringify(results.find((x) => x.status === "rejected")?.reason?.message));
+  assert.ok(results.every((x) => x.status === "fulfilled" || x.reason?.status === 503),
+    JSON.stringify(results.find((x) => x.status === "rejected" && x.reason?.status !== 503)?.reason?.message));
+  // Concurrent identical deliveries may be told to retry while another worker
+  // owns the lease; after completion the same signed payload is a true duplicate.
+  assert.equal((await webhook(raw)).duplicate, true);
+  assert.equal((await webhook(raw2)).duplicate, true);
   assert.equal((await payout(r.payoutId)).status, "paid");
   assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 2, "one settlement pair");
   assert.equal(await ledgerCount(r.payoutId, "payout_fee"), 1);
   assert.equal((await sql.query(`select count(*)::int n from wallet_payout_events where payout_id=$1`, [r.payoutId]))[0].n, 2, "two distinct payloads stored once each");
+  await assertInvariants(m);
+});
+
+test("T09b an inbox event interrupted by provider lookup remains retryable", { skip }, async () => {
+  const m = await newMerchant(); await earn(m);
+  const r = await request(m, "25.00");
+  await sim.finish(r.payoutId, "paid");
+  const raw = JSON.stringify({ payoutId: r.payoutId, providerReference: (await sim.transfers(r.payoutId))[0].reference });
+  await sim.injectFault("mocka", "lookup", "unavailable");
+  await assert.rejects(webhook(raw), /status lookup unavailable/);
+  const [unfinished] = await sql.query(
+    `select processed_at, processing_token, processing_until from wallet_payout_events where payout_id=$1`, [r.payoutId]);
+  assert.equal(unfinished.processed_at, null, "failed processing must not acknowledge the notification");
+  assert.equal(unfinished.processing_token, null, "failure releases the processing lease");
+  assert.equal(unfinished.processing_until, null);
+  const applied = await webhook(raw);
+  assert.equal(applied.status, "paid", "retry with identical signed payload settles the withdrawal");
+  const [finished] = await sql.query(
+    `select count(*)::int as count, count(processed_at)::int as processed from wallet_payout_events where payout_id=$1`, [r.payoutId]);
+  assert.equal(finished.count, 1, "retry does not insert a second inbox row");
+  assert.equal(finished.processed, 1);
+  assert.equal(await ledgerCount(r.payoutId, "payout_paid"), 2, "only one payout settlement pair");
   await assertInvariants(m);
 });
 
@@ -440,7 +467,13 @@ test("T23 a confirmed provider failure releases the reservation once", { skip },
   const r = await request(m, "40.00");
   await sim.finish(r.payoutId, "failed");
   const raw = JSON.stringify({ payoutId: r.payoutId });
-  await Promise.all([webhook(raw), webhook(raw), (async () => { await due(r.payoutId); await wallet.reconcilePayouts(); })()]);
+  const delivered = await Promise.allSettled([
+    webhook(raw), webhook(raw),
+    (async () => { await due(r.payoutId); await wallet.reconcilePayouts(); })(),
+  ]);
+  assert.ok(delivered.every((x) => x.status === "fulfilled" || x.reason?.status === 503),
+    "in-flight duplicate callbacks may receive a retriable 503, never a false acknowledgement");
+  assert.equal((await webhook(raw)).duplicate, true, "completed callbacks are idempotent");
   assert.equal((await payout(r.payoutId)).status, "failed");
   assert.equal(await ledgerCount(r.payoutId, "payout_returned"), 2, "one return pair");
   assert.deepEqual(await balances(m), before);
