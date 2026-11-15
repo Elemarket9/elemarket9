@@ -146,7 +146,7 @@ begin
   end if;
   -- All orders must be payable, not silently partially delivered or cancelled.
   select bool_and(p.status='initiated' and o.status='payment_pending'
-                and o.payment_timing='before_delivery'
+                and o.payment_timing='upfront'
                 and p.user_id=g.user_id and o.user_id=g.user_id
                 and p.provider_key=g.provider_key
                 and p.settlement_model=g.settlement_model
