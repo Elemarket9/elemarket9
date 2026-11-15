@@ -83,6 +83,12 @@ test("two seller orders are paid with one charge and one signed webhook (duplica
   const repeat=await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
   assert.equal(repeat.checkoutUrl,intent.checkoutUrl);
   assert.equal(provider.initializeBodies.length,initialCount+1,"must never charge a group twice");
+  const {createExternalPaymentIntent}=await harness.load("/src/modules/payments/public/payment.server.ts");
+  await assert.rejects(
+    createExternalPaymentIntent({paymentId:g.a.payment,userId:g.userId}),
+    /single-charge|combined checkout/,
+    "group members must never also be charged separately",
+  );
   assert.equal((await groupState(g)).every(x=>x.paymentStatus==="initiated"&&x.orderStatus==="payment_pending"),true);
   const {answer,raw}=await sendSuccess(g);
   assert.equal(answer.status,"completed");
@@ -136,4 +142,37 @@ test("one group wallet collection credits both merchants separately exactly once
     group by merchant_id`,[[g.a.merchant,g.b.merchant]]);
   assert.equal(ledger.length,2);
   assert.equal(ledger.every(x=>x.n===1&&Number(x.amount)>0),true);
+});
+
+
+test("missing provider webhook reconciles one group charge without sending another payment request",async()=>{
+  const g=await seedGroup();
+  const count=provider.initializeBodies.length;
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  assert.equal(provider.initializeBodies.length,count+1);
+  const [charge]=await sql.query(
+    "select id,provider_reference from checkout_group_charges where group_id=$1",[g.groupId]);
+  provider.pay(charge.provider_reference);
+  // Simulate an authorized PSP charge whose callback never reaches ELEMARKET.
+  await sql.query(
+    "update checkout_group_charges set updated_at=now()-interval '10 minutes' where id=$1",[charge.id]);
+  const {reconcileStaleGroupCharges}=await harness.load("/src/modules/payments/public/reconciliation.server.ts");
+  const result=await reconcileStaleGroupCharges(20);
+  assert.ok(result.settled>=1,"provider read-back must settle the real merchant group");
+  assert.equal(provider.initializeBodies.length,count+1,"reconciliation must never create another charge");
+  const rows=await groupState(g);
+  assert.equal(rows.every(x=>x.paymentStatus==="completed"&&x.orderStatus==="paid"),true);
+});
+
+test("a definitively failed group payment cancels every merchant order and releases reservations",async()=>{
+  const g=await seedGroup();
+  await startCustomerGroupPayment({groupId:g.groupId,userId:g.userId});
+  const [charge]=await sql.query("select provider_reference,amount::text from checkout_group_charges where group_id=$1",[g.groupId]);
+  const raw=JSON.stringify({event:"charge.failed",data:{
+    id:200011+Number(charge.amount.replace(".",""))%10000,
+    reference:charge.provider_reference,amount:Math.round(Number(charge.amount)*100),currency:"GHS"}});
+  const result=await handlePaymentWebhook({providerKey:"paystack",rawBody:raw,signature:provider.sign(raw)});
+  assert.equal(result.status,"failed");
+  const statuses=await groupState(g);
+  assert.equal(statuses.every(x=>x.orderStatus==="cancelled"&&x.paymentStatus==="failed"),true);
 });
