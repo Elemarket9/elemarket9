@@ -6,6 +6,8 @@ import {
   cancelMerchantWithdrawal,
   listWalletMerchants,
   loadMerchantWallet,
+  loadMerchantWalletHistory,
+  exportMerchantWalletLedger,
   previewMerchantWithdrawal,
   requestMerchantWithdrawal,
 } from "../../modules/wallet/public/transport/merchant/wallet.functions";
@@ -114,6 +116,7 @@ function WalletPage() {
         <Withheld wallet={wallet} />
         <Payouts wallet={wallet} />
         <Ledger wallet={wallet} />
+        <WalletHistory wallet={wallet} />
       </div>
     </main>
   );
@@ -312,6 +315,127 @@ function Payouts({ wallet }: { wallet: Snapshot }) {
           ))}
         </ul>
       ) : <p className="mt-3 text-sm text-market-muted">No withdrawals yet.</p>}
+    </Card>
+  );
+}
+
+type WalletHistoryResult = Awaited<ReturnType<typeof loadMerchantWalletHistory>>;
+
+/** Full ledger-side and payout history, paginated independently of the summary. */
+function WalletHistory({ wallet }: { wallet: Snapshot }) {
+  const [kind, setKind] = useState<"ledger" | "payouts">("ledger");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [history, setHistory] = useState<WalletHistoryResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function load(page: number) {
+    setBusy(true); setMessage(null);
+    try {
+      const next = await loadMerchantWalletHistory({
+        data: {
+          merchantId: wallet.merchantId, kind, page,
+          dateFrom: dateFrom || undefined, dateTo: dateTo || undefined,
+        },
+      });
+      setHistory(next);
+    } catch (error) {
+      setMessage(safeError(error));
+    } finally { setBusy(false); }
+  }
+
+  async function download() {
+    if (!dateFrom || !dateTo) { setMessage("Choose both dates for the CSV ledger extract."); return; }
+    setBusy(true); setMessage(null);
+    try {
+      const file = await exportMerchantWalletLedger({
+        data: { merchantId: wallet.merchantId, dateFrom, dateTo },
+      });
+      const url = URL.createObjectURL(new Blob(["\uFEFF", file.csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = file.filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage(`Exported ${file.count} ledger entries. This is a transaction extract, not a bank receipt.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not export this statement.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Card title="Financial history & exports" className="lg:col-span-2">
+      <p className="mt-2 text-sm text-market-muted">
+        Search your own wallet ledger or provider payouts by UTC date. History pages show up to 50 records.
+        A ledger debit and credit are separate records, so neither is hidden by activity grouping.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="text-sm font-bold">History type
+          <select className="market-input mt-1 w-full rounded-xl border border-market-line px-3 py-2"
+            value={kind} onChange={(e) => { setKind(e.target.value as "ledger" | "payouts"); setHistory(null); }}>
+            <option value="ledger">Wallet ledger</option>
+            <option value="payouts">Withdrawals</option>
+          </select>
+        </label>
+        <label className="text-sm font-bold">From (UTC)
+          <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setHistory(null); }}
+            className="market-input mt-1 w-full rounded-xl border border-market-line px-3 py-2" />
+        </label>
+        <label className="text-sm font-bold">To (UTC)
+          <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setHistory(null); }}
+            className="market-input mt-1 w-full rounded-xl border border-market-line px-3 py-2" />
+        </label>
+        <div className="flex flex-wrap items-end gap-2">
+          <Button type="button" disabled={busy} onClick={() => void load(1)}>Load history</Button>
+          <Button type="button" disabled={busy} onClick={() => void download()}
+            className="border border-market-line bg-white">Export ledger CSV</Button>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-market-muted">
+        CSV exports cover at most 93 days and 5,000 ledger entries; shorten the range if needed. No payout account numbers are exported.
+      </p>
+      {message ? <p role="status" aria-live="polite" className="mt-3 text-sm font-semibold">{message}</p> : null}
+      {history ? (
+        <>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs uppercase text-market-muted">
+                {history.kind === "ledger"
+                  ? <tr><th className="p-2">Date</th><th>Event</th><th>Balance</th><th>Reference</th><th className="text-right">Signed amount</th></tr>
+                  : <tr><th className="p-2">Requested</th><th>Status</th><th>Destination</th><th>Provider reference</th><th className="text-right">Net / fee</th></tr>}
+              </thead>
+              <tbody>
+                {history.kind === "ledger"
+                  ? history.rows.map((entry) => (
+                    <tr key={entry.id} className="border-t border-market-line">
+                      <td className="p-2 whitespace-nowrap">{when(entry.created_at)}</td>
+                      <td>{TYPE_LABEL[entry.entry_type] ?? entry.entry_type}</td>
+                      <td>{BUCKET_LABEL[entry.bucket] ?? entry.bucket}</td>
+                      <td className="text-xs">{entry.order_id ? `Order ${entry.order_id.slice(-8)}` : entry.payout_id ? `Withdrawal ${entry.payout_id.slice(-8)}` : "—"}</td>
+                      <td className="text-right whitespace-nowrap font-bold">{entry.amount.startsWith("-") ? "−" : "+"}{ghs(Math.abs(Number(entry.amount)).toFixed(2))}</td>
+                    </tr>
+                  ))
+                  : history.rows.map((payout) => (
+                    <tr key={payout.id} className="border-t border-market-line">
+                      <td className="p-2 whitespace-nowrap">{when(payout.created_at)}</td>
+                      <td className="capitalize">{payout.status.replaceAll("_", " ")}</td>
+                      <td>{payout.rail === "bank" ? "Bank" : "Mobile money"} {payout.display_hint ?? ""}</td>
+                      <td className="break-all text-xs">{payout.provider_reference ?? "Awaiting provider"}</td>
+                      <td className="text-right whitespace-nowrap font-bold">{ghs(payout.net_amount)} <span className="block text-xs font-normal text-market-muted">Fee {ghs(payout.fee)}</span></td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+          {history.rows.length === 0 ? <p className="mt-3 text-sm text-market-muted">No records found for these dates.</p> : null}
+          <div className="mt-4 flex items-center justify-end gap-3">
+            <Button type="button" disabled={busy || history.page <= 1} className="border border-market-line bg-white"
+              onClick={() => void load(history.page - 1)}>Previous</Button>
+            <span className="text-sm font-bold">Page {history.page}</span>
+            <Button type="button" disabled={busy || !history.hasMore} onClick={() => void load(history.page + 1)}>Next</Button>
+          </div>
+        </>
+      ) : <p className="mt-4 text-sm text-market-muted">Load history to view detailed transactions and withdrawal records.</p>}
     </Card>
   );
 }
