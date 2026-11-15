@@ -469,3 +469,49 @@ end $$;
 drop trigger if exists group_member_separate_attempt_guard on checkout_group_charge_members;
 create trigger group_member_separate_attempt_guard before insert on checkout_group_charge_members
 for each row execute function elemarket_guard_group_charge_member();
+
+
+-- Freeze every value used to authorize the one external charge. A status
+-- transition may advance, but no later worker/admin can silently reprice a
+-- merchant's share or redirect the provider settlement.
+create or replace function elemarket_guard_group_charge_immutable()
+returns trigger language plpgsql as $$
+begin
+  if new.id is distinct from old.id
+    or new.group_id is distinct from old.group_id
+    or new.user_id is distinct from old.user_id
+    or new.provider_key is distinct from old.provider_key
+    or new.method is distinct from old.method
+    or new.currency is distinct from old.currency
+    or new.amount is distinct from old.amount
+    or new.settlement_model is distinct from old.settlement_model
+    or new.split_snapshot is distinct from old.split_snapshot
+    or new.provider_reference is distinct from old.provider_reference then
+    raise exception 'group payment monetary terms and provider reference are immutable';
+  end if;
+  if old.status='completed' and new.status is distinct from old.status then
+    raise exception 'completed group payment state is immutable';
+  end if;
+  return new;
+end $$;
+drop trigger if exists group_charge_immutable on checkout_group_charges;
+create trigger group_charge_immutable before update on checkout_group_charges
+for each row execute function elemarket_guard_group_charge_immutable();
+
+create or replace function elemarket_guard_group_member_immutable()
+returns trigger language plpgsql as $$
+begin
+  raise exception 'group charge merchant allocation is immutable';
+end $$;
+drop trigger if exists group_charge_member_immutable on checkout_group_charge_members;
+create trigger group_charge_member_immutable before update or delete on checkout_group_charge_members
+for each row execute function elemarket_guard_group_member_immutable();
+
+create or replace function elemarket_guard_group_evidence_immutable()
+returns trigger language plpgsql as $$
+begin
+  raise exception 'provider group payment evidence is append-only';
+end $$;
+drop trigger if exists group_charge_event_immutable on checkout_group_charge_events;
+create trigger group_charge_event_immutable before update or delete on checkout_group_charge_events
+for each row execute function elemarket_guard_group_evidence_immutable();
