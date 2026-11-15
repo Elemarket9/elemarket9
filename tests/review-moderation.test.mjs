@@ -1,4 +1,4 @@
-// Review moderation guards (migration 0226): every customer-facing read of
+// Review moderation guards (migration 0233): every customer-facing read of
 // reviews goes through the public_reviews view (which excludes hidden reviews),
 // the reason vocabulary matches the database, and merchants have no hide path.
 import test from 'node:test';
@@ -46,7 +46,7 @@ test('customer report endpoint is customer-only and rate limited to 10 per hour'
 
 test('reason list matches both CHECK constraints in the migration', () => {
   const { REVIEW_MODERATION_REASONS, REVIEW_MODERATION_REASON_LABELS } = loadTypeScript('src/modules/engagement/internal/review-moderation.shared.ts');
-  const sql = fs.readFileSync('migrations/0226_review_moderation.sql', 'utf8');
+  const sql = fs.readFileSync('migrations/0233_review_moderation.sql', 'utf8');
   const lists = [...sql.matchAll(/(?:hidden_reason is null or hidden_reason|reason) in \(([^)]*)\)/g)]
     .map((m) => [...m[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]));
   assert.equal(lists.length, 2);
@@ -55,7 +55,7 @@ test('reason list matches both CHECK constraints in the migration', () => {
 });
 
 test('every SQL aggregate over reviews filters out hidden reviews', () => {
-  const sql = fs.readFileSync('migrations/0226_review_moderation.sql', 'utf8');
+  const sql = fs.readFileSync('migrations/0233_review_moderation.sql', 'utf8');
   for (const fn of ['calculate_product_listing_quality', 'merchant_performance_snapshot', 'recalculate_merchant_health_score']) {
     const start = sql.indexOf(`FUNCTION public.${fn}(`);
     assert.ok(start > 0, `${fn} is redefined`);

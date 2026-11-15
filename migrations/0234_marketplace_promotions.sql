@@ -1,4 +1,4 @@
--- 0228 Marketplace promotions run and funded by ELEMARKET, plus admin
+-- 0234 Marketplace promotions run and funded by ELEMARKET, plus admin
 -- oversight (pause/resume) of merchant promotions and flash sales.
 --
 -- Builds on the existing promotion engine (0063/0065/0112):
@@ -277,7 +277,7 @@ $fn$;
 
 -- ---------------------------------------------------------------------------
 -- 5. Checkout. Redefined from the LIVE definition (pg_get_functiondef after
---    0223). Changes are marked "0228"/"marketplace"; the merchant-funded path
+--    0230). Changes are marked "0234"/"marketplace"; the merchant-funded path
 --    is byte-for-byte the previous logic. One promo code per checkout and the
 --    single-merchant restriction for promo codes are unchanged.
 -- ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ declare
   v_last jsonb;
   v_absorb numeric(12,2);
   v_line_total numeric(12,2);
-  -- 0228 marketplace (ELEMARKET-funded) promotions.
+  -- 0234 marketplace (ELEMARKET-funded) promotions.
   v_platform_funded boolean := false;
   v_gross_fee numeric(12,2) := 0;
   v_gross_fee_pre numeric(12,2) := 0;

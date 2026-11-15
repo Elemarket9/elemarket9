@@ -1,5 +1,5 @@
 // Client-safe review moderation vocabulary. Must match the CHECK lists in
-// migrations/0226_review_moderation.sql (reviews.hidden_reason, review_reports.reason).
+// migrations/0233_review_moderation.sql (reviews.hidden_reason, review_reports.reason).
 export const REVIEW_MODERATION_REASONS = [
   "abusive",
   "spam",

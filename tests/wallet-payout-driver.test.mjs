@@ -24,9 +24,9 @@ function driverWith(handler) {
 const command = { payoutId: PAYOUT_ID, idempotencyKey: PAYOUT_ID, amount: "98.50", currency: "GHS", rail: "mobile_money", destinationRef: "dst_123", narration: "ELEMARKET payout" };
 
 test("every payout command is HMAC-signed over method, path and body, with the payout id as idempotency key", async () => {
-  const { driver, calls } = driverWith(() => json(200, { providerReference: "prv_1", status: "processing" }));
+  const { driver, calls } = driverWith(() => json(200, { providerReference: "prv_1", status: "processing", amount: "98.50", currency: "GHS" }));
   const state = await driver.createPayout(command);
-  assert.deepEqual(state, { providerReference: "prv_1", status: "processing" });
+  assert.deepEqual(state, { providerReference: "prv_1", status: "processing", amount: "98.50", currency: "GHS" });
   const call = calls[0];
   assert.equal(call.url, "https://payouts.example.com/v1/payouts");
   assert.equal(call.method, "POST");
@@ -58,6 +58,18 @@ test("only a validation refusal counts as definitely not sent", async () => {
 test("malformed provider responses are refused", async () => {
   const { driver } = driverWith(() => json(200, { status: "done" }));
   await assert.rejects(driver.createPayout(command), (error) => isProviderError(error));
+  // A successful-looking reference without the monetary contract is not
+  // sufficient to settle a merchant withdrawal.
+  for (const response of [
+    { providerReference: "prv_1", status: "paid" },
+    { providerReference: "prv_1", status: "paid", amount: "98.50" },
+    { providerReference: "prv_1", status: "paid", currency: "GHS" },
+    { providerReference: "prv_1", status: "paid", amount: "98.50", currency: "USD" },
+  ]) {
+    const { driver: incomplete } = driverWith(() => json(200, response));
+    await assert.rejects(incomplete.createPayout(command), (error) => isProviderError(error, false));
+    await assert.rejects(incomplete.getPayout(PAYOUT_ID, null), (error) => isProviderError(error, false));
+  }
   const { driver: lookup } = driverWith(() => json(404, {}));
   assert.equal(await lookup.getPayout(PAYOUT_ID, null), null);
 });

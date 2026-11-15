@@ -87,7 +87,7 @@ create trigger review_reports_no_self_report
   before insert or update of review_id, reporter_user_id on review_reports
   for each row execute function elemarket_review_report_guard();
 
--- Redefined from their live definitions (pg_get_functiondef after 0223);
+-- Redefined from their live definitions (pg_get_functiondef after 0230);
 -- the only change in each is the moderation_status = 'published' filter, plus
 -- one pre-existing bug fix in calculate_product_listing_quality: it called
 -- jsonb_object_length(), which does not exist in PostgreSQL, so every call

@@ -140,8 +140,8 @@ Mobile registry auditing and local security regression checks pass; local forks
 require maintenance. PAD contract tests do not validate
 biometric matching, liveness or resistance to spoofing. Keep facial login off.
 
-The source repository is private. Public marketplace access does not authorize public
-source publication. No version bump, tag or public deployment is implied by this
+GitHub repository visibility is managed separately from marketplace access.
+Before publishing code, audit the repository and its history for sensitive data. No version bump, tag or public deployment is implied by this
 working branch.
 
 ## Source ZIP packaging

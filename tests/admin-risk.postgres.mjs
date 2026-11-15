@@ -1,4 +1,4 @@
-// Fraud & risk review queue on REAL PostgreSQL (migration 0225).
+// Fraud & risk review queue on REAL PostgreSQL (migration 0232).
 // Flags come from the real producers (checkout risk via create_pending_order,
 // and the scoring functions), claims are exclusive under concurrency, only the
 // claimer (or the Main Administrator) decides, decisions are final and audited.

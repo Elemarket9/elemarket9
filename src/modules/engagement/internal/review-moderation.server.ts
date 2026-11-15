@@ -1,4 +1,4 @@
-// Review reporting and moderation (migration 0226). Server-only.
+// Review reporting and moderation (migration 0233). Server-only.
 // Authorization (customer / admin.reviews.moderate), fresh-session and rate
 // limits are enforced by the transport layer before these run; these functions
 // own the data rules, row locking and same-transaction audit records.

@@ -16,7 +16,7 @@ export type RiskDecision = (typeof RISK_DECISIONS)[number];
 export const RISK_SUBJECT_TYPES = ["customer", "merchant"] as const;
 export type RiskSubjectType = (typeof RISK_SUBJECT_TYPES)[number];
 
-/** Must match risk_flag_claim_ttl() in migration 0225 (the database enforces it). */
+/** Must match risk_flag_claim_ttl() in migration 0232 (the database enforces it). */
 export const RISK_CLAIM_TTL_MINUTES = 30;
 export const RISK_NOTE_MIN = 12;
 export const RISK_NOTE_MAX = 2000;

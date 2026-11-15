@@ -13,7 +13,7 @@ import {
 } from "./risk-review-format";
 
 /**
- * Fraud & risk review queue (migration 0225).
+ * Fraud & risk review queue (migration 0232).
  *
  * Reviewers claim a flag (30-minute claim, enforced by the database), then
  * dismiss it as a false positive or confirm it (fraud / keep monitoring) with

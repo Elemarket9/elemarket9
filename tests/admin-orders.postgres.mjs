@@ -1,4 +1,4 @@
-// Admin order management on REAL PostgreSQL (migration 0224): search filters,
+// Admin order management on REAL PostgreSQL (migration 0231): search filters,
 // the read-only order timeline, append-only internal notes, the admin
 // cancellation of unpaid orders (stock released, paid orders refused), the
 // delivery hold shared with the support desk, contact reveal auditing, and the

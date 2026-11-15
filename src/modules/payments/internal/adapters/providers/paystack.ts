@@ -180,7 +180,14 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       // has it, do not mint another one. Checkout can resume from verification.
       try {
         const existing = await this.verifyTransaction(reference);
-        if (existing.reference === reference) {
+        // The reference alone is insufficient: reject a provider record with
+        // a different amount/currency instead of reporting recovery as safe.
+        if (
+          existing.reference === reference &&
+          existing.currency === input.currency &&
+          Number.isFinite(existing.amount) &&
+          Math.round(existing.amount * 100) === amountMinor
+        ) {
           return {
             providerReference: reference,
             status: existing.status === "completed" ? "completed" : "initiated",

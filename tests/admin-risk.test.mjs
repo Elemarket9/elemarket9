@@ -42,7 +42,7 @@ test('claim lasts 30 minutes', () => {
   assert.equal(fmt.isClaimActive(null, now), false);
   assert.equal(fmt.isClaimActive('not a date', now), false);
   // The database is the source of truth; keep the constant in step with it.
-  assert.match(fs.readFileSync('migrations/0225_risk_review_queue.sql', 'utf8'), /risk_flag_claim_ttl\(\)[\s\S]*?interval '30 minutes'/);
+  assert.match(fs.readFileSync('migrations/0232_risk_review_queue.sql', 'utf8'), /risk_flag_claim_ttl\(\)[\s\S]*?interval '30 minutes'/);
 });
 
 test('emails are always masked', () => {

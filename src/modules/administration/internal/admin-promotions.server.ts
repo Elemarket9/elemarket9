@@ -7,7 +7,7 @@ import { getSql, withTransaction, type Sql } from "@/lib/db";
  * transport layer (promotions.functions.ts); every mutation here writes its
  * audit event in the same transaction as the change.
  *
- * Money rules live in the database (migration 0228, create_pending_order):
+ * Money rules live in the database (migration 0234, create_pending_order):
  * a marketplace promotion lowers what the customer pays and ELEMARKET's
  * commission on that order, never merchant_net. The discount per order is
  * capped one pesewa below the order's commission, and the budget is reserved

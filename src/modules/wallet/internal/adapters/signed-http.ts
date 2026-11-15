@@ -29,8 +29,10 @@ export type HttpTransport = (
 const stateSchema = z.object({
   providerReference: z.string().min(1).max(256),
   status: z.enum(["processing", "paid", "failed"]),
-  amount: z.string().regex(/^\d{1,9}\.\d{2}$/).optional(),
-  currency: z.literal("GHS").optional(),
+  // Provider states must carry the amount and currency so the wallet can
+  // verify the settlement rather than trusting a reference alone.
+  amount: z.string().regex(/^\d{1,9}\.\d{2}$/),
+  currency: z.literal("GHS"),
   failureReason: z.string().max(500).optional(),
 });
 const destinationSchema = z.object({

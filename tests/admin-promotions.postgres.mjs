@@ -1,4 +1,4 @@
-// Marketplace (ELEMARKET-funded) promotions on REAL PostgreSQL (migration 0228).
+// Marketplace (ELEMARKET-funded) promotions on REAL PostgreSQL (migration 0234).
 // Money rules proven here:
 //   * the customer pays less; merchant_net, the provider split to the merchant
 //     and the wallet sale credit are identical to the same order without it;

@@ -1,4 +1,4 @@
-// Product review moderation on REAL PostgreSQL (migration 0226).
+// Product review moderation on REAL PostgreSQL (migration 0233).
 // A hidden review must vanish from every public read path and every rating
 // aggregate, come back on restore, and every moderation step must be audited.
 // Reports are idempotent per customer and a customer can never report their

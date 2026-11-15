@@ -28,9 +28,18 @@ test("0217 upgrades 0216 wallet history without changing it", { skip: !base && "
     cpSync(path.join(root, "scripts"), path.join(work, "scripts"), { recursive: true });
     symlinkSync(path.join(root, "node_modules"), path.join(work, "node_modules"), "dir");
     cpSync(path.join(root, "migrations"), path.join(work, "migrations"), { recursive: true });
-    rmSync(path.join(work, "migrations/0217_wallet_payout_safety.sql"));
+    // A real 0216-era database never saw *any* later migration. Running future
+    // migrations (which may depend on 0217 tables) before this upgrade would
+    // invalidate the historical snapshot and make this test brittle.
+    for (const name of readdirSync(path.join(work, "migrations"))) {
+      if (/^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) > 216)
+        rmSync(path.join(work, "migrations", name));
+    }
     const manifest = JSON.parse(readFileSync(path.join(root, "migrations.sha256.json"), "utf8"));
-    delete manifest["0217_wallet_payout_safety.sql"];
+    for (const name of Object.keys(manifest)) {
+      if (/^\d{4}_.*\.sql$/.test(name) && Number(name.slice(0, 4)) > 216)
+        delete manifest[name];
+    }
     writeFileSync(path.join(work, "migrations.sha256.json"), JSON.stringify(manifest, null, 2));
     const at0216 = spawnSync(process.execPath, ["scripts/migrate.mjs"], { cwd: work, env: { ...process.env, DATABASE_URL: url.toString() }, encoding: "utf8" });
     assert.equal(at0216.status, 0, at0216.stderr);

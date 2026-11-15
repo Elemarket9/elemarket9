@@ -136,7 +136,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
         ...products.map((row) => ({ id:`listing:${row.id}`, type:"listing" as const, title:`Listed ${row.name}`, detail:`GHS ${row.price} · ${row.stock} in stock`, status:row.status, createdAt:row.created_at })),
       ].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,20);
       return {
-        ...merchant, profile, products, productMedia: productMedia.map(pm=>({...pm,url:`/api/product-media/${encodeURIComponent(pm.id)}`})), recentOrders:orders, variants, inventoryHistory, activities,
+        ...merchant, listingCount: merchant.products, profile, products, productMedia: productMedia.map(pm=>({...pm,url:`/api/product-media/${encodeURIComponent(pm.id)}`})), recentOrders:orders, variants, inventoryHistory, activities,
         finance:financeSnapshot, merchantHealth, merchantFinancingProviders, merchantFinancingApplications, performance, funnel, productQuestions:questionRows, settlementModel:merchant.settlement_model, catalogSource:merchant.catalog_source,
         enterpriseCatalog:catalogRows[0] ?? null,
         enterpriseHealth: merchant.catalog_source === "enterprise_api" ? await getEnterpriseHealth({merchantId:merchant.merchant_id}) : null,
