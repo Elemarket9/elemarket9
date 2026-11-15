@@ -150,12 +150,12 @@ begin
                 and p.user_id=g.user_id and o.user_id=g.user_id
                 and p.provider_key=g.provider_key
                 and p.settlement_model=g.settlement_model
-                and p.amount=m.amount and o.grand_total=m.amount)
+                and p.amount=cm.amount and o.grand_total=cm.amount)
     into v_status_ok
-    from checkout_group_charge_members m
-    join payments p on p.id=m.payment_id
-    join orders o on o.id=m.order_id and o.id=p.order_id and o.group_id=g.group_id
-   where m.charge_id=g.id;
+    from checkout_group_charge_members cm
+    join payments p on p.id=cm.payment_id
+    join orders o on o.id=cm.order_id and o.id=p.order_id and o.group_id=g.group_id
+   where cm.charge_id=g.id;
   if v_status_ok is distinct from true then
     update checkout_group_charges set status='needs_attention',
         failure_reason='merchant order or payment changed before group confirmation',
