@@ -44,6 +44,37 @@ export const loadMerchantWallet = createServerFn({ method: "GET" })
     return getWalletSnapshot(data.merchantId);
   });
 
+const statementDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+
+export const loadMerchantWalletHistory = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator(z.object({
+    merchantId,
+    kind: z.enum(["ledger", "payouts"]),
+    page: z.number().int().min(1).max(1_000),
+    dateFrom: statementDay.optional(),
+    dateTo: statementDay.optional(),
+  }))
+  .handler(async ({ data, context }) => {
+    await authorizeView(data.merchantId, getAuthenticatedUserId(context));
+    const { loadWalletHistory } = await import("@/modules/wallet/internal/history.server");
+    return loadWalletHistory(data);
+  });
+
+export const exportMerchantWalletLedger = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ merchantId, dateFrom: statementDay, dateTo: statementDay }))
+  .handler(async ({ data, context }) => {
+    const userId = getAuthenticatedUserId(context);
+    await authorizeView(data.merchantId, userId);
+    const { enforceRateLimit } = await import("@/lib/security/rate-limit.server");
+    await enforceRateLimit("merchant-wallet-statement", {
+      windowSeconds: 60, maxRequests: 3, subject: userId,
+    });
+    const { exportWalletLedger } = await import("@/modules/wallet/internal/history.server");
+    return exportWalletLedger(data);
+  });
+
 export const addMerchantPayoutDestination = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(z.object({
