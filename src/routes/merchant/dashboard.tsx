@@ -16,7 +16,6 @@ import { loadActiveCatalogTaxonomy, type ActiveCatalogGroup } from "@/modules/ca
 import { answerProductQuestion } from "@/modules/engagement/public/customer-engagement.functions";
 import { startMerchantFinancing } from "@/modules/financing/public/financing";
 import { createHomepageAdCampaign } from "@/modules/catalog/public/homepage.functions";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 import { MerchantProductImageManager } from "@/components/merchant-product-image-manager";
 import { parseCsvRecords } from "@/lib/merchant-product-csv";
 
@@ -81,7 +80,6 @@ function Dashboard(){
   <nav role="tablist" aria-label="Merchant workspace sections" className="mt-6 flex gap-2 overflow-x-auto border-t border-market-line pt-4 pb-1">{tabs.map((t,index)=><button type="button" role="tab" id={`merchant-tab-${index}`} aria-controls="merchant-workspace-panel" aria-selected={tab===t} tabIndex={tab===t?0:-1} key={t} onClick={()=>setTab(t)} onKeyDown={event=>{if(!["ArrowRight","ArrowLeft","Home","End"].includes(event.key))return;event.preventDefault();const destination=event.key==="Home"?0:event.key==="End"?tabs.length-1:(index+(event.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;setTab(tabs[destination]);const buttons=event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');buttons?.[destination]?.focus();}} className={`min-h-11 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition ${tab===t?"bg-market-green text-white shadow-sm":"bg-market-soft text-market-ink hover:bg-market-line"}`}>{t}</button>)}</nav></header>
   {message?<div role="status" aria-live="polite" className="mt-4 rounded-xl border border-market-line bg-market-soft p-3 text-sm font-semibold">{message}</div>:null}
   <div key={m.merchant_id} id="merchant-workspace-panel" role="tabpanel" aria-labelledby={`merchant-tab-${tabs.indexOf(tab)}`} tabIndex={0} className="mt-6">{tab==="Overview"?<Overview m={m}/>:tab==="Insights"?<Insights m={m}/>:tab==="Products"?<Products m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="Inventory"?<Inventory m={m} run={run} busy={busy}/>:tab==="Orders"?<Orders m={m} run={run} busy={busy}/>:tab==="Finance"?<Finance m={m}/>:tab==="Business"?<Business m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="KYB"?<Kyb m={m}/>:tab==="Promotions"?<Promotions m={m} run={run} busy={busy}/>:tab==="Advertising"?<Advertising m={m}/>:tab==="Enterprise"?<Enterprise m={m} run={run} busy={busy}/>:<Locations merchantId={m.merchant_id}/>}</div>
-  <ContactSupportWidget />
  </main>;
 }
 function Card({title,children,wide=false}:{title:string;children:ReactNode;wide?:boolean}){return <section className={`rounded-2xl border border-market-line bg-white p-5 shadow-market ${wide?"lg:col-span-2":""}`}><h2 className="text-xl font-black">{title}</h2>{children}</section>}

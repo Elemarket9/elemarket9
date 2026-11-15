@@ -7,7 +7,6 @@ import { SignInGate } from "@/modules/identity/public/auth/gates";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { formatGhs } from "@/modules/shared/public/money";
 import { MarketFooter, MarketHeader } from "@/components/market-header";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 
 export const Route = createFileRoute("/orders/")({
   head: () => ({ meta: [{ title: "My orders | ELEMARKET" }, { name: "robots", content: "noindex,nofollow" }] }),
@@ -35,7 +34,7 @@ function Orders() {
   }, [isPending, user, retry]);
 
   return <div className="min-h-screen bg-market-bg">
-    <MarketHeader /><ContactSupportWidget mode="order" />
+    <MarketHeader />
     <main id="main-content" className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6 lg:px-8">
       <nav aria-label="Breadcrumb" className="text-xs font-semibold text-market-muted"><Link to="/" className="hover:text-market-green">Shop</Link> <span aria-hidden="true">/</span> My orders</nav>
       <div className="mt-5 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">Your account</p><h1 className="section-title">Orders & deliveries</h1><p className="mt-2 text-sm text-market-muted">Track purchases, provider delivery updates, disputes and refunds.</p></div><Link to="/" className="market-btn-secondary">Continue shopping <ArrowRight size={16} aria-hidden="true" /></Link></div>

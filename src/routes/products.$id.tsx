@@ -13,7 +13,6 @@ import { formatGhs } from "@/modules/shared/public/money";
 import type { JsonValue, ProductVariant } from "@/modules/shared/public/types";
 import { addCartLine, readCart } from "@/modules/ordering/public/cart";
 import { MarketFooter, MarketHeader } from "@/components/market-header";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 import { ReviewReportControl } from "@/components/review-report-control";
 
 export const Route = createFileRoute("/products/$id")({
@@ -172,7 +171,6 @@ function ProductContent() {
   return <div className="min-h-screen bg-market-bg text-market-ink">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productJsonLd }} />
     <MarketHeader trailing={<button type="button" disabled={engagementBusy || engagementLoading} aria-pressed={saved} aria-label={saved ? "Remove from saved products" : "Save product"} onClick={() => data.product && void toggleSavedProduct(data.product.id)} className={`market-icon-link ${saved ? "bg-market-soft text-market-orange" : ""}`}><Heart size={18} className={saved ? "fill-current" : ""}/></button>} />
-    <ContactSupportWidget />
     <main id="main-content" className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
       <div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-semibold text-market-muted"><Link to="/" className="hover:text-market-green">Home</Link><span>/</span><span>{product.category}</span>{product.subcategory && <><span>/</span><span>{product.subcategory}</span></>}<span>/</span><span className="text-market-ink">{product.name}</span></div>
 

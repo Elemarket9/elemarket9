@@ -5,7 +5,7 @@ export function supportStatusLabel(status: SupportStatus | undefined): string {
   if (status === "waiting_customer") return "ELEMARKET replied. Waiting for you.";
   if (status === "resolved") return "Resolved. Reply to reopen.";
   if (status === "closed") return "Closed";
-  return "Chat with ELEMARKET Support";
+  return "We usually reply within minutes";
 }
 
 

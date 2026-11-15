@@ -13,7 +13,6 @@ import { resolveProductMerchants } from "@/modules/catalog/public/catalog";
 import { formatGhs, fromPesewas, lineTotal, sumMoney, toPesewas } from "@/modules/shared/public/money";
 import { previewCustomerFinancing, type FinancingProvider } from "@/modules/financing/public/financing";
 import { FinancingProviderApplicationForm } from "@/components/financing-provider-application-form";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 
 import { PAYMENT_QUEUE_KEY, cartTotal, readCart, writeCart, type CartLine } from "@/modules/ordering/public/cart";
 
@@ -320,7 +319,6 @@ function CheckoutForm() {
 
   return (
     <main className="min-h-screen bg-market-bg">
-      <ContactSupportWidget mode="order" />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <nav aria-label="Checkout progress" className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-market-line bg-white px-4 py-3 text-xs font-bold text-market-muted"><Link to="/cart" className="text-market-green hover:underline">1. Cart</Link><span aria-hidden="true">→</span><span aria-current="step" className="rounded-md bg-market-soft px-2 py-1 text-market-green">2. Delivery & payment options</span><span aria-hidden="true">→</span><span>3. Review & pay</span></nav>
         <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold"><ArrowLeft size={16} /> Marketplace</Link>
