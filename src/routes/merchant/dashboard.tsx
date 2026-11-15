@@ -100,7 +100,7 @@ function Products({m,run,busy,taxonomy}:{m:Merchant;run:RunAction;busy:boolean;t
  const [newPrice,setNewPrice]=useState("");
  const [imageProductId,setImageProductId]=useState(m.products[0]?.id??"");
  const imageProduct=m.products.find(p=>p.id===imageProductId)??m.products[0];
- const [bulkRows,setBulkRows]=useState<Array<{name:string;category:(typeof CATALOG_GROUPS)[number]["key"];subcategory?:string;brand?:string;model?:string;sku?:string;price:number;stock:number;description:string;listingType:"product"|"food"|"stay"}>>([]);
+ const [bulkRows,setBulkRows]=useState<Array<{name:string;category:(typeof CATALOG_GROUPS)[number]["key"];subcategory?:string;brand?:string;model?:string;sku?:string;price:number;stock:number;description:string;listingType:"product"|"stay"}>>([]);
  const [bulkError,setBulkError]=useState<string|null>(null);
  const createSubcategories=taxonomy.find(group=>group.key===newCategory)?.subcategories??[];
  const editSubcategories=taxonomy.find(group=>group.key===form.category)?.subcategories??[];
@@ -162,8 +162,8 @@ function parseProductCsv(text:string){
   if(!Number.isFinite(price)||price<=0)throw new Error(`Row ${index+2}: invalid price.`);
   if(!Number.isInteger(stock)||stock<0)throw new Error(`Row ${index+2}: invalid stock.`);
   const listingRaw=get("listingtype")||get("listing_type")||"product";
-  if(!["product","food","stay"].includes(listingRaw))throw new Error(`Row ${index+2}: invalid listingType.`);
-  return {name:get("name"),category,subcategory,brand:get("brand")||undefined,model:get("model")||undefined,sku:get("sku")||undefined,price,stock,description:get("description"),listingType:listingRaw as "product"|"food"|"stay"};
+  if(!["product","stay"].includes(listingRaw))throw new Error(`Row ${index+2}: invalid listingType.`);
+  return {name:get("name"),category,subcategory,brand:get("brand")||undefined,model:get("model")||undefined,sku:get("sku")||undefined,price,stock,description:get("description"),listingType:listingRaw as "product"|"stay"};
  });
 }
 
