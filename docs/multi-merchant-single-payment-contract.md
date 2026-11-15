@@ -41,7 +41,7 @@ The platform account also pays the PSP fee out of its own share. Any underlying 
 
 ## Acceptance gates
 
-- 2, 3, 10 merchants; mixed item quantities, 1-pesewa boundaries, discounts, commission overrides, varied delivery charges; exact totals and subaccount shares.
+- 2 or 3 merchants under the current checkout quota; later, 10 merchants only **after** the `create_pending_order` limit on total unpaid orders (currently 3), reservation policy and capacity protections are explicitly redesigned and tested. Include mixed quantities, 1-pesewa boundaries, discounts, commission overrides and varied delivery charges with exact totals and subaccount shares.
 - Two simultaneous group-charge initializations; duplicate successful webhook; webhook before initialization-response; crashed/restarted server; stale lease; lost callback; delayed confirmation; verified provider mismatch; double charge / refund attacks.
 - One of three merchant orders cancelled before charge, one merchant partially refunded after a 3-merchant successful charge, repeat refund notification, refund failure and reversal, provider split discrepancy, cash liability / settlement review.
 - Product variants, stock, flash-sale/redemption consumption, dispatched orders, return windows, rider OTP and support/reconciliation cases do not diverge from single-merchant behavior.
