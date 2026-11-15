@@ -191,6 +191,12 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       parsed.data.data.reference !== reference ||
       !parsed.data.data.authorization_url
     ) {
+      // An amount-matched charge is NOT proof of a merchant-by-merchant split.
+      // The provider split configuration must be read back and reconciled
+      // independently before any group charge can be resumed or settled.
+      if (input.multiMerchantSplit) {
+        throw new Error("Uncertain multi-seller charge requires verified provider split reconciliation");
+      }
       // The reference was reserved before this call. If the provider already
       // has it, do not mint another one. Checkout can resume from verification.
       try {
