@@ -221,5 +221,8 @@
   "0221_admin_separation_of_duties.sql": "2518b71dc62e7645bb5c5176df27241718d134f3a88ff553902f69232e1eb0f2",
   "0222_fix_refund_preparation_order_binding.sql": "f182902d393682e32d3b7b0aec20b57ebf52a9771aa4b66fa1135e812026cc2f",
   "0223_wallet_webhook_retry_lease.sql": "ab7ff1399c6416d131c70a249e9a51d92e58d5d8e020dbe1e5cc776ef7ca8783",
-  "0224_atomic_group_checkout.sql": "a30ce8a7751229367ce18e4d3462def1f99eaae305f4597493ce50aa7c080638"
+  "0224_atomic_group_checkout.sql": "a30ce8a7751229367ce18e4d3462def1f99eaae305f4597493ce50aa7c080638",
+  "0225_native_catalog_duplicate_guard.sql": "3253eff5144c1f48df292e0ed38ab4e005657bf9f6f1793dc141c83e6b3ebe53",
+  "0226_unique_merchant_catalog_categories.sql": "1ca9cc1eebbc0444029f06737af88b0421b4cb38bcb1a89880441b4422cc89df",
+  "0227_retire_food_restaurant_catalogs.sql": "d2240086a0964b77032d36f57697a0c70e77939f538ded2356501fbf44a33fc5"
 }

@@ -4,7 +4,7 @@ import { isDatabaseUnavailable } from "@/lib/db-unavailable.mjs";
 import { enforceRateLimit, rateLimitResponse } from "@/lib/security/rate-limit.server";
 
 const SEARCH_SORTS = new Set(["relevance", "price_asc", "price_desc", "newest"]);
-const LISTING_TYPES = new Set(["product", "food", "stay"]);
+const LISTING_TYPES = new Set(["product", "stay"]);
 const CONDITIONS = new Set(["new", "refurbished", "used", "open_box"]);
 
 function enumParam<T extends string>(value: string | null, valid: Set<string>, label: string): T | undefined {
@@ -69,7 +69,7 @@ export const Route = createFileRoute("/api/search")({
             brand: url.searchParams.get("brand") ?? undefined,
             model: url.searchParams.get("model") ?? undefined,
             merchantId: url.searchParams.get("merchantId") ?? undefined,
-            listingType: enumParam<"product" | "food" | "stay">(url.searchParams.get("listingType"), LISTING_TYPES, "listing type"),
+            listingType: enumParam<"product" | "stay">(url.searchParams.get("listingType"), LISTING_TYPES, "listing type"),
             condition: enumParam<"new" | "refurbished" | "used" | "open_box">(url.searchParams.get("condition"), CONDITIONS, "condition"),
             lat,
             lon,

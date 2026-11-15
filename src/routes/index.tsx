@@ -14,7 +14,6 @@ import {
   HeartPulse,
   House,
   Shirt,
-  UtensilsCrossed,
   ShoppingBasket,
   Wheat,
   ChevronRight,
@@ -246,7 +245,7 @@ function Home() {
             <div className="relative z-10 max-w-3xl lg:max-w-[59%]">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[.14em] text-market-mint"><Sparkles size={14} /> Ghana's commerce ecosystem</div>
               <h1 className="max-w-3xl text-4xl font-black leading-[1.02] tracking-[-0.05em] sm:text-6xl lg:text-[4.2rem]">Everything you need.<br /><span className="text-market-mint">One marketplace.</span></h1>
-              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">Shop from verified merchants across electronics, home appliances, fashion, food, agriculture, machinery and more — with clear delivery, support, returns and provider-connected services where available.</p>
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">Shop from verified merchants across electronics, home appliances, fashion, groceries, agriculture, machinery and more — with clear delivery, support, returns and provider-connected services where available.</p>
               <div className="mt-7 flex flex-wrap gap-3">
                 <button onClick={() => document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-5 text-sm font-black text-market-green shadow-lg hover:bg-market-mint">Explore marketplace <ArrowRight size={17} /></button>
                 <button onClick={() => document.getElementById("featured-deals")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-bold text-white hover:bg-white/15"><Sparkles size={16} /> See today’s picks</button>
@@ -344,7 +343,7 @@ function CatalogueSkeleton() {
 }
 
 const CATEGORY_ICONS = {
-  food: UtensilsCrossed, restaurants: UtensilsCrossed, groceries: ShoppingBasket,
+  groceries: ShoppingBasket,
   electronics: Cpu, fashion: Shirt, beauty: Sparkles, home: House,
   agriculture: Wheat, automotive: CarFront, health: HeartPulse,
   hospitality: House, "baby-kids": Baby, "books-media": BookOpen,

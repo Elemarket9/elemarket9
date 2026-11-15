@@ -24,6 +24,7 @@ function safeError(error:unknown){
  const message=error instanceof Error?error.message:"";
  if(/access denied|forbidden|merchant access/i.test(message)) return "Merchant access is required.";
  const safe=[
+  ["Duplicate merchant catalog listing","This product is already in your catalogue. Edit the existing listing, or use a genuinely different SKU."],
   ["Fresh authentication required","Please sign in again before changing security-sensitive settings."],
   ["Bearer token is required","A bearer token is required for this authentication mode."],
   ["API key is required","An API key is required for this authentication mode."],
@@ -99,7 +100,7 @@ function Products({m,run,busy,taxonomy}:{m:Merchant;run:RunAction;busy:boolean;t
  const [newPrice,setNewPrice]=useState("");
  const [imageProductId,setImageProductId]=useState(m.products[0]?.id??"");
  const imageProduct=m.products.find(p=>p.id===imageProductId)??m.products[0];
- const [bulkRows,setBulkRows]=useState<Array<{name:string;category:(typeof CATALOG_GROUPS)[number]["key"];subcategory?:string;brand?:string;model?:string;sku?:string;price:number;stock:number;description:string;listingType:"product"|"food"|"stay"}>>([]);
+ const [bulkRows,setBulkRows]=useState<Array<{name:string;category:(typeof CATALOG_GROUPS)[number]["key"];subcategory?:string;brand?:string;model?:string;sku?:string;price:number;stock:number;description:string;listingType:"product"|"stay"}>>([]);
  const [bulkError,setBulkError]=useState<string|null>(null);
  const createSubcategories=taxonomy.find(group=>group.key===newCategory)?.subcategories??[];
  const editSubcategories=taxonomy.find(group=>group.key===form.category)?.subcategories??[];
@@ -113,7 +114,7 @@ function Products({m,run,busy,taxonomy}:{m:Merchant;run:RunAction;busy:boolean;t
    <input required type="number" min="0.01" step="0.01" value={newPrice} onChange={e=>setNewPrice(e.target.value)} placeholder="GHS price" className="h-11 rounded-xl border border-market-line px-3"/>
    <Button disabled={busy}>Add product</Button>
   </form></Card>
-  <Card title="Bulk catalogue import"><p className="mb-3 text-sm leading-6 text-market-muted">Upload a UTF-8 CSV exported from Excel/Sheets. Required columns: <b>name, category, price, stock</b>. Optional: subcategory, brand, model, sku, description, listingType. Every row is server-validated and enters pending review.</p><input type="file" accept=".csv,text/csv" onChange={async e=>{setBulkError(null);setBulkRows([]);const file=e.target.files?.[0];if(!file)return;if(file.size>1024*1024){setBulkError("CSV must be 1 MB or smaller.");return;}try{const text=await file.text();const parsed=parseProductCsv(text);setBulkRows(parsed);}catch(err){setBulkError(err instanceof Error?err.message:"Could not read CSV.");}}} className="block w-full text-sm"/>{bulkError&&<p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{bulkError}</p>}{bulkRows.length>0&&<div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-market-soft p-3"><span className="text-sm font-bold">{bulkRows.length} validated row{bulkRows.length===1?"":"s"} ready</span><Button disabled={busy} onClick={()=>void run(()=>bulkCreateMerchantListings({data:{merchantId:m.merchant_id,rows:bulkRows}}),`${bulkRows.length} listings submitted for review`)}>Import listings</Button></div>}</Card>
+  <Card title="Bulk catalogue import"><p className="mb-3 text-sm leading-6 text-market-muted">Upload a UTF-8 CSV exported from Excel/Sheets. Required columns: <b>name, category, price, stock</b>. Optional: subcategory, brand, model, sku, description, listingType. Every row is server-validated and enters pending review. Duplicate rows are rejected; if one is rejected, the whole CSV batch is rolled back.</p><input type="file" accept=".csv,text/csv" onChange={async e=>{setBulkError(null);setBulkRows([]);const file=e.target.files?.[0];if(!file)return;if(file.size>1024*1024){setBulkError("CSV must be 1 MB or smaller.");return;}try{const text=await file.text();const parsed=parseProductCsv(text);setBulkRows(parsed);}catch(err){setBulkError(err instanceof Error?err.message:"Could not read CSV.");}}} className="block w-full text-sm"/>{bulkError&&<p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{bulkError}</p>}{bulkRows.length>0&&<div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-market-soft p-3"><span className="text-sm font-bold">{bulkRows.length} validated row{bulkRows.length===1?"":"s"} ready</span><Button disabled={busy} onClick={()=>void run(()=>bulkCreateMerchantListings({data:{merchantId:m.merchant_id,rows:bulkRows}}),`${bulkRows.length} listings submitted for review`)}>Import listings</Button></div>}</Card>
   <Card title={`Customer questions · ${m.productQuestions.length}`}><div className="space-y-3">{m.productQuestions.length?m.productQuestions.map(q=><MerchantQuestion key={q.id} q={q} merchantId={m.merchant_id} run={run} busy={busy}/>):<p className="text-sm text-market-muted">No unanswered customer questions.</p>}</div></Card>
   <Card title={`My item listings · ${m.products.length} shown`}><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-market-line text-xs uppercase text-market-muted"><th className="py-3">Product</th><th>Status</th><th>Price</th><th>Stock</th><th></th></tr></thead><tbody>{m.products.map((p:MerchantProduct)=><tr key={p.id} className="border-b border-market-line"><td className="py-3"><p className="font-bold">{p.name}</p><p className="text-xs text-market-muted">{p.sku??"No SKU"} · {p.category}</p></td><td>{p.status}</td><td>GHS {money(p.price)}</td><td>{p.stock}</td><td className="text-right"><Button className="bg-black text-white" onClick={()=>open(p)}>Edit</Button>{p.status!=="archived"?<Button className="ml-2 bg-market-soft text-market-ink" disabled={busy} onClick={()=>void run(()=>archiveMerchantProduct({data:{merchantId:m.merchant_id,productId:p.id}}),"Product archived")}>Archive</Button>:null}</td></tr>)}</tbody></table></div></Card>
   <Card title="Product photos & storage">
@@ -161,8 +162,8 @@ function parseProductCsv(text:string){
   if(!Number.isFinite(price)||price<=0)throw new Error(`Row ${index+2}: invalid price.`);
   if(!Number.isInteger(stock)||stock<0)throw new Error(`Row ${index+2}: invalid stock.`);
   const listingRaw=get("listingtype")||get("listing_type")||"product";
-  if(!["product","food","stay"].includes(listingRaw))throw new Error(`Row ${index+2}: invalid listingType.`);
-  return {name:get("name"),category,subcategory,brand:get("brand")||undefined,model:get("model")||undefined,sku:get("sku")||undefined,price,stock,description:get("description"),listingType:listingRaw as "product"|"food"|"stay"};
+  if(!["product","stay"].includes(listingRaw))throw new Error(`Row ${index+2}: invalid listingType.`);
+  return {name:get("name"),category,subcategory,brand:get("brand")||undefined,model:get("model")||undefined,sku:get("sku")||undefined,price,stock,description:get("description"),listingType:listingRaw as "product"|"stay"};
  });
 }
 
