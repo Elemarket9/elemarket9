@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
@@ -94,6 +95,8 @@ export type CanonicalPaymentEvent =
   | "refund.failed" | "refund.processed";
 
 export type ParsedPaymentWebhook = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   eventId: string;
   eventType: CanonicalPaymentEvent;
   providerReference: string;
@@ -104,6 +107,8 @@ export type ParsedPaymentWebhook = {
 };
 
 export type VerifiedPayment = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   status: string;
   reference: string;
   amount: number;
