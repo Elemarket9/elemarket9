@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { isExactProviderSplit } from "@/modules/payments/internal/group-split-proof";
 import { recordMetric } from "@/lib/observability/logger.server";
 import { emitSecurityAlert } from "@/lib/observability/security-alert.server";
 import { getPaymentAdapter } from "@/modules/payments/internal/adapters/registry";
@@ -253,6 +254,101 @@ export async function reconcileStalePayments(limit = 50): Promise<Reconciliation
     }
   }
 
+  // Group charges have no separate merchant payment_attempts. Reconcile their
+  // single provider reference independently, never initiate a second charge.
+  try {
+    const group = await reconcileStaleGroupCharges(20);
+    await recordMetric("payment.group_reconciliation.sweep", { metadata: { ...group } });
+  } catch {
+    summary.providerErrors += 1;
+  }
   await recordMetric("payment.reconciliation.sweep", { metadata: { ...summary } });
   return summary;
+}
+
+
+type UnsettledGroup = {
+  id:string; group_id:string; provider_key:string; driver_key:string|null;
+  provider_reference:string; currency:string; amount:string;
+  settlement_model:string;split_snapshot:{split?:unknown};
+};
+export async function reconcileStaleGroupCharges(limit=20) {
+  if (!Number.isInteger(limit) || limit<1 || limit>100) throw new Error("Invalid group reconciliation limit");
+  const sql=await getSql();
+  const counters={scanned:0,settled:0,failed:0,mismatches:0,pending:0,providerErrors:0};
+  const groups=await sql.query<UnsettledGroup>(
+    `select g.id,g.group_id,g.provider_key,p.driver_key,g.provider_reference,g.currency,
+        g.amount::text as amount,g.settlement_model,g.split_snapshot
+       from checkout_group_charges g
+       join payment_providers p on p.provider_key=g.provider_key and p.status='active'
+      where g.status in ('initializing','pending','needs_attention')
+        and g.updated_at < now()-interval '3 minutes'
+      order by g.created_at asc limit $1`,[limit]);
+  for (const g of groups) {
+    // Atomic DB throttle: the order remains reserved while an external outcome
+    // is uncertain. Multiple workers may read, but only one claims a sweep.
+    const claim=await sql.query<{id:string}>(`update checkout_group_charges
+        set updated_at=now() where id=$1 and status in ('initializing','pending','needs_attention')
+        and updated_at<now()-interval '3 minutes' returning id`,[g.id]);
+    if (!claim[0])continue;
+    counters.scanned++;
+    try {
+      const adapter=await getPaymentAdapter(g.provider_key,g.driver_key??undefined);
+      if (!adapter.verifyTransaction) {counters.providerErrors++;continue;}
+      const state=await adapter.verifyTransaction(g.provider_reference);
+      if (state.reference!==g.provider_reference||state.currency!==g.currency||
+          !Number.isFinite(state.amount)||Math.abs(state.amount-Number(g.amount))>0.001) {
+        counters.mismatches++;
+        await sql.query(`update checkout_group_charges set status='needs_attention',
+          failure_reason='payment provider reconciliation disagrees with the original group charge'
+          where id=$1 and status not in ('completed','failed')`,[g.id]);
+        await emitSecurityAlert({alertKey:`group-charge-mismatch:${g.id}`,
+          severity:"error",eventName:"security.group_charge_reconciliation_mismatch",
+          message:"Group charge verification disagrees with the frozen provider reference, currency or amount.",
+          metadata:{groupId:g.group_id,chargeId:g.id,providerKey:g.provider_key},
+          dedupeKey:`group-charge-mismatch:${g.id}`});
+        continue;
+      }
+      const resultStatus=state.status==="completed"||state.status==="success"?"completed":
+        state.status==="failed"?"failed":null;
+      if (!resultStatus) {counters.pending++;continue;}
+      if (resultStatus==="completed") {
+        const proofOk = g.settlement_model==="provider_split"
+          ? isExactProviderSplit(g.split_snapshot?.split,state.providerSplit)
+          : !state.providerSplit || state.providerSplit.subaccounts.length===0;
+        if (!proofOk) {
+          counters.mismatches++;
+          await sql.query(`update checkout_group_charges set status='needs_attention',
+            failure_reason='provider read-back lacks the frozen merchant payout allocation',
+            updated_at=now() where id=$1 and status in ('initializing','pending','needs_attention')`,[g.id]);
+          await emitSecurityAlert({
+            alertKey:`group-charge-split:${g.id}`,
+            severity:"error",eventName:"security.group_charge_allocation_unverified",
+            message:"Provider group charge cannot be settled without verified per-seller allocation.",
+            metadata:{groupId:g.group_id,chargeId:g.id,providerKey:g.provider_key},
+            dedupeKey:`group-charge-split:${g.id}`,
+          });
+          continue;
+        }
+      }
+      const payloadHash=await canonicalPayloadHash({
+        paymentId:g.id,providerReference:g.provider_reference,
+        amount:state.amount,currency:state.currency,
+      });
+      const eventId=`group-recon:${g.id}:${resultStatus}`;
+      const [outcome]=await sql.query<{result:{status?:string;reconciliationRequired?:boolean;duplicate?:boolean}}>(
+        `select apply_checkout_group_charge_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
+        [g.provider_key,eventId,`reconciliation.${resultStatus}`,g.provider_reference,
+         resultStatus,state.amount,state.currency,payloadHash]);
+      if(outcome?.result?.reconciliationRequired){counters.mismatches++;continue;}
+      if(outcome?.result?.status===resultStatus||outcome?.result?.duplicate){
+        if(resultStatus==="completed")counters.settled++;
+        else counters.failed++;
+      }
+    }catch{
+      // Never restart a provider transaction after a lost response.
+      counters.providerErrors++;
+    }
+  }
+  return counters;
 }

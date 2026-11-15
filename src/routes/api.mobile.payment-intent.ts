@@ -9,7 +9,10 @@ import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
 import { logServerError } from "@/lib/observability/safe-error.mjs";
 
-const schema = z.object({ paymentId: z.string().min(1).max(128) });
+const schema = z.union([
+  z.object({paymentId:z.string().min(1).max(128)}),
+  z.object({groupId:z.string().min(16).max(128)}),
+]);
 
 export const Route = createFileRoute("/api/mobile/payment-intent")({
   server: { handlers: { POST: async ({ request }) => {
@@ -32,7 +35,11 @@ export const Route = createFileRoute("/api/mobile/payment-intent")({
     const parsed = schema.safeParse(body);
     if (!parsed.success) return Response.json({ error: "Invalid payment request" }, { status: 400 });
     try {
-      const result = await createExternalPaymentIntent({ paymentId: parsed.data.paymentId, userId: current.user.id });
+      const result = "groupId" in parsed.data
+        ? await (await import("@/modules/payments/public/group-checkout.server")).startCustomerGroupPayment({
+            groupId:parsed.data.groupId,userId:current.user.id,
+          })
+        : await createExternalPaymentIntent({ paymentId:parsed.data.paymentId,userId:current.user.id });
       return Response.json(result, { headers: { "cache-control": "no-store" } });
     } catch (error) {
       const limited = rateLimitResponse(error);

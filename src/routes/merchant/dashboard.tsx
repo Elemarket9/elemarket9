@@ -4,7 +4,7 @@ import type { JsonObject } from "@/lib/db-types";
 import React, { useState, type FormEvent, type ButtonHTMLAttributes, type ReactNode } from "react";
 import {
   advanceMerchantOrder, adjustMerchantInventory, archiveMerchantProduct, bulkCreateMerchantListings, configureEnterpriseCatalog, createMerchantListing,
-  loadMerchantDashboard, listMerchantAdCampaigns, setMerchantPromotionParticipation, syncMerchantEnterpriseCatalog, testMerchantEnterpriseConnection, updateMerchantProduct, updateMerchantProfile,
+  loadMerchantDashboard, loadMerchantSalesInsights, listMerchantAdCampaigns, setMerchantPromotionParticipation, syncMerchantEnterpriseCatalog, testMerchantEnterpriseConnection, updateMerchantProduct, updateMerchantProfile,
   withdrawMerchantPromotionParticipation,
 } from "../../modules/merchants/public/transport/merchant/dashboard.functions";
 import { createEnterpriseLocationFn, loadEnterpriseLocations, loadEnterpriseStaff, setEnterpriseStaffAssignmentFn } from "../../modules/merchants/public/transport/merchant/enterprise-locations.functions";
@@ -50,11 +50,12 @@ function safeError(error:unknown){
 export const Route=createFileRoute("/merchant/dashboard")({loader:async()=>({dashboard:await loadMerchantDashboard(),taxonomy:await loadActiveCatalogTaxonomy()}),component:Dashboard,errorComponent:({error})=><main className="mx-auto max-w-xl px-4 py-16 text-center"><h1 className="text-3xl font-black">Merchant access required</h1><p className="mt-3 text-sm text-market-muted">{safeError(error)}</p></main>});
 function money(v:string){const n=Number(v);return Number.isFinite(n)?n.toLocaleString("en-GH",{minimumFractionDigits:2,maximumFractionDigits:2}):v}
 function date(v:string){const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleString("en-GH",{dateStyle:"medium",timeStyle:"short"})}
-const tabs=["Overview","Products","Inventory","Orders","Finance","Business","KYB","Promotions","Advertising","Enterprise","Locations"] as const;
+const tabs=["Overview","Insights","Products","Inventory","Orders","Finance","Business","KYB","Promotions","Advertising","Enterprise","Locations"] as const;
 type Tab=typeof tabs[number];
 type FulfillmentType = "delivery" | "pickup" | "delivery_and_pickup";
 type EnterpriseLocationType = "store" | "warehouse" | "distribution_center" | "fulfillment_center" | "pickup_point" | "office" | "service_center";
 type MerchantDashboardData = Awaited<ReturnType<typeof loadMerchantDashboard>>;
+type SalesInsights = Awaited<ReturnType<typeof loadMerchantSalesInsights>>;
 type EnterpriseSyncRun = { id:string; status:string; source:string; generation:string|number; started_at:string; completed_at:string|null; received_count:number; upserted_count:number; deactivated_count:number; error_count:number; cursor_pages:number; error_code:string|null };
 type EnterpriseWebhookEvent = { id:string; event_type:string; status:string; attempts:number; received_at:string; processed_at:string|null; next_attempt_at:string|null; error_code:string|null };
 type EnterpriseOrderOutbox = { id:string; order_id:string; event_type:string; status:string; attempts:number; available_at:string|null; sent_at:string|null; error_code:string|null; created_at:string; updated_at:string };
@@ -79,7 +80,7 @@ function Dashboard(){
   <header className="rounded-3xl border border-market-line bg-white p-5 shadow-market sm:p-7"><div className="mb-5 flex flex-wrap items-center gap-2 text-xs font-bold"><a href={portalHref("marketplace")} className="text-market-green hover:underline">← Marketplace</a><span className="text-market-muted">/</span><span className="text-market-muted">Seller workspace</span></div><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-[.16em] text-market-muted">ELEMARKET Merchant Operations</p><h1 className="mt-2 text-3xl font-black">{m.name}</h1><p className="mt-1 text-sm text-market-muted">{(m.catalog_categories?.length?m.catalog_categories:[m.category]).join(" · ")} · {m.city} · {m.neighborhood}</p></div><div className="flex items-center gap-2">{d.merchants.length>1?<select value={merchantId} onChange={e=>{setMerchantId(e.target.value);setTab("Overview")}} className="h-10 rounded-xl border border-market-line px-3 text-sm font-bold">{d.merchants.map(x=><option key={x.merchant_id} value={x.merchant_id}>{x.name}</option>)}</select>:null}<span className="rounded-full bg-black px-3 py-2 text-xs font-bold text-white">{m.verified?"Verified merchant":"Active merchant"}</span></div></div>
   <nav role="tablist" aria-label="Merchant workspace sections" className="mt-6 flex gap-2 overflow-x-auto border-t border-market-line pt-4 pb-1">{tabs.map((t,index)=><button type="button" role="tab" id={`merchant-tab-${index}`} aria-controls="merchant-workspace-panel" aria-selected={tab===t} tabIndex={tab===t?0:-1} key={t} onClick={()=>setTab(t)} onKeyDown={event=>{if(!["ArrowRight","ArrowLeft","Home","End"].includes(event.key))return;event.preventDefault();const destination=event.key==="Home"?0:event.key==="End"?tabs.length-1:(index+(event.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;setTab(tabs[destination]);const buttons=event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]');buttons?.[destination]?.focus();}} className={`min-h-11 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-black transition ${tab===t?"bg-market-green text-white shadow-sm":"bg-market-soft text-market-ink hover:bg-market-line"}`}>{t}</button>)}</nav></header>
   {message?<div role="status" aria-live="polite" className="mt-4 rounded-xl border border-market-line bg-market-soft p-3 text-sm font-semibold">{message}</div>:null}
-  <div key={m.merchant_id} id="merchant-workspace-panel" role="tabpanel" aria-labelledby={`merchant-tab-${tabs.indexOf(tab)}`} tabIndex={0} className="mt-6">{tab==="Overview"?<Overview m={m}/>:tab==="Products"?<Products m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="Inventory"?<Inventory m={m} run={run} busy={busy}/>:tab==="Orders"?<Orders m={m} run={run} busy={busy}/>:tab==="Finance"?<Finance m={m}/>:tab==="Business"?<Business m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="KYB"?<Kyb m={m}/>:tab==="Promotions"?<Promotions m={m} run={run} busy={busy}/>:tab==="Advertising"?<Advertising m={m}/>:tab==="Enterprise"?<Enterprise m={m} run={run} busy={busy}/>:<Locations merchantId={m.merchant_id}/>}</div>
+  <div key={m.merchant_id} id="merchant-workspace-panel" role="tabpanel" aria-labelledby={`merchant-tab-${tabs.indexOf(tab)}`} tabIndex={0} className="mt-6">{tab==="Overview"?<Overview m={m}/>:tab==="Insights"?<Insights m={m}/>:tab==="Products"?<Products m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="Inventory"?<Inventory m={m} run={run} busy={busy}/>:tab==="Orders"?<Orders m={m} run={run} busy={busy}/>:tab==="Finance"?<Finance m={m}/>:tab==="Business"?<Business m={m} run={run} busy={busy} taxonomy={taxonomy}/>:tab==="KYB"?<Kyb m={m}/>:tab==="Promotions"?<Promotions m={m} run={run} busy={busy}/>:tab==="Advertising"?<Advertising m={m}/>:tab==="Enterprise"?<Enterprise m={m} run={run} busy={busy}/>:<Locations merchantId={m.merchant_id}/>}</div>
   <ContactSupportWidget />
  </main>;
 }
@@ -87,7 +88,7 @@ function Card({title,children,wide=false}:{title:string;children:ReactNode;wide?
 function Overview({m}:{m:Merchant}){
  const perf=m.performance??{}; const [answers,setAnswers]=useState<Record<string,string>>({}); const performanceMetrics: Array<[string, string | number]>=[["90-day orders",Number(perf.orders??0)],["Cancellation rate",`${perf.cancellationRate??0}%`],["Verified reviews",Number(perf.reviewCount??0)],["Average rating",Number(perf.reviewCount??0)>0?`${Number(perf.avgRating??0).toFixed(1)}/5`:"No reviews"]];
  async function answer(q:{id:string}){const value=(answers[q.id]??"").trim(); if(value.length<2)return; await answerProductQuestion({data:{merchantId:m.merchant_id,questionId:q.id,answer:value}}); window.location.reload();}
- return <div className="grid gap-5 lg:grid-cols-2"><Card title="Sales & commission"><p className="sr-only">Product sales · ELEMARKET commission · Merchant order value</p><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Listings",m.listingCount],["Orders",m.orders],["Sales",`GHS ${money(m.finance.balance.totalSales)}`],["Commission",`GHS ${money(m.finance.balance.platformCommission)}`]].map(([a,b])=><div key={String(a)} className="rounded-xl border border-market-line p-4"><p className="text-xs font-bold text-market-muted">{a}</p><p className="mt-2 text-2xl font-black">{b}</p></div>)}</div></Card><Card title="Merchant activities"><div className="mt-3 space-y-3">{m.activities.slice(0,10).map(x=><div key={x.id} className="flex justify-between gap-3 border-b border-market-line pb-3"><div><p className="font-bold">{x.title}</p><p className="text-xs text-market-muted">{x.detail}</p></div><div className="text-right text-xs font-bold"><p>{x.status}</p><p className="text-market-muted">{date(x.createdAt)}</p></div></div>)}</div></Card><Card title="Seller performance · last 90 days" wide><div className="grid gap-3 sm:grid-cols-4">{performanceMetrics.map(([label,value])=><div key={String(label)} className="rounded-xl border border-market-line p-4"><p className="text-xs font-bold text-market-muted">{label}</p><p className="mt-2 text-2xl font-black">{String(value)}</p></div>)}</div><p className="mt-4 text-xs leading-5 text-market-muted">These are operational facts from completed ELEMARKET orders and verified-purchase reviews—not a customer-facing seller score or financing decision.</p></Card><Card title="Customer questions" wide>{m.productQuestions.length===0?<p className="mt-3 text-sm text-market-muted">No unanswered product questions.</p>:<div className="mt-3 space-y-4">{m.productQuestions.map(q=><div key={q.id} className="rounded-xl border border-market-line p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-black uppercase text-market-muted">{q.product_name}</p><p className="mt-1 font-bold">{q.question}</p></div><span className="text-xs text-market-muted">{date(q.created_at)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={answers[q.id]??""} onChange={e=>setAnswers(v=>({...v,[q.id]:e.target.value.slice(0,1500)}))} maxLength={1500} placeholder="Answer this customer question" className="h-11 flex-1 rounded-xl border border-market-line px-3 text-sm"/><Button type="button" disabled={(answers[q.id]??"").trim().length<2} onClick={()=>void answer(q)}>Publish answer</Button></div></div>)}</div>}</Card><Card title="Operations" wide><div className="grid gap-3 sm:grid-cols-4">{["paid","confirmed","fulfilling","shipped"].map(s=><div key={s} className="rounded-xl bg-market-soft p-4"><p className="text-xs font-bold uppercase text-market-muted">{s}</p><p className="mt-2 text-2xl font-black">{m.recentOrders.filter(o=>o.status===s).length}</p></div>)}</div><p className="mt-5 text-sm leading-6 text-market-muted">Payment collection, settlement and refunds remain with the configured payment provider. Merchant operations stay ownership-scoped and database-authoritative.</p></Card></div>}
+ return <div className="grid gap-5 lg:grid-cols-2"><Card title="Sales & commission"><p className="sr-only">Product sales · ELEMARKET commission · Merchant order value</p><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Listings",m.listingCount],["Orders",m.orders],["Sales",`GHS ${money(m.finance.balance.totalSales)}`],["Commission",`GHS ${money(m.finance.balance.platformCommission)}`]].map(([a,b])=><div key={String(a)} className="rounded-xl border border-market-line p-4"><p className="text-xs font-bold text-market-muted">{a}</p><p className="mt-2 text-2xl font-black">{b}</p></div>)}</div></Card><Card title="Merchant activities"><div className="mt-3 space-y-3">{m.activities.slice(0,10).map(x=><div key={x.id} className="flex justify-between gap-3 border-b border-market-line pb-3"><div><p className="font-bold">{x.title}</p><p className="text-xs text-market-muted">{x.detail}</p></div><div className="text-right text-xs font-bold"><p>{x.status}</p><p className="text-market-muted">{date(x.createdAt)}</p></div></div>)}</div></Card><Card title="Seller performance · last 90 days" wide><div className="grid gap-3 sm:grid-cols-4">{performanceMetrics.map(([label,value])=><div key={String(label)} className="rounded-xl border border-market-line p-4"><p className="text-xs font-bold text-market-muted">{label}</p><p className="mt-2 text-2xl font-black">{String(value)}</p></div>)}</div><p className="mt-4 text-xs leading-5 text-market-muted">These are operational facts from completed ELEMARKET orders and verified-purchase reviews—not a customer-facing seller score or financing decision.</p></Card><Card title="Customer questions" wide>{m.productQuestions.length===0?<p className="mt-3 text-sm text-market-muted">No unanswered product questions.</p>:<div className="mt-3 space-y-4">{m.productQuestions.map(q=><div key={q.id} className="rounded-xl border border-market-line p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-xs font-black uppercase text-market-muted">{q.product_name}</p><p className="mt-1 font-bold">{q.question}</p></div><span className="text-xs text-market-muted">{date(q.created_at)}</span></div><div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={answers[q.id]??""} onChange={e=>setAnswers(v=>({...v,[q.id]:e.target.value.slice(0,1500)}))} maxLength={1500} placeholder="Answer this customer question" className="h-11 flex-1 rounded-xl border border-market-line px-3 text-sm"/><Button type="button" disabled={(answers[q.id]??"").trim().length<2} onClick={()=>void answer(q)}>Publish answer</Button></div></div>)}</div>}</Card><Card title="Recent order operations (latest 100)" wide><div className="grid gap-3 sm:grid-cols-4">{["paid","confirmed","fulfilling","shipped"].map(s=><div key={s} className="rounded-xl bg-market-soft p-4"><p className="text-xs font-bold uppercase text-market-muted">{s}</p><p className="mt-2 text-2xl font-black">{m.recentOrders.filter(o=>o.status===s).length}</p></div>)}</div><p className="mt-5 text-sm leading-6 text-market-muted">Payment collection, settlement and refunds remain with the configured payment provider. Merchant operations stay ownership-scoped and database-authoritative.</p></Card></div>}
 
 function Products({m,run,busy,taxonomy}:{m:Merchant;run:RunAction;busy:boolean;taxonomy:ActiveCatalogGroup[]}){
  const [editing,setEditing]=useState<MerchantProduct|null>(null);
@@ -237,4 +238,82 @@ function Enterprise({m,run,busy}:{m:Merchant;run:RunAction;busy:boolean}){
   <div className="grid gap-5 lg:grid-cols-2"><Card title="Connection health">{health?.connection?<div className="mt-4 space-y-3 text-sm"><Row a="Connection" b={health.connection.status}/><Row a="Webhook" b={health.connection.webhook_enabled?"Enabled":"Disabled"}/><Row a="Last sync" b={health.connection.last_sync_completed_at?date(health.connection.last_sync_completed_at):"Never"}/><Row a="Sync result" b={health.connection.last_sync_status??"Never"}/><Row a="Records in last sync" b={String(health.connection.last_sync_count??0)}/><Row a="Consecutive failures" b={String(health.connection.consecutive_sync_failures??0)}/>{health.connection.next_sync_at?<Row a="Next scheduled retry" b={date(health.connection.next_sync_at)}/>:null}<Row a="Inventory freshness" b={health.connection.last_inventory_sync_at?date(health.connection.last_inventory_sync_at):"Not synchronized"}/><Row a="Last connection test" b={health.connection.last_connection_test_at?`${health.connection.last_connection_test_status??"unknown"} · ${date(health.connection.last_connection_test_at)}`:"Never"}/>{health.connection.last_connection_test_error?<p className="rounded-lg bg-market-soft p-2 text-xs">Last test: {health.connection.last_connection_test_error}</p>:null}</div>:<p className="mt-4 text-sm text-market-muted">Enterprise integration is not configured.</p>}</Card><Card title="Operating boundary"><ul className="mt-4 space-y-2 text-sm leading-6 text-market-muted"><li>• External enterprise catalog is authoritative.</li><li>• Partial syncs do not deactivate the existing snapshot.</li><li>• Webhooks are signature-verified, deduplicated and retried.</li><li>• Enterprise order delivery is asynchronous and idempotent.</li><li>• Payment settlement/refunds remain with the configured provider.</li></ul></Card></div>
   <div className="grid gap-5 lg:grid-cols-3"><Card title="Recent sync runs"><div className="space-y-3">{ops?.syncRuns.map((x:EnterpriseSyncRun)=><div key={String(x.id)} className="border-b border-market-line pb-3"><div className="flex justify-between gap-3"><b>{String(x.status)}</b><span className="text-xs text-market-muted">{x.started_at?date(String(x.started_at)):""}</span></div><p className="text-xs text-market-muted">{String(x.source)} · {String(x.upserted_count??0)} upserted · {String(x.error_count??0)} errors</p></div>)}{!ops?.syncRuns.length?<p className="text-sm text-market-muted">No sync runs recorded.</p>:null}</div></Card><Card title="Webhook queue"><div className="space-y-3">{ops?.webhookEvents.map((x:EnterpriseWebhookEvent)=><div key={String(x.id)} className="border-b border-market-line pb-3"><div className="flex justify-between gap-3"><b>{String(x.event_type)}</b><span className="text-xs font-bold">{String(x.status)}</span></div><p className="text-xs text-market-muted">Attempts: {String(x.attempts??0)} · {x.received_at?date(String(x.received_at)):""}</p>{x.error_code?<p className="mt-1 text-xs">{String(x.error_code).replaceAll("_"," ")}</p>:null}</div>)}{!ops?.webhookEvents.length?<p className="text-sm text-market-muted">No webhook events recorded.</p>:null}</div></Card><Card title="Order delivery queue"><div className="space-y-3">{ops?.orderOutbox.map((x:EnterpriseOrderOutbox)=><div key={String(x.id)} className="border-b border-market-line pb-3"><div className="flex justify-between gap-3"><b>{String(x.event_type)}</b><span className="text-xs font-bold">{String(x.status)}</span></div><p className="text-xs text-market-muted">Order {String(x.order_id)} · Attempts {String(x.attempts??0)}</p>{x.error_code?<p className="mt-1 text-xs">{String(x.error_code).replaceAll("_"," ")}</p>:null}</div>)}{!ops?.orderOutbox.length?<p className="text-sm text-market-muted">No enterprise order events recorded.</p>:null}</div></Card></div>
  </div>
+}
+
+
+/** Lightweight seller analytics: finance statements remain authoritative. */
+function Insights({m}:{m:Merchant}) {
+  const [days,setDays]=useState<7|30|90>(30);
+  const [report,setReport]=useState<SalesInsights|null>(null);
+  const [error,setError]=useState<string|null>(null);
+  React.useEffect(()=>{
+    let active=true;
+    setReport(null);
+    setError(null);
+    loadMerchantSalesInsights({data:{merchantId:m.merchant_id,days}})
+      .then(data=>{if(active)setReport(data);})
+      .catch(()=>{if(active)setError("Sales insights are temporarily unavailable.");});
+    return ()=>{active=false;};
+  },[m.merchant_id,days]);
+  const peak=Math.max(1,...(report?.daily??[]).map(x=>Number(x.productSales)));
+  return <div className="grid gap-5 lg:grid-cols-2">
+    <Card title="Sales insights" wide>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-market-muted">Paid orders, product sales, commissions and merchant order value.</p>
+        <label className="text-sm font-bold">Period
+          <select className="ml-2 rounded-xl border border-market-line px-3 py-2" value={days}
+            onChange={e=>setDays(Number(e.target.value) as 7|30|90)}>
+            <option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option>
+          </select>
+        </label>
+      </div>
+      {error?<p role="alert" className="mt-4 text-sm text-red-700">{error}</p>:null}
+      {!report&&!error?<p className="mt-4 text-sm text-market-muted">Loading seller analytics…</p>:null}
+      {report?<div className="mt-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {([["Paid orders",String(report.summary.orders)],["Product sales",`GH₵ ${money(report.summary.productSales)}`],
+            ["ELEMARKET commission",`GH₵ ${money(report.summary.commission)}`],
+            ["Merchant order value",`GH₵ ${money(report.summary.merchantValue)}`]] as Array<[string,string]>).map(([label,value])=>
+            <div key={label} className="rounded-xl border border-market-line p-4">
+              <p className="text-xs font-bold text-market-muted">{label}</p>
+              <p className="mt-2 text-xl font-black">{value}</p>
+            </div>)}
+        </div>
+        <h3 className="mt-6 text-sm font-black">Daily product sales (GH₵)</h3>
+        <div className="mt-3 overflow-x-auto rounded-xl border border-market-line p-3">
+          <div className="flex min-w-max items-end gap-1" role="img" aria-label="Daily product sales chart; full numerical values appear in the table below">
+            {report.daily.map(d=>{
+              const value=Number(d.productSales);
+              return <div key={d.day} className="flex w-5 flex-col items-center justify-end">
+                <div className="w-full rounded-t bg-market-green" style={{height:value>0?Math.max(3,Math.round(140*value/peak)):2,opacity:value>0?1:.15}}
+                  title={`${d.day}: GH₵ ${money(d.productSales)}, ${d.orders} orders`}/>
+              </div>;
+            })}
+          </div>
+        </div>
+        <details className="mt-4 rounded-xl border border-market-line p-4">
+          <summary className="cursor-pointer text-sm font-bold">View daily sales figures</summary>
+          <div className="mt-3 max-h-80 overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead><tr className="border-b border-market-line"><th className="py-2">Date</th><th>Orders</th><th>Product sales</th><th>Merchant value</th></tr></thead>
+              <tbody>{report.daily.map(d=><tr key={d.day} className="border-b border-market-line">
+                <td className="py-2">{d.day}</td><td>{d.orders}</td><td>GH₵ {money(d.productSales)}</td><td>GH₵ {money(d.merchantValue)}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </details>
+        <p className="mt-4 text-xs leading-5 text-market-muted">Operational paid-order figures are before partial refunds, payout fees and later reversals. Use Wallet → Financial history for the authoritative merchant ledger.</p>
+      </div>:null}
+    </Card>
+    <Card title="Top-selling products" wide>
+      {report?.topProducts.length?
+        <div className="mt-4 overflow-x-auto"><table className="w-full text-left text-sm">
+          <thead><tr className="border-b border-market-line"><th className="py-2">Product</th><th>Units sold</th><th className="text-right">Sales (GH₵)</th></tr></thead>
+          <tbody>{report.topProducts.map(p=><tr key={p.productId} className="border-b border-market-line">
+            <td className="py-2 pr-3 font-bold">{p.productName}</td><td>{p.units}</td><td className="text-right">{money(p.productSales)}</td>
+          </tr>)}</tbody>
+        </table></div>
+        :<p className="mt-4 text-sm text-market-muted">{report?"No paid product sales in this period.":"Select a period to load your best-selling products."}</p>}
+    </Card>
+  </div>;
 }

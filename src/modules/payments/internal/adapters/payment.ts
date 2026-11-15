@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
@@ -11,6 +12,8 @@ export type PaymentAdapterInput = {
   customerReference?: string;
   customerEmail?: string;
   merchantSubaccount?: string;
+  /** Immutable, server-authorized atomic multi-seller settlement in minor units. */
+  multiMerchantSplit?: { amountMinor: number; platformMinor: number; subaccounts: Array<{ subaccount: string; share: number }> };
   idempotencyKey?: string;
   callbackUrl?: string;
   /** Merchandise commission retained by the platform account, in major units. */
@@ -49,6 +52,8 @@ export interface PaymentProviderAdapter {
   readonly supportsIdempotentInitialization: boolean;
   /** True only when the adapter can route a payment directly to a supplied provider/subaccount reference. */
   readonly supportsDirectSubaccountSettlement: boolean;
+  /** True only after the adapter can issue one provider charge with atomic subaccount allocation. */
+  readonly supportsMultiMerchantSplit?: boolean;
   /** Provider-specific webhook signature headers belong to the adapter boundary. */
   readonly webhookSignatureHeaders?: readonly string[];
   createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult>;
@@ -90,6 +95,8 @@ export type CanonicalPaymentEvent =
   | "refund.failed" | "refund.processed";
 
 export type ParsedPaymentWebhook = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   eventId: string;
   eventType: CanonicalPaymentEvent;
   providerReference: string;
@@ -100,6 +107,8 @@ export type ParsedPaymentWebhook = {
 };
 
 export type VerifiedPayment = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   status: string;
   reference: string;
   amount: number;

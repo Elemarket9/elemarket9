@@ -107,7 +107,8 @@ export function createPayoutDriver({ key }) {
     },
     async parseWebhook(raw) {
       const body = JSON.parse(raw);
-      return { payoutId: body.payoutId, providerReference: body.providerReference ?? null, status: body.status };
+      return { payoutId: body.payoutId, providerReference: body.providerReference ?? null,
+        status: body.status, amount: body.amount, currency: body.currency };
     },
   };
   return driver;

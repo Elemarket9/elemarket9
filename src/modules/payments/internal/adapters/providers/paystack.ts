@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { readResponseBodyWithLimit } from "@/lib/security/body.server";
 import type {
   MobileMoneyNetwork,
@@ -48,6 +49,7 @@ const verifyResponse = z.object({
       reference: z.string().min(1).max(256),
       amount: z.number().int().positive().safe(),
       currency: z.string().regex(/^[A-Z]{3}$/),
+      split: z.unknown().optional(),
     })
     .nullable()
     .optional(),
@@ -118,6 +120,42 @@ function asProviderId(value: unknown): string | null {
   return asString(value);
 }
 
+/** Paystack's signed charge.success split includes immutable formula and
+ * applied subaccount shares. Require BOTH to agree to avoid mistaking a
+ * transaction amount for evidence of merchant settlement allocation. */
+function flatProviderSplit(value: unknown): ProviderSplitProof | undefined {
+  const parsed = z.object({
+    formula: z.object({
+      type: z.literal("flat"),
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        share:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+    shares: z.object({
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        amount:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+  }).safeParse(value);
+  if (!parsed.success) return undefined;
+  const formula = new Map<string,number>();
+  for (const sub of parsed.data.formula.subaccounts) {
+    if (formula.has(sub.subaccount_code)) return undefined;
+    formula.set(sub.subaccount_code,sub.share);
+  }
+  const observed: ProviderSplitProof["subaccounts"]=[];
+  const seen = new Set<string>();
+  for (const sub of parsed.data.shares.subaccounts) {
+    if (seen.has(sub.subaccount_code) || formula.get(sub.subaccount_code)!==sub.amount) return undefined;
+    seen.add(sub.subaccount_code);
+    observed.push({subaccount:sub.subaccount_code,share:sub.amount});
+  }
+  if (seen.size!==formula.size) return undefined;
+  return {type:"flat",subaccounts:observed};
+}
+
 export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // A request header is not evidence of refund idempotency. Automatic retries stay disabled.
   readonly supportsIdempotentRefunds = false;
@@ -125,6 +163,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // and verifies it before another initialize, so it cannot create a second charge.
   readonly supportsIdempotentInitialization = true;
   readonly supportsDirectSubaccountSettlement = true;
+  readonly supportsMultiMerchantSplit = true;
   readonly webhookSignatureHeaders = ["x-paystack-signature"] as const;
   constructor(
     private readonly secret: string,
@@ -144,6 +183,20 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference,
       metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId }),
     };
+    if (input.multiMerchantSplit && input.merchantSubaccount) throw new Error("Conflicting payment split modes");
+    if (input.multiMerchantSplit) {
+      const split = input.multiMerchantSplit;
+      const accounts = new Set(split.subaccounts.map((x) => x.subaccount));
+      const allocated = split.subaccounts.reduce((n, x) => n + x.share, 0);
+      if (split.amountMinor !== amountMinor || split.platformMinor !== amountMinor - allocated ||
+        split.platformMinor < 0 || split.subaccounts.length < 2 || accounts.size !== split.subaccounts.length ||
+        !split.subaccounts.every((x) => typeof x.subaccount === "string" && x.subaccount.length > 0 && x.subaccount.length <= 256 &&
+          Number.isSafeInteger(x.share) && x.share > 0) || !Number.isSafeInteger(allocated)) {
+        throw new Error("Unsafe multi-seller split allocation");
+      }
+      // Exact pesewa merchant shares. Platform bears processor fees.
+      body.split = { type: "flat", bearer_type: "account", subaccounts: split.subaccounts };
+    }
     if (input.merchantSubaccount) {
       body.subaccount = input.merchantSubaccount;
       if (input.platformFee != null) {
@@ -176,6 +229,12 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       parsed.data.data.reference !== reference ||
       !parsed.data.data.authorization_url
     ) {
+      // An amount-matched charge is NOT proof of a merchant-by-merchant split.
+      // The provider split configuration must be read back and reconciled
+      // independently before any group charge can be resumed or settled.
+      if (input.multiMerchantSplit) {
+        throw new Error("Uncertain multi-seller charge requires verified provider split reconciliation");
+      }
       // The reference was reserved before this call. If the provider already
       // has it, do not mint another one. Checkout can resume from verification.
       try {
@@ -208,6 +267,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   }
   readonly supportsMobileMoneyPrompt = true;
   async requestMobileMoneyPrompt(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult> {
+    if (input.multiMerchantSplit) throw new Error("Atomic multi-seller split requires hosted checkout");
     if (!input.customerEmail) throw new Error("Provider requires a customer email");
     if (input.currency !== "GHS") throw new Error("Mobile money prompts support GHS only");
     const amountMinor = moneyToMinorUnits(input.amount);
@@ -320,6 +380,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: normalized.status,
       amount: amountMinor / 100,
       currency,
+      providerSplit: !isRefund && event==="charge.success" ? flatProviderSplit(data.split) : undefined,
       providerRefundId: isRefund
         ? (asProviderId(data.id) ?? asString(data.refund_reference) ?? undefined)
         : undefined,
@@ -415,6 +476,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference: parsed.data.data.reference,
       amount: parsed.data.data.amount / 100,
       currency: parsed.data.data.currency,
+      providerSplit: flatProviderSplit(parsed.data.data.split),
     };
   }
 }

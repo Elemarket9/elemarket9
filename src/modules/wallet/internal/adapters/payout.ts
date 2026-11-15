@@ -52,6 +52,7 @@ export type PayoutWebhookNotice = {
   /** Used only when the provider has no status lookup; otherwise re-read. */
   status?: "processing" | "paid" | "failed";
   amount?: string;
+  currency?: string;
 };
 
 /** A transfer as listed by the provider, for reconciliation. */

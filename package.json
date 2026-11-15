@@ -33,6 +33,7 @@
     "test": "node scripts/test.mjs",
     "test:integration:concurrency": "node --test tests/integration.test.mjs",
     "test:payment:simulation": "node --test tests/payment-simulation.integration.mjs",
+    "test:group:simulation": "node --test tests/group-payment.integration.mjs",
     "test:wallet:simulation": "node --test tests/wallet-simulation.integration.mjs",
     "test:wallet:postgres": "node --test --test-concurrency=1 tests/wallet-adversarial.postgres.mjs tests/wallet-migration-upgrade.postgres.mjs",
     "test:db:postgres": "node --test --test-concurrency=1 tests/database-operations.postgres.mjs tests/commerce-integrity.postgres.mjs tests/scheduled-jobs.postgres.mjs tests/returns-policy.postgres.mjs tests/checkout-pickup.postgres.mjs tests/pay-on-delivery.postgres.mjs tests/admin-dual-approval.postgres.mjs tests/admin-reviews.postgres.mjs tests/admin-orders.postgres.mjs tests/admin-risk.postgres.mjs tests/admin-reports.postgres.mjs tests/admin-promotions.postgres.mjs",
