@@ -36,7 +36,7 @@ export const Route = createFileRoute("/api/mobile/payment-intent")({
     if (!parsed.success) return Response.json({ error: "Invalid payment request" }, { status: 400 });
     try {
       const result = "groupId" in parsed.data
-        ? await (await import("@/modules/payments/internal/group-checkout.server")).startCustomerGroupPayment({
+        ? await (await import("@/modules/payments/public/group-checkout.server")).startCustomerGroupPayment({
             groupId:parsed.data.groupId,userId:current.user.id,
           })
         : await createExternalPaymentIntent({ paymentId:parsed.data.paymentId,userId:current.user.id });
