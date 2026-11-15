@@ -513,7 +513,7 @@ function ActivityBalances({ event }: { event: ActivityEvent }) {
 function Ledger({ wallet }: { wallet: Snapshot }) {
   const events = groupLedgerEntries(wallet.ledger);
   return (
-    <Card title="Activity" className="lg:col-span-2">
+    <Card title="Recent activity (preview)" className="lg:col-span-2">
       {events.length ? (
         <>
           {/* Phones: one card per event so nothing is squeezed into five columns. */}
@@ -547,6 +547,7 @@ function Ledger({ wallet }: { wallet: Snapshot }) {
               </tbody>
             </table>
           </div>
+          {wallet.ledger.length >= 100 ? <p className="mt-3 text-xs font-semibold text-market-muted">Only the newest 100 ledger entries are summarized here; use Financial history to inspect complete debit and credit rows, including entries across this preview boundary.</p> : null}
           <p className="mt-3 text-xs text-market-muted">
             <span className="text-market-green font-bold">+</span> adds to your earnings, <span className="text-market-orange font-bold">−</span> takes from them; amounts without a sign moved between your balances.
           </p>
