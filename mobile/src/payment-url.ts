@@ -5,7 +5,7 @@
  */
 export function requireServerCheckoutUrl(value: unknown): string {
   if (typeof value !== "string" || value.length < 12 || value.length > 2048 ||
-      /[\u0000-\u001f\u007f]/.test(value)) throw new Error("Payment checkout URL is unavailable");
+      /[\u0000-\u001f\u007f\\]/.test(value) || value !== value.trim()) throw new Error("Payment checkout URL is unavailable");
   let url: URL;
   try { url = new URL(value); } catch { throw new Error("Payment checkout URL is invalid"); }
   if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
