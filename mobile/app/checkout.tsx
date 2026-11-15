@@ -48,7 +48,7 @@ export default function Checkout() {
       if (!chargedOrders.length) throw new Error("Checkout did not create an order");
       const authoritativeMinor=chargedOrders.reduce((sum,order)=>{
         const price=order.grandTotal;
-        if (!price || !/^\\d+(?:\\.\\d{1,2})?$/.test(price)) {
+        if (!price || !/^\d+(?:\.\d{1,2})?$/.test(price)) {
           throw new Error("The order amount could not be verified. Refresh checkout.");
         }
         const [cedis,pesewas=""]=price.split(".");
