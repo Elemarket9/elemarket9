@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getAuthenticatedUserId, authMiddleware } from "@/modules/identity/public/auth/middleware";
-import { requireAdminForUserId } from "@/modules/identity/public/auth/authorization.server";
+import { requireAdminForUserId, getAdminCapabilitiesForUserId } from "@/modules/identity/public/auth/authorization.server";
 import { getSql } from "@/lib/db";
 import { enforceRateLimit } from "@/lib/security/rate-limit.server";
 import type { JsonObject, JsonValue } from "@/lib/db-types";
@@ -14,11 +14,22 @@ export type SupportInternalNote = { id:string; adminId:string; adminName:string|
 export type SupportThread = { conversation:Omit<SupportInboxRow,"lastMessage">; messages:SupportThreadMessage[]; notes:SupportInternalNote[] };
 export type AssistedProductRow = { id:string; name:string; price:string; stock:number; merchantId:string; merchantName:string; variants:JsonValue[] };
 
+/** Reading the inbox accepts `admin.support` (agents) or `admin.support.view`
+ * (trainees, QA). Every write below still requires `admin.support` exactly.
+ * Reads must never change conversation state (no mark-read, no auto-claim). */
+export const SUPPORT_READ_CAPABILITIES = ["admin.support", "admin.support.view"] as const;
+function assertSupportReader(capabilities: readonly string[]): void {
+  if (capabilities.includes("admin.full")) return;
+  if (!SUPPORT_READ_CAPABILITIES.some((capability) => capabilities.includes(capability))) {
+    throw new Error("Forbidden: administrator permission required");
+  }
+}
+
 const conversationIdSchema=z.object({conversationId:z.string().trim().min(1).max(80)});
 const replySchema=conversationIdSchema.extend({body:z.string().trim().min(1).max(4000),idempotencyKey:z.string().trim().min(16).max(128)});
 
 export const listSupportInbox=createServerFn({method:"GET"}).middleware([authMiddleware]).handler(async({context})=>{
-  const adminId=getAuthenticatedUserId(context); await requireAdminForUserId(adminId, "admin.support");
+  const adminId=getAuthenticatedUserId(context); assertSupportReader(await getAdminCapabilitiesForUserId(adminId));
   await enforceRateLimit("admin-support-read",{windowSeconds:60,maxRequests:60,subject:adminId});
   const sql=await getSql();
   return sql.query<SupportInboxRow>(`select c.id,c.customer_id as "customerId",u.name as "customerName",u.email as "customerEmail",c.order_id as "orderId",c.status,c.priority,c.assigned_admin_id as "assignedAdminId",au.name as "assignedAdminName",(c.assigned_admin_id=$1) as "assignedToMe",c.updated_at as "updatedAt",
@@ -29,7 +40,7 @@ export const listSupportInbox=createServerFn({method:"GET"}).middleware([authMid
 });
 
 export const getSupportThread=createServerFn({method:"GET"}).middleware([authMiddleware]).validator(conversationIdSchema).handler(async({data,context})=>{
-  const adminId=getAuthenticatedUserId(context); await requireAdminForUserId(adminId, "admin.support");
+  const adminId=getAuthenticatedUserId(context); assertSupportReader(await getAdminCapabilitiesForUserId(adminId));
   await enforceRateLimit("admin-support-thread-read",{windowSeconds:60,maxRequests:120,subject:adminId});
   const sql=await getSql();
   const rows=await sql.query<Omit<SupportInboxRow,"lastMessage">>(`select c.id,c.customer_id as "customerId",u.name as "customerName",u.email as "customerEmail",c.order_id as "orderId",c.status,c.priority,c.assigned_admin_id as "assignedAdminId",au.name as "assignedAdminName",(c.assigned_admin_id=$2) as "assignedToMe",c.updated_at as "updatedAt" from support_conversations c join "user" u on u.id=c.customer_id left join "user" au on au.id=c.assigned_admin_id where c.id=$1 limit 1`,[data.conversationId,adminId]);

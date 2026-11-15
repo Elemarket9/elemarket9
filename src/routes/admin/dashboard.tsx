@@ -244,7 +244,7 @@ function Dashboard() {
         ))}
       </section>
 
-      <AdminWorkspaceNav staffRole="owner" /><div className="mt-10"><AdminSupportWorkspace compact /></div>
+      <AdminWorkspaceNav staffRole="owner" /><div className="mt-10"><AdminSupportWorkspace compact canReply /></div>
 
       <section id="merchant-reviews" className="mt-10 rounded-2xl border border-market-line bg-white p-6 shadow-market">
         <div className="flex items-center justify-between gap-3">
