@@ -216,12 +216,16 @@ function ReportBody({ report, q }: { report: Report; q: string }) {
       <Panel title="Sales" intro="Paid orders only. Merchandise value is the product total after discounts, without delivery."
         actions={<ExportButton section="daily" label="Download daily CSV" exporter={exporter} />}>
         <dl className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <Stat label="Merchandise value (GMV)" value={ghs(sales.gmv)} />
+          <Stat label="Merchandise value (GMV)" value={ghs(sales.gmv)} hint="At list price, before promotions" />
           <Stat label="Paid orders" value={count(sales.orders)} />
           <Stat label="Average order value" value={ghs(sales.averageOrderValue)} hint="Amount paid incl. delivery ÷ paid orders" />
           <Stat label="Delivery fees" value={ghs(sales.deliveryFees)} />
-          <Stat label="ELEMARKET commission" value={ghs(sales.commission)} />
-          <Stat label="Merchant earnings" value={ghs(sales.merchantEarnings)} hint="Merchandise value minus commission" />
+          <Stat label="ELEMARKET commission" value={ghs(sales.commission)} hint={`${ghs(sales.grossCommission)} before ELEMARKET-funded promotions`} />
+          <Stat label="Merchant earnings" value={ghs(sales.merchantEarnings)} hint="What merchants are owed for these sales" />
+          <Stat label="ELEMARKET-funded promotions" value={ghs(sales.elemarketPromotions)} hint="Discounts ELEMARKET paid for" />
+          <Stat label="Merchant-funded promotions" value={ghs(sales.merchantPromotions)} hint="Discounts merchants paid for" />
+          <Stat label="Refunded since" value={count(sales.refundedOrders)} hint={`${ghs(sales.refundedAmount)} returned to customers`} />
+          <Stat label="Commission after refunds" value={ghs(sales.commissionAfterRefunds)} hint={`Merchant earnings after refunds: ${ghs(sales.merchantEarningsAfterRefunds)}`} />
         </dl>
         <DailyChart daily={sales.daily} />
       </Panel>

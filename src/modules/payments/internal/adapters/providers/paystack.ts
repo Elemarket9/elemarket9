@@ -45,6 +45,7 @@ const verifyResponse = z.object({
   status: z.boolean(),
   data: z
     .object({
+      id: z.union([z.string(), z.number()]).optional(),
       status: z.string().min(1).max(64),
       reference: z.string().min(1).max(256),
       amount: z.number().int().positive().safe(),
@@ -54,6 +55,44 @@ const verifyResponse = z.object({
     .nullable()
     .optional(),
 });
+
+const refundRecord = z.object({
+  id: z.union([z.string(), z.number()]),
+  status: z.string().min(1).max(64),
+  amount: z.number().int().nonnegative().safe(),
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  transaction: z.union([z.string(), z.number(), z.object({ id: z.union([z.string(), z.number()]).optional(), reference: z.string().optional().nullable() })]).optional().nullable(),
+  expected_at: z.string().optional().nullable(),
+});
+const refundFetchResponse = z.object({ status: z.boolean(), data: refundRecord.nullable().optional() });
+const refundListResponse = z.object({ status: z.boolean(), data: z.array(refundRecord).max(100).optional() });
+
+/** Paystack refund state -> our refund state. "failed"/"reversed" mean no money left: treat as absent. */
+/**
+ * Zero ELEMARKET commission (0% category, 100%-off merchant coupon, a fee that
+ * rounds to nothing). Without an explicit split Paystack falls back to the
+ * percentage typed into the subaccount on the Paystack dashboard, so the
+ * merchant can receive less than the ledger says (money audit H1).
+ *
+ * With ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT=1 the whole amount is assigned to
+ * the merchant with the same flat dynamic split the group checkout already
+ * uses. Off by default until verified in the Paystack sandbox: if Paystack
+ * refused it, zero-commission checkouts would fail to start.
+ */
+export function applyZeroCommissionSplit(body: Record<string, unknown>, subaccount: string, amount: string) {
+  if (process.env.ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT !== "1") return;
+  delete body.subaccount;
+  delete body.transaction_charge;
+  delete body.bearer;
+  body.split = { type: "flat", bearer_type: "account", subaccounts: [{ subaccount, share: moneyToMinorUnits(amount) }] };
+}
+
+export function mapPaystackRefundStatus(status: string): "processed" | "processing" | "needs_attention" | "absent" {
+  if (status === "processed") return "processed";
+  if (status === "pending" || status === "processing") return "processing";
+  if (status === "failed" || status === "reversed") return "absent";
+  return "needs_attention";
+}
 
 const refundResponse = z.object({
   status: z.boolean(),
@@ -159,6 +198,7 @@ function flatProviderSplit(value: unknown): ProviderSplitProof | undefined {
 export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // A request header is not evidence of refund idempotency. Automatic retries stay disabled.
   readonly supportsIdempotentRefunds = false;
+  readonly reconcileProvesAbsence = true;
   // The charge reference is the payment attempt id. A retry reuses that reference
   // and verifies it before another initialize, so it cannot create a second charge.
   readonly supportsIdempotentInitialization = true;
@@ -201,11 +241,11 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       body.subaccount = input.merchantSubaccount;
       if (input.platformFee != null) {
         const charge = marketplaceSettlementChargePesewas(input.amount, input.platformFee);
-        // A zero commission keeps the provider's configured split. Delivery is not commission.
+        // Delivery is not commission.
         if (charge > 0) {
           body.transaction_charge = charge;
           body.bearer = "account";
-        }
+        } else applyZeroCommissionSplit(body, input.merchantSubaccount, input.amount);
       }
     }
     if (input.callbackUrl) body.callback_url = input.callbackUrl;
@@ -288,7 +328,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
         if (charge > 0) {
           body.transaction_charge = charge;
           body.bearer = "account";
-        }
+        } else applyZeroCommissionSplit(body, input.merchantSubaccount, input.amount);
       }
     }
     return this.chargeCall("/charge", body, reference);
@@ -451,6 +491,52 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: "processing",
       metadata: { expectedAt: data.expected_at ?? null, amount: providerAmount },
     };
+  }
+
+  /**
+   * Find out what really happened to a refund whose outcome we don't know.
+   * Never creates a refund. With a provider refund id we fetch it directly;
+   * otherwise we list every refund on the transaction and match the amount.
+   */
+  async reconcileRefund(input: {
+    providerReference: string;
+    providerRefundId: string | null;
+    amount: string;
+    currency: string;
+    idempotencyKey: string;
+  }): Promise<PaymentRefundResult | { status: "not_found" }> {
+    const amountMinor = moneyToMinorUnits(input.amount);
+    const get = async (path: string) => {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        headers: { authorization: `Bearer ${this.secret}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new PaymentProviderError("Provider refund lookup failed", response.status);
+      return readProviderJson(response);
+    };
+    const result = (record: z.infer<typeof refundRecord>): PaymentRefundResult | { status: "not_found" } => {
+      if (record.amount !== amountMinor) throw new Error("Provider refund amount does not match this request");
+      const state = mapPaystackRefundStatus(record.status);
+      if (state === "absent") return { status: "not_found" };
+      return { providerRefundId: String(record.id), status: state, metadata: { providerStatus: record.status, reconciled: true, amount: record.amount } };
+    };
+    if (input.providerRefundId) {
+      const parsed = refundFetchResponse.safeParse(await get(`/refund/${encodeURIComponent(input.providerRefundId)}`));
+      if (!parsed.success || parsed.data.status !== true || !parsed.data.data) throw new Error("Provider refund lookup failed");
+      return result(parsed.data.data);
+    }
+    const verified = verifyResponse.safeParse(await get(`/transaction/verify/${encodeURIComponent(input.providerReference)}`));
+    const transactionId = verified.success ? verified.data.data?.id : undefined;
+    if (!verified.success || verified.data.status !== true || transactionId === undefined)
+      throw new Error("Provider transaction lookup failed");
+    const listed = refundListResponse.safeParse(await get(`/refund?transaction=${encodeURIComponent(String(transactionId))}&perPage=100`));
+    if (!listed.success || listed.data.status !== true) throw new Error("Provider refund list failed");
+    const live = (listed.data.data ?? []).filter((r) => mapPaystackRefundStatus(r.status) !== "absent");
+    if (live.length === 0) return { status: "not_found" };
+    // More than one live refund for one payment must never be auto-resolved.
+    if (live.length > 1) return { providerRefundId: null, status: "needs_attention", metadata: { reconciled: true, liveRefunds: live.map((r) => String(r.id)) } };
+    return result(live[0]);
   }
 
   async verifyTransaction(reference: string): Promise<VerifiedPayment> {

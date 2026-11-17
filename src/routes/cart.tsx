@@ -4,7 +4,6 @@ import { Minus, Plus, ShoppingBag, Trash2, ArrowRight, ArrowLeft, ShieldCheck } 
 import { useEffect, useMemo, useState } from "react";
 import { formatGhs, lineTotal } from "@/modules/shared/public/money";
 import { cartCount, cartTotal, readCart, writeCart, type CartLine } from "@/modules/ordering/public/cart";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 import { MarketFooter, MarketHeader } from "@/components/market-header";
 
 export const Route = createFileRoute("/cart")({
@@ -35,7 +34,6 @@ function Cart() {
   return (
     <div className="min-h-screen bg-market-bg">
       <MarketHeader />
-      <ContactSupportWidget mode="order" />
       <main id="main-content" className="mx-auto max-w-[1180px] px-4 py-7 pb-16 sm:px-6 lg:px-8">
         <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs font-semibold text-market-muted"><Link to="/" className="hover:text-market-green">Shop</Link><span aria-hidden="true">/</span><span aria-current="page" className="text-market-ink">Cart</span></nav>
         <div className="mt-5 flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Ready to order?</p><h1 className="section-title">Your shopping cart</h1><p className="mt-2 text-sm text-market-muted">{count} item{count === 1 ? "" : "s"} · Review your choices before checkout</p></div><Link to="/" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-market-green"><ArrowLeft size={16} aria-hidden="true"/> Continue shopping</Link></div>

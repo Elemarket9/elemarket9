@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SupportComposer, SupportMessages } from "@/components/support-thread";
 import { supportStatusLabel } from "@/modules/support/public/support-labels";
-import { Headphones, Mail, MessageCircle, Phone, X } from "lucide-react";
+import { orderNumber } from "@/modules/shared/public/display";
+import { useRouterState } from "@tanstack/react-router";
+import { Headphones, Mail, MessageCircle, Minus, Phone } from "lucide-react";
 import { useCurrentUserState } from "@/modules/identity/public/auth/use-current-user";
 import { useCustomerSupportChat, useSupportUnread } from "@/modules/support/public/use-customer-support-chat";
 import type { CurrentUserState } from "@/modules/identity/public/auth/use-current-user";
@@ -25,12 +27,31 @@ const SUPPORT_WHATSAPP = SUPPORT_WHATSAPP_RAW && /^(https:\/\/(?:wa\.me|api\.wha
  * the customer away from shopping for normal chat use. A full-page support
  * route remains available only as an accessibility/fallback surface.
  */
-export function ContactSupportWidget({ mode = "home", orderId = null }: { mode?: SupportMode; orderId?: string | null }) {
-  const identity = useCurrentUserState();
-  return <SupportWidget key={JSON.stringify([identity.user?.id ?? null, orderId])} mode={mode} orderId={orderId} identity={identity} />;
+/** Pages that must not show the shopper chat (staff consoles, the full support page, sign-in). */
+const HIDDEN_PREFIXES = ["/admin", "/executive", "/support", "/login", "/register", "/reset-password", "/verify", "/provider", "/partner", "/rider", "/payment"];
+
+/**
+ * Mounted ONCE in the root layout so the chat opens from every page (the footer
+ * "Open support chat" link used to do nothing on pages that did not mount their
+ * own copy). Order context comes from the URL.
+ */
+export function GlobalSupportWidget() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (HIDDEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return null;
+  const orderMatch = pathname.match(/^\/orders\/([^/]+)$/);
+  const orderId = orderMatch ? decodeURIComponent(orderMatch[1]) : null;
+  const mode: SupportMode = orderId || /^\/(cart|checkout|orders)(\/|$)/.test(pathname) ? "order" : "home";
+  // Keep the chat above the checkout's sticky pay bar instead of covering it.
+  const raised = /^\/(checkout|cart)(\/|$)/.test(pathname) || /^\/products\//.test(pathname);
+  return <ContactSupportWidget mode={mode} orderId={orderId} raised={raised} />;
 }
 
-function SupportWidget({ mode, orderId, identity }: { mode: SupportMode; orderId: string | null; identity: CurrentUserState }) {
+export function ContactSupportWidget({ mode = "home", orderId = null, raised = false }: { mode?: SupportMode; orderId?: string | null; raised?: boolean }) {
+  const identity = useCurrentUserState();
+  return <SupportWidget key={JSON.stringify([identity.user?.id ?? null, orderId])} mode={mode} orderId={orderId} identity={identity} raised={raised} />;
+}
+
+function SupportWidget({ mode, orderId, identity, raised }: { mode: SupportMode; orderId: string | null; identity: CurrentUserState; raised: boolean }) {
   const [open, setOpen] = useState(false);
   const [sessionStalled, setSessionStalled] = useState(false);
   const { user, isPending } = identity;
@@ -76,10 +97,10 @@ function SupportWidget({ mode, orderId, identity }: { mode: SupportMode; orderId
   }, []);
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] sm:bottom-5 sm:right-5" data-support-widget>
+    <div className={`fixed right-3 z-[60] sm:right-5 ${raised ? "bottom-24 sm:bottom-6" : "bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-5"}`} data-support-widget>
       {open ? (
         <section
-          className="fixed inset-0 flex flex-col overflow-hidden bg-white sm:static sm:h-[min(38rem,calc(100dvh-6rem))] sm:w-[24rem] sm:rounded-2xl sm:border sm:border-market-line sm:shadow-market-lg"
+          className="fixed inset-x-0 bottom-0 flex h-[min(72dvh,34rem)] flex-col overflow-hidden rounded-t-2xl border-t border-market-line bg-white shadow-market-lg sm:static sm:h-[min(36rem,calc(100dvh-7rem))] sm:w-[23rem] sm:rounded-2xl sm:border"
           role="dialog"
           aria-label="ELEMARKET customer support"
         >
@@ -90,11 +111,11 @@ function SupportWidget({ mode, orderId, identity }: { mode: SupportMode; orderId
               </span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-black">ELEMARKET Support</p>
-                <p className="truncate text-xs text-market-muted">{supportStatusLabel(conversation?.status)}</p>
+                <p className="truncate text-xs text-market-muted">{orderId && !conversation?.messages.length ? `About order ${orderNumber(orderId)}` : supportStatusLabel(conversation?.status)}</p>
               </div>
             </div>
-            <button ref={closeButton} type="button" onClick={() => setOpen(false)} className="grid h-11 w-11 place-items-center rounded-lg text-market-muted hover:bg-market-soft" aria-label="Close support chat">
-              <X size={20} aria-hidden="true" />
+            <button ref={closeButton} type="button" onClick={() => setOpen(false)} className="grid h-11 w-11 place-items-center rounded-lg text-market-muted hover:bg-market-soft" aria-label="Minimise support chat" title="Minimise (your conversation is kept)">
+              <Minus size={20} aria-hidden="true" />
             </button>
           </header>
 
@@ -125,7 +146,7 @@ function SupportWidget({ mode, orderId, identity }: { mode: SupportMode; orderId
                 conversation={conversation} outgoing={chat.outgoing} loading={loading} error={chat.error} stale={chat.stale} online={chat.online}
                 emptyText={mode === "order"
                   ? "Tell us what you need help with for your order or checkout. Your message goes straight to the ELEMARKET support team, and their reply appears here."
-                  : "Tell us what you need help with. Your message goes straight to the ELEMARKET support team. You can keep shopping; a red dot on the chat button shows when we reply."}
+                  : "Tell us what you need help with. Your message goes straight to the ELEMARKET support team. Minimise this any time to keep shopping; a red dot on the chat button shows when we reply."}
                 onRetryOpen={chat.retry} onRetrySend={() => void chat.retrySend()} onDiscard={chat.discardFailed}
               />
             ) : null}
@@ -154,14 +175,14 @@ function SupportWidget({ mode, orderId, identity }: { mode: SupportMode; orderId
           type="button"
           ref={openButton}
           onClick={() => setOpen(true)}
-          className="relative inline-flex h-12 items-center gap-2 rounded-full border border-market-line bg-white px-4 text-sm font-black text-market-ink shadow-market hover:border-market-green/30 hover:bg-market-soft"
+          className="relative grid h-12 w-12 place-items-center rounded-full bg-market-green text-white shadow-market ring-2 ring-white transition hover:bg-market-green/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-market-green"
           aria-expanded={false}
           aria-label={`${mode === "order" ? "Open order support chat" : "Open ELEMARKET support chat"}${unread > 0 ? `, ${unread} new ${unread === 1 ? "reply" : "replies"}` : ""}`}
+          title="Chat with ELEMARKET Support"
         >
-          <MessageCircle size={18} className="text-market-green" aria-hidden="true" />
-          {unread > 0 ? "New reply" : mode === "order" ? "Order Support" : "Chat Support"}
+          <MessageCircle size={22} aria-hidden="true" />
           {unread > 0 ? (
-            <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-red-600 px-1.5 text-xs font-black text-white">{unread > 9 ? "9+" : unread}</span>
+            <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-xs font-black text-white ring-2 ring-white">{unread > 9 ? "9+" : unread}</span>
           ) : null}
         </button>
       )}

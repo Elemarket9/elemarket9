@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AuthProvider } from "@/modules/identity/public/auth/provider";
+import { GlobalSupportWidget } from "@/components/contact-support-widget";
 import { portalHref, isMarketplaceOrigin } from "@/lib/portal-links";
 import appCss from "../styles.css?url";
 
@@ -57,5 +58,5 @@ function RootDocument() {
     }
     void navigator.serviceWorker.register("/app-sw.js", { scope: "/" }).catch(() => undefined);
   }, []);
-  return <html lang="en" suppressHydrationWarning><head><HeadContent /></head><body><AuthProvider><Outlet /></AuthProvider><Scripts /></body></html>;
+  return <html lang="en" suppressHydrationWarning><head><HeadContent /></head><body><AuthProvider><Outlet /><GlobalSupportWidget /></AuthProvider><Scripts /></body></html>;
 }

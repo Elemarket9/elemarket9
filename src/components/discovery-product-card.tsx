@@ -93,10 +93,10 @@ export function DiscoveryProductCard({ product, quantity, onAdd, sponsored, offi
             ) : (
               <div className="grid h-full place-items-center text-market-muted"><ShoppingBag size={26} aria-hidden="true"/><span className="sr-only">Product photo unavailable</span></div>
             )}
-            {sponsored && <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-[10px] font-semibold text-market-muted">Sponsored</span>}
-            {!available && <span className="absolute left-2 top-2 rounded-lg bg-market-ink px-2 py-1 text-[10px] font-black text-white">Out of stock</span>}
-            {discount !== null && available && <span className="absolute left-2 top-2 rounded-lg bg-market-orange px-2 py-1 text-[11px] font-black text-white">-{discount}%</span>}
-            {officialStore && <span className="absolute right-2 top-2 rounded-lg border border-market-green/15 bg-white/95 px-2 py-1 text-[10px] font-extrabold text-market-green">Official store</span>}
+            {sponsored && <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-xs font-semibold text-market-muted">Sponsored</span>}
+            {!available && <span className="absolute left-2 top-2 rounded-lg bg-market-ink px-2 py-1 text-xs font-black text-white">Out of stock</span>}
+            {discount !== null && available && <span className="absolute left-2 top-2 rounded-lg bg-market-orange px-2 py-1 text-xs font-black text-white">-{discount}%</span>}
+            {officialStore && <span className="absolute right-2 top-2 rounded-lg border border-market-green/15 bg-white/95 px-2 py-1 text-xs font-extrabold text-market-green">Official store</span>}
           </div>
         </Link>
         <button type="button" disabled={wishlistBusy} aria-label={`Save ${product.name} to wishlist`} aria-pressed={saved === true} onClick={() => void toggleWishlist()} className="absolute bottom-2 right-2 inline-flex h-11 w-11 items-center justify-center rounded-full border border-market-line bg-white text-market-ink shadow-sm transition hover:bg-market-soft disabled:opacity-50">
@@ -104,29 +104,29 @@ export function DiscoveryProductCard({ product, quantity, onAdd, sponsored, offi
         </button>
       </div>
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
-        {adTitle && <p className="mb-1 line-clamp-1 text-[11px] font-black text-market-orange">{adTitle}</p>}
-        {adSubtitle && <p className="mb-1 line-clamp-2 text-[11px] text-market-muted">{adSubtitle}</p>}
+        {adTitle && <p className="mb-1 line-clamp-1 text-xs font-black text-market-orange">{adTitle}</p>}
+        {adSubtitle && <p className="mb-1 line-clamp-2 text-xs text-market-muted">{adSubtitle}</p>}
         <Link to="/products/$id" params={{ id: product.id }} onClick={productClick} className="min-h-10 text-sm font-bold leading-5 text-market-ink hover:text-market-green sm:text-[15px]">
           <span className="line-clamp-2">{product.name}</span>
         </Link>
-        <div className="mt-1 flex min-w-0 items-center gap-1 text-[11px] text-market-muted">
+        <div className="mt-1 flex min-w-0 items-center gap-1 text-xs text-market-muted">
           <Link to="/stores/$id" params={{ id: product.merchantId }} className="max-w-full truncate hover:text-market-green hover:underline">{product.merchantName}</Link>
           {product.verified && <ShieldCheck size={14} className="shrink-0 text-market-green" aria-label="Verified merchant" />}
         </div>
-        {(product.brand || product.model) && <p className="mt-1 truncate text-[11px] text-market-muted">{[product.brand, product.model].filter(Boolean).join(" · ")}</p>}
+        {(product.brand || product.model) && <p className="mt-1 truncate text-xs text-market-muted">{[product.brand, product.model].filter(Boolean).join(" · ")}</p>}
         {product.reviewCount > 0 && <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-market-ink"><Star size={13} className="fill-amber-500 text-amber-500" aria-hidden="true" />{product.avgRating?.toFixed(1)} <span className="font-normal text-market-muted">({product.reviewCount} reviews)</span></p>}
         <div className="mt-auto pt-3">
           <strong className="block text-lg font-black tracking-tight text-market-ink sm:text-xl">{formatGhs(product.price)}</strong>
           {discount !== null && <p className="mt-0.5 text-xs text-market-muted"><span className="line-through">{formatGhs(originalPrice!)}</span><span className="ml-2 font-bold text-market-orange">Save {discount}%</span></p>}
-          {product.financingEligible && <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-market-green"><CreditCard size={12} aria-hidden="true"/> Financing may be available*</p>}
-          {available && product.stock <= 5 && <p className="mt-1 text-[11px] font-bold text-market-orange">Only {product.stock} left</p>}
+          {product.financingEligible && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-market-green"><CreditCard size={12} aria-hidden="true"/> Financing may be available*</p>}
+          {available && product.stock <= 5 && <p className="mt-1 text-xs font-bold text-market-orange">Only {product.stock} left</p>}
           {onAdd && !product.hasVariants && available ? (
             <button type="button" onClick={onAdd} className="market-btn-accent mt-3 w-full px-2" aria-label={`Add ${product.name} to cart`}> <ShoppingBag size={16} aria-hidden="true" />{quantity ? `Add another (${quantity} in cart)` : "Add to cart"}</button>
           ) : (
             <Link to="/products/$id" params={{ id: product.id }} onClick={productClick} className="market-btn-secondary mt-3 w-full px-2">{product.hasVariants && available ? "Choose options" : "View details"}<ArrowUpRight size={16} aria-hidden="true" /></Link>
           )}
         </div>
-        {wishlistMessage && <p role="status" aria-live="polite" className="mt-2 text-[11px] text-market-muted">{wishlistMessage}</p>}
+        {wishlistMessage && <p role="status" aria-live="polite" className="mt-2 text-xs text-market-muted">{wishlistMessage}</p>}
       </div>
     </article>
   );

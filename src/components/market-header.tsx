@@ -50,7 +50,7 @@ export function MarketHeader({ afterBrand, trailing }: { afterBrand?: ReactNode;
             </SignedIn>
             <Link to="/cart" className="market-icon-link relative" aria-label={`Shopping cart, ${count} item${count === 1 ? "" : "s"}`}>
               <ShoppingBag size={19} aria-hidden="true" />
-              {count > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-market-orange px-1 text-[10px] font-black text-white">{count > 99 ? "99+" : count}</span>}
+              {count > 0 && <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-market-orange px-1 text-xs font-black text-white">{count > 99 ? "99+" : count}</span>}
             </Link>
           </nav>
         </div>
@@ -68,9 +68,9 @@ export function MarketFooter() {
           <p className="mt-3 max-w-xs leading-6 text-market-muted">Discover products from merchants across Ghana, with clear checkout information and customer support.</p>
           <p className="mt-4 text-xs font-semibold text-market-muted">Powered by ELEVORA TRADING LIMITED</p>
         </div>
-        <nav aria-label="Shopping and account"><h2 className="font-black text-market-ink">Shop & account</h2><div className="mt-4 grid gap-3 text-market-muted"><Link to="/">Explore products</Link><Link to="/cart">Shopping cart</Link><Link to="/orders">My orders</Link><Link to="/profile">My profile</Link></div></nav>
-        <nav aria-label="Customer help"><h2 className="font-black text-market-ink">Help & policies</h2><div className="mt-4 grid gap-3 text-market-muted"><Link to="/help">Help centre</Link><button type="button" onClick={() => window.dispatchEvent(new Event("elemarket:open-support"))} className="text-left hover:text-market-green">Open support chat</button><Link to="/support">Support centre</Link><Link to="/returns-policy">Returns & refunds</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div></nav>
-        <nav aria-label="Business services"><h2 className="font-black text-market-ink">Work with ELEMARKET</h2><div className="mt-4 grid gap-3 text-market-muted"><a href={portalHref("seller", "/merchant/register")}>Become a merchant</a><a href={portalHref("seller", "/merchant/login")}>Merchant workspace</a><a href={portalHref("provider", "/provider/")}>Delivery & financing partners</a></div></nav>
+        <nav aria-label="Shopping and account"><h2 className="font-black text-market-ink">Shop & account</h2><div className="mt-3 grid gap-0.5 text-market-muted [&>*]:py-2"><Link to="/">Explore products</Link><Link to="/cart">Shopping cart</Link><Link to="/orders">My orders</Link><Link to="/profile">My profile</Link></div></nav>
+        <nav aria-label="Customer help"><h2 className="font-black text-market-ink">Help & policies</h2><div className="mt-3 grid gap-0.5 text-market-muted [&>*]:py-2"><Link to="/help">Help centre</Link><button type="button" onClick={() => window.dispatchEvent(new Event("elemarket:open-support"))} className="text-left hover:text-market-green">Open support chat</button><Link to="/support">Support centre</Link><Link to="/returns-policy">Returns & refunds</Link><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div></nav>
+        <nav aria-label="Business services"><h2 className="font-black text-market-ink">Work with ELEMARKET</h2><div className="mt-3 grid gap-0.5 text-market-muted [&>*]:py-2"><a href={portalHref("seller", "/merchant/register")}>Become a merchant</a><a href={portalHref("seller", "/merchant/login")}>Merchant workspace</a><a href={portalHref("provider", "/provider/")}>Delivery & financing partners</a></div></nav>
       </div>
       <div className="border-t border-market-line bg-market-bg/60"><p className="mx-auto max-w-[1440px] px-4 py-4 text-xs leading-5 text-market-muted sm:px-6 lg:px-8">Prices are in Ghana cedis (GHS). Delivery fees and availability are confirmed at checkout. Financing, where available, is subject to independent provider terms and approval.</p></div>
     </footer>
