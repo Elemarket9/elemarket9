@@ -91,14 +91,14 @@ test("the executor re-sends only when the lookup is complete and the first attem
 });
 
 // Money audit H1: zero-commission orders and the Paystack split.
-const single = { paymentId: "pay_1", attemptId: "attempt_123456789", amount: "265.00", currency: "GHS", method: "card",
-  customerEmail: "buyer@example.com", idempotencyKey: "attempt_123456789", merchantSubaccount: "ACCT_merchant" };
+const single = { paymentId: "pay_1", attemptId: "attempt-one", amount: "265.00", currency: "GHS", method: "card",
+  customerEmail: "buyer@example.com", idempotencyKey: "attempt-one", merchantSubaccount: "ACCT_merchant" };
 async function initBody(extra) {
   let body;
   const original = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     body = JSON.parse(init.body);
-    return Response.json({ status: true, data: { reference: "attempt123456789", authorization_url: "https://checkout.paystack.com/x", access_code: "a" } });
+    return Response.json({ status: true, data: { reference: "attempt-one", authorization_url: "https://checkout.paystack.com/x", access_code: "a" } });
   };
   try { await new PaystackPaymentAdapter("secret", "https://api.paystack.test").createPayment({ ...single, ...extra }); }
   finally { globalThis.fetch = original; }
