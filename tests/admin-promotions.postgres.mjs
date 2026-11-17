@@ -473,3 +473,17 @@ test("reporting shows redemptions, discount given and budget used/remaining", { 
   assert.ok(deals.some((d) => d.code === code));
   assert.ok(!("budget" in deals[0]), "public deals never expose budgets");
 });
+
+// Money audit M3: reports show GMV at list price and the promotion cost separately.
+test("reports show promotion cost instead of hiding it in GMV and commission", { skip }, async () => {
+  const { code } = await marketplacePromo();
+  const s = await shop();
+  const order = await buy(s, { promoCode: code });
+  await pay(order, s.user);
+  const [o] = await sql.query(`select original_product_total, platform_fee, platform_funded_discount, (now() at time zone 'Africa/Accra')::date::text as day from orders where id=$1`, [order.orderId]);
+  const reports = await harness.load("/src/modules/administration/internal/reports/admin-reports.server.ts");
+  const sales = await reports.loadSalesReport(sql, { from: o.day, to: o.day });
+  assert.ok(Number(sales.elemarketPromotions) >= Number(o.platform_funded_discount) && Number(o.platform_funded_discount) > 0);
+  assert.equal((Number(sales.grossCommission) - Number(sales.commission)).toFixed(2), Number(sales.elemarketPromotions).toFixed(2));
+  assert.ok(Number(sales.gmv) >= Number(o.original_product_total));
+});

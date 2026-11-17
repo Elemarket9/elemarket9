@@ -165,6 +165,14 @@ test("sales: only paid, non-cancelled orders in the range, with exact totals and
   assert.equal(s.merchantEarnings, "1010.00");
   assert.equal(s.amountPaid, "1220.00");
   assert.equal(s.averageOrderValue, "152.50");
+  // Money audit M3: promotion cost and refunds are shown, not hidden in the totals.
+  assert.equal(s.elemarketPromotions, "0.00");
+  assert.equal(s.merchantPromotions, "0.00");
+  assert.equal(s.grossCommission, "90.00");
+  assert.equal(s.refundedOrders, 1, "A4 was refunded");
+  assert.equal(s.refundedAmount, "115.00");
+  assert.equal(s.commissionAfterRefunds, "80.00");
+  assert.equal(s.merchantEarningsAfterRefunds, "920.00");
   assert.equal(report.timeZone, "Africa/Accra");
   assert.equal(s.daily.length, 4);
   assert.deepEqual(s.daily.map((d) => d.day), [0, 1, 2, 3].map((i) => day(NOW - (3 - i) * DAY)));

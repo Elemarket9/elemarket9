@@ -36,7 +36,6 @@ import { formatGhs } from "@/modules/shared/public/money";
 import type { ProductCard } from "@/modules/shared/public/types";
 import { addCartLine, readCart } from "@/modules/ordering/public/cart";
 import { MerchantWorkspaceLink, SignedIn, SignedOut, UserButton } from "@/modules/identity/public/auth/gates";
-import { ContactSupportWidget } from "@/components/contact-support-widget";
 import { MarketFooter } from "@/components/market-header";
 import { safeImageSource } from "@/modules/shared/public/media";
 import { loadHomepageMerchandising, recordHomepageAdEvent } from "../modules/catalog/public/transport/homepage.functions";
@@ -170,8 +169,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-market-bg text-market-ink">
       <a href="#main-content" className="sr-only z-[70] rounded-lg bg-white px-4 py-2 font-bold text-market-green focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to marketplace content</a>
-      <ContactSupportWidget />
-      <div className="border-b border-market-green/15 bg-market-green px-4 py-1.5 text-center text-[11px] font-semibold text-white sm:text-xs">Shopping across Ghana · Delivery options and fees confirmed at checkout · Support when you need it</div>
+      <div className="border-b border-market-green/15 bg-market-green px-4 py-1.5 text-center text-xs font-semibold text-white sm:text-xs">Shopping across Ghana · Delivery options and fees confirmed at checkout · Support when you need it</div>
       <header className="sticky top-0 z-40 border-b border-market-line/80 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <button
@@ -219,7 +217,7 @@ function Home() {
           <SignedIn><Link to="/profile" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-market-line bg-white text-market-ink lg:hidden" aria-label="My account"><CircleUserRound size={19} /></Link></SignedIn>
           <Link to="/cart" className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-market-line bg-white hover:bg-market-soft" aria-label={`Cart, ${cartCountValue} item${cartCountValue === 1 ? "" : "s"}`}>
             <ShoppingBag size={19} />
-            {cartCountValue > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-market-orange px-1.5 py-0.5 text-center text-[11px] font-black text-white">{cartCountValue}</span>}
+            {cartCountValue > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-market-orange px-1.5 py-0.5 text-center text-xs font-black text-white">{cartCountValue}</span>}
           </Link>
         </div>
         <div className="hidden border-t border-market-line/60 bg-white lg:block">
@@ -252,19 +250,8 @@ function Home() {
                 <button onClick={() => document.getElementById("featured-deals")?.scrollIntoView({ behavior: "smooth" })} className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-bold text-white hover:bg-white/15"><Sparkles size={16} /> See today’s picks</button>
               </div>
             </div>
-            {products.length > 0 && <div className="relative z-10 mt-7 grid gap-2 border-t border-white/15 pt-5 sm:grid-cols-2 lg:absolute lg:bottom-8 lg:right-8 lg:mt-0 lg:w-[38%] lg:border-0 lg:pt-0">{products.slice(0,2).map(product => <Link key={product.id} to="/products/$id" params={{id:product.id}} className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md hover:bg-white/15"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/10">{product.imagePath ? <img src={safeImageSource(product.imagePath) ?? undefined} alt="" loading="lazy" className="h-full w-full object-contain" /> : <div className="grid h-full place-items-center text-[10px] text-white/60">Product</div>}</div><div className="min-w-0"><p className="truncate text-xs font-bold text-white">{product.name}</p><p className="mt-1 truncate text-[10px] text-white/60">{product.merchantName}</p><p className="mt-1 text-xs font-black text-market-mint">{formatGhs(product.price)}</p></div></Link>)}</div>}
+            {products.length > 0 && <div className="relative z-10 mt-7 grid gap-2 border-t border-white/15 pt-5 sm:grid-cols-2 lg:absolute lg:bottom-8 lg:right-8 lg:mt-0 lg:w-[38%] lg:border-0 lg:pt-0">{products.slice(0,2).map(product => <Link key={product.id} to="/products/$id" params={{id:product.id}} className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md hover:bg-white/15"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/10">{product.imagePath ? <img src={safeImageSource(product.imagePath) ?? undefined} alt="" loading="lazy" className="h-full w-full object-contain" /> : <div className="grid h-full place-items-center text-xs text-white/60">Product</div>}</div><div className="min-w-0"><p className="truncate text-xs font-bold text-white">{product.name}</p><p className="mt-1 truncate text-xs text-white/60">{product.merchantName}</p><p className="mt-1 text-xs font-black text-market-mint">{formatGhs(product.price)}</p></div></Link>)}</div>}
             <div className="hero-orb hero-orb-one" /><div className="hero-orb hero-orb-two" />
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-market-line bg-white p-5 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[.14em] text-market-orange">For businesses</p>
-              <h2 className="mt-1 text-xl font-black">Register your business on ELEMARKET</h2>
-              <p className="mt-1 max-w-2xl text-sm leading-6 text-market-muted">Reach new customers with your own catalogue and seller workspace. Already shop here? Use your existing account to apply.</p>
-            </div>
-            <a href={portalHref("seller", "/merchant/register")} className="mt-4 inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-market-green px-5 text-sm font-black text-white hover:bg-market-green/90 sm:mt-0">Register as a merchant</a>
           </div>
         </section>
 
@@ -284,6 +271,20 @@ function Home() {
         </section>
 
         {!hasDiscoveryFilters(state)&&<div id="featured-deals"><HomepageMerchandising sections={merchandising} onAdClick={recordAd} cart={cart} onAdd={addProductToCart} /></div>}
+        {/* Shoppers see categories and deals first; the seller invitation follows. */}
+        {!hasDiscoveryFilters(state) && (
+          <section className="mx-auto max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-market-line bg-white p-5 shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-6">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[.14em] text-market-orange">For businesses</p>
+                <h2 className="mt-1 text-xl font-black">Register your business on ELEMARKET</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-market-muted">Reach new customers with your own catalogue and seller workspace. Already shop here? Use your existing account to apply.</p>
+              </div>
+              <a href={portalHref("seller", "/merchant/register")} className="mt-4 inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-market-green px-5 text-sm font-black text-white hover:bg-market-green/90 sm:mt-0">Register as a merchant</a>
+            </div>
+          </section>
+        )}
+
 
         <section id="catalogue" className="mx-auto max-w-[1440px] px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-5 flex items-end justify-between"><div><p className="eyebrow">Marketplace</p><h2 className="section-title">{state.q?"Search results":category ? selectedCategory?.name??category.replaceAll("_"," ") : "Browse products"}</h2></div>{(category || subcategory || query || brandFilter || conditionFilter || minPrice || maxPrice || searchSort!=="relevance") && <button onClick={clearDiscovery} className="min-h-11 px-2 text-sm font-bold text-market-green">Clear all filters</button>}</div>
@@ -321,7 +322,7 @@ function FlashSaleCountdown({ endsAt }: { endsAt?: string }) {
 }
 
 function HomepageMerchandising({ sections,onAdClick,cart,onAdd }: { sections:HomepageSection[]; onAdClick:(id:string,type:"impression"|"click",receipt:string)=>void; cart:Record<string,number>; onAdd:(product:ProductCard)=>void }) {
-  return <>{sections.map(section=>{ if(!section.items.length)return null; const flash=section.key==="flash_sales"; const official=section.key==="official_stores"; return <section key={section.key} className={`mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 ${section.mobileVisible===false?"hidden sm:block":""} ${section.desktopVisible===false?"sm:hidden":""}`}><div className={`mb-4 flex flex-wrap items-end justify-between gap-3 ${flash?"rounded-2xl bg-market-orange px-4 py-3 text-white":""}`}><div><p className={flash?"text-[11px] font-black uppercase tracking-[.14em] text-white/80":"eyebrow"}>{section.eyebrow??"Discover"}</p><h2 className={flash?"text-xl font-black sm:text-2xl":"section-title"}>{section.title}</h2></div><div className="flex items-center gap-3">{flash?<FlashSaleCountdown endsAt={section.items[0]?.saleEndsAt}/>:null}<a href="#catalogue" className={`inline-flex items-center gap-1 text-sm font-bold ${flash?"text-white":"text-market-green"}`}>Browse catalogue <ArrowRight size={15}/></a></div></div><div className={flash?"flex snap-x gap-3 overflow-x-auto pb-2":"grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"}>{section.items.map(product=><div key={`${section.key}:${product.id}:${product.adId??"organic"}`} className={flash?"w-[72vw] max-w-[230px] shrink-0 snap-start sm:w-[230px]":"min-w-0"}><DiscoveryProductCard product={product} quantity={cart[product.id]??0} sponsored={Boolean(product.sponsored)} officialStore={official} originalPrice={product.originalPrice} adTitle={product.adTitle} adSubtitle={product.adSubtitle} onAdClick={product.adId?()=>onAdClick(product.adId!,"click",product.adReceipt??""):undefined} onAdImpression={product.adId?()=>onAdClick(product.adId!,"impression",product.adReceipt??""):undefined} onAdd={()=>onAdd(product)}/></div>)}</div></section>; })}</>;
+  return <>{sections.map(section=>{ if(!section.items.length)return null; const flash=section.key==="flash_sales"; const official=section.key==="official_stores"; return <section key={section.key} className={`mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8 ${section.mobileVisible===false?"hidden sm:block":""} ${section.desktopVisible===false?"sm:hidden":""}`}><div className={`mb-4 flex flex-wrap items-end justify-between gap-3 ${flash?"rounded-2xl bg-market-orange px-4 py-3 text-white":""}`}><div><p className={flash?"text-xs font-black uppercase tracking-[.14em] text-white/80":"eyebrow"}>{section.eyebrow??"Discover"}</p><h2 className={flash?"text-xl font-black sm:text-2xl":"section-title"}>{section.title}</h2></div><div className="flex items-center gap-3">{flash?<FlashSaleCountdown endsAt={section.items[0]?.saleEndsAt}/>:null}<a href="#catalogue" className={`inline-flex items-center gap-1 text-sm font-bold ${flash?"text-white":"text-market-green"}`}>Browse catalogue <ArrowRight size={15}/></a></div></div><div className={flash?"flex snap-x gap-3 overflow-x-auto pb-2":"grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"}>{section.items.map(product=><div key={`${section.key}:${product.id}:${product.adId??"organic"}`} className={flash?"w-[72vw] max-w-[230px] shrink-0 snap-start sm:w-[230px]":"min-w-0"}><DiscoveryProductCard product={product} quantity={cart[product.id]??0} sponsored={Boolean(product.sponsored)} officialStore={official} originalPrice={product.originalPrice} adTitle={product.adTitle} adSubtitle={product.adSubtitle} onAdClick={product.adId?()=>onAdClick(product.adId!,"click",product.adReceipt??""):undefined} onAdImpression={product.adId?()=>onAdClick(product.adId!,"impression",product.adReceipt??""):undefined} onAdd={()=>onAdd(product)}/></div>)}</div></section>; })}</>;
 }
 
 function TrustItem({ icon, title, text }: { icon: ReactNode; title: string; text: string }) { return <div className="flex items-center gap-3 rounded-2xl border border-market-line bg-white p-4"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-market-soft text-market-green">{icon}</div><div><p className="text-sm font-extrabold">{title}</p><p className="text-xs text-market-muted">{text}</p></div></div>; }

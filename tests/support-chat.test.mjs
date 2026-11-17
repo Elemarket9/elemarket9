@@ -37,3 +37,19 @@ test('a failed message keeps its idempotency key for the retry and is never drop
   assert.match(hook, /setOutgoing\(\{ body: attempt\.body, state: "failed" \}\)/);
   assert.match(hook, /if \(outgoing\) return;/, 'one unconfirmed message at a time');
 });
+
+test('the chat is mounted once for the whole site, so "Open support chat" works on every page', () => {
+  const root = fs.readFileSync('src/routes/__root.tsx', 'utf8');
+  assert.match(root, /<GlobalSupportWidget \/>/);
+  const perPage = fs.readdirSync('src/routes', { recursive: true })
+    .filter((f) => String(f).endsWith('.tsx'))
+    .filter((f) => /<ContactSupportWidget/.test(fs.readFileSync(`src/routes/${f}`, 'utf8')));
+  assert.deepEqual(perPage, [], 'pages must not mount their own copy');
+});
+
+test('the closed chat is a small icon, and the open chat can be minimised', () => {
+  const widget = fs.readFileSync('src/components/contact-support-widget.tsx', 'utf8');
+  assert.match(widget, /grid h-12 w-12 place-items-center rounded-full/);
+  assert.match(widget, /aria-label="Minimise support chat"/);
+  assert.doesNotMatch(widget, /fixed inset-0/, 'the open chat must not cover the whole marketplace');
+});

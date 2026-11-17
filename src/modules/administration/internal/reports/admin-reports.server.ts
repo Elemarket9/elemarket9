@@ -35,6 +35,7 @@ completed as (
 ),
 paid as (
   select o.id, o.merchant_id, o.status, o.product_total, o.delivery_total, o.platform_fee,
+         o.original_product_total, o.promo_discount, o.platform_funded_discount,
          o.merchant_net, o.grand_total, o.payment_timing, o.customer_received_at, c.paid_at,
          (c.paid_at at time zone '${TZ}')::date as paid_day,
          q.eta_minutes, (q.pickup_location_id is not null) as is_pickup,
@@ -67,6 +68,18 @@ export type SalesReport = {
   merchantEarnings: string;
   amountPaid: string;
   averageOrderValue: string | null;
+  /** Discount paid by ELEMARKET (marketplace promotions). */
+  elemarketPromotions: string;
+  /** Discount paid by merchants (their own coupons). */
+  merchantPromotions: string;
+  /** Commission before ELEMARKET-funded discounts. */
+  grossCommission: string;
+  /** Paid orders later fully refunded (counted in the totals above). */
+  refundedOrders: number;
+  refundedAmount: string;
+  /** Commission and merchant earnings with refunded orders taken out. */
+  commissionAfterRefunds: string;
+  merchantEarningsAfterRefunds: string;
   daily: Array<{ day: string; orders: number; gmv: string; deliveryFees: string; commission: string; merchantEarnings: string }>;
 };
 
@@ -128,11 +141,21 @@ export type AdminReport = {
 export async function loadSalesReport(sql: Sql, range: ReportRange): Promise<SalesReport> {
   const [totals] = await sql.query<{
     orders: number; gmv: string; delivery_fees: string; commission: string; merchant_earnings: string;
-    amount_paid: string; aov: string | null;
+    amount_paid: string; aov: string | null; elemarket_promotions: string; merchant_promotions: string;
+    gross_commission: string; refunded_orders: number; refunded_amount: string;
+    commission_after_refunds: string; merchant_earnings_after_refunds: string;
   }>(
     `${PAID_CTE}
      select count(*)::int as orders,
-            coalesce(sum(product_total), 0)::text as gmv,
+            -- GMV is merchandise value at list price, before any promotion.
+            coalesce(sum(original_product_total), 0)::text as gmv,
+            coalesce(sum(platform_funded_discount), 0)::text as elemarket_promotions,
+            coalesce(sum(promo_discount - platform_funded_discount), 0)::text as merchant_promotions,
+            coalesce(sum(platform_fee + platform_funded_discount), 0)::text as gross_commission,
+            count(*) filter (where status = 'refunded')::int as refunded_orders,
+            coalesce(sum(grand_total) filter (where status = 'refunded'), 0)::text as refunded_amount,
+            coalesce(sum(platform_fee) filter (where status <> 'refunded'), 0)::text as commission_after_refunds,
+            coalesce(sum(merchant_net) filter (where status <> 'refunded'), 0)::text as merchant_earnings_after_refunds,
             coalesce(sum(delivery_total), 0)::text as delivery_fees,
             coalesce(sum(platform_fee), 0)::text as commission,
             coalesce(sum(merchant_net), 0)::text as merchant_earnings,
@@ -148,7 +171,7 @@ export async function loadSalesReport(sql: Sql, range: ReportRange): Promise<Sal
      days as (select d::date as day from generate_series($1::date, $2::date, interval '1 day') d)
      select to_char(days.day, 'YYYY-MM-DD') as day,
             count(paid.id)::int as orders,
-            coalesce(sum(paid.product_total), 0)::text as gmv,
+            coalesce(sum(paid.original_product_total), 0)::text as gmv,
             coalesce(sum(paid.delivery_total), 0)::text as delivery_fees,
             coalesce(sum(paid.platform_fee), 0)::text as commission,
             coalesce(sum(paid.merchant_net), 0)::text as merchant_earnings
@@ -166,6 +189,13 @@ export async function loadSalesReport(sql: Sql, range: ReportRange): Promise<Sal
     merchantEarnings: totals?.merchant_earnings ?? "0",
     amountPaid: totals?.amount_paid ?? "0",
     averageOrderValue: totals?.aov ?? null,
+    elemarketPromotions: totals?.elemarket_promotions ?? "0",
+    merchantPromotions: totals?.merchant_promotions ?? "0",
+    grossCommission: totals?.gross_commission ?? "0",
+    refundedOrders: totals?.refunded_orders ?? 0,
+    refundedAmount: totals?.refunded_amount ?? "0",
+    commissionAfterRefunds: totals?.commission_after_refunds ?? "0",
+    merchantEarningsAfterRefunds: totals?.merchant_earnings_after_refunds ?? "0",
     daily: daily.map((d) => ({
       day: d.day, orders: d.orders, gmv: d.gmv, deliveryFees: d.delivery_fees,
       commission: d.commission, merchantEarnings: d.merchant_earnings,
@@ -324,7 +354,7 @@ export async function loadMerchantReport(sql: Sql, range: ReportRange, search?: 
      per_merchant as (
        select paid.merchant_id,
               count(*) as orders,
-              sum(paid.product_total) as gmv,
+              sum(paid.original_product_total) as gmv,
               count(refunded.order_id) as refunded_orders,
               count(*) filter (where paid.cancelled_after_payment) as cancelled,
               percentile_cont(0.5) within group (order by paid.delivery_minutes) filter (where paid.timed) as median_minutes
