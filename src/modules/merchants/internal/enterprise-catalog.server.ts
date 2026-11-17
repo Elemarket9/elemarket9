@@ -243,7 +243,7 @@ export async function syncEnterpriseCatalog(input: { merchantId: string; source?
   const connection = connections[0];
   if (!connection) throw new Error("Enterprise catalog connection not configured");
   if (connection.status !== "active") throw new Error("Enterprise catalog connection is not active");
-  // Enterprise is the merchant tier; it may be paid by Paystack subaccount or the wallet.
+  // Enterprise is the merchant tier; it may be paid by a provider subaccount or the wallet.
   const merchantRows = await sql.query<{ tier: string; catalog_source: string; status: string; verified: boolean }>(
     `select tier,catalog_source,status,verified from merchants where id=$1`, [input.merchantId]);
   const merchant = merchantRows[0];
