@@ -84,7 +84,7 @@
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
     "@tanstack/start-storage-context": "1.167.39",
-    "better-auth": "1.7.19",
+    "better-auth": "1.7.25",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
