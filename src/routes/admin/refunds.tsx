@@ -1,10 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
+import { z } from "zod";
 import { AdminWorkspaceNav } from "@/components/admin-workspace-nav";
 import { getAdminAccessState } from "@/modules/administration/public/transport/admin/access.functions";
 import { requestAdminProviderRefund } from "@/modules/administration/public/transport/admin/dashboard.functions";
 
 export const Route = createFileRoute("/admin/refunds")({
+  // ?order=<id> prefills the order (link from the Orders workspace); it is never submitted automatically.
+  validateSearch: z.object({ order: z.string().trim().max(128).optional().catch(undefined) }),
   head: () => ({ meta: [{ title: "Authorized refund operations | ELEMARKET" }, { name: "robots", content: "noindex,nofollow,noarchive" }] }),
   loader: async () => {
     const access = await getAdminAccessState();
@@ -18,7 +21,8 @@ export const Route = createFileRoute("/admin/refunds")({
 
 function RefundWorkspace() {
   const { access } = Route.useLoaderData();
-  const [orderId, setOrderId] = useState("");
+  const { order } = Route.useSearch();
+  const [orderId, setOrderId] = useState(order ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -29,14 +33,16 @@ function RefundWorkspace() {
     try {
       // Backend applies fresh-session checks, authorization, ordering locks,
       // audit records and provider-specific execution through neutral contracts.
-      await requestAdminProviderRefund({ data: { orderId: orderId.trim(), note: note.trim() } });
-      setNotice("Refund request processed by the server. Verify its reconciliation state before telling the customer that funds have returned.");
+      const result = await requestAdminProviderRefund({ data: { orderId: orderId.trim(), note: note.trim() } });
+      setNotice(result.status === "awaiting_approval"
+        ? "This refund is above the two-person limit. It is now waiting in Finance approvals for a second administrator; no money has moved yet."
+        : "Refund request processed by the server. Verify its reconciliation state before telling the customer that funds have returned.");
     } catch (e) { setError(e instanceof Error ? e.message : "Refund request failed"); }
     finally { setBusy(false); }
   }
   return <main className="mx-auto max-w-4xl px-4 py-8"><AdminWorkspaceNav staffRole={access.staffRole} capabilities={access.capabilities} />
     <header className="rounded-3xl border border-market-line bg-white p-6"><h1 className="text-3xl font-black">Authorized refund requests</h1>
-      <p className="mt-2 text-sm text-market-muted">Only delegated finance staff with refund authority can use this action. A request is not proof the customer has received funds. Never mark a refund successful before the payment provider confirms it.</p></header>
+      <p className="mt-2 text-sm text-market-muted">Only delegated finance staff with refund authority can use this action. Refunds above the two-person limit wait for a second administrator in <a href="/admin/finance" className="font-bold text-market-green underline">Finance approvals</a>. A request is not proof the customer has received funds. Never mark a refund successful before the payment provider confirms it.</p></header>
     {notice && <p role="status" className="mt-5 rounded-xl bg-green-50 p-4 text-sm text-green-900">{notice}</p>}
     {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
     <section className="mt-6 rounded-2xl border border-market-line bg-white p-6">

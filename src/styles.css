@@ -25,7 +25,7 @@
 @layer components {
   .nav-pill { @apply inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-bold text-market-muted transition hover:bg-market-soft hover:text-market-ink; }
   .nav-pill-active { @apply bg-market-soft text-market-green; }
-  .eyebrow { @apply text-[11px] font-black uppercase tracking-[.16em] text-market-green; }
+  .eyebrow { @apply text-xs font-black uppercase tracking-[.16em] text-market-green; }
   .section-title { @apply mt-1 text-2xl font-black tracking-[-.035em] sm:text-3xl; }
   .category-tile { @apply flex min-h-24 flex-col items-start justify-center rounded-2xl border border-market-line bg-white px-3 py-3 text-left text-xs font-bold text-market-ink transition hover:border-market-green/30 hover:shadow-market; }
   .category-tile-active { @apply border-market-green bg-market-green text-white; }

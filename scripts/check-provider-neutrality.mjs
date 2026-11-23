@@ -29,6 +29,7 @@ for (const dir of [
   'src/modules/identity/internal/auth/email/providers',
   'src/modules/notifications/internal/notifications/push/providers',
   'src/modules/merchants/internal/kyb/providers',
+  'src/modules/wallet/internal/adapters/providers',
 ]) for (const file of walk(path.join(root, dir))) providerNames.add(path.parse(file).name.split('.')[0].toLowerCase());
 // Drop generic words that are domain terms rather than vendor identifiers.
 for (const generic of ['provider', 'registry', 'index']) providerNames.delete(generic);

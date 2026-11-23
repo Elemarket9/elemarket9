@@ -84,3 +84,30 @@ docker compose --env-file .env.production up -d --force-recreate app
 Restarting a container alone does not refresh its environment. Updating the
 application code or bundled payment driver requires `up -d --build` again.
 The payment readiness and registry activation requirements above still apply.
+
+## Zero-commission orders (`ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT`)
+
+When ELEMARKET's commission on an order is GH₵ 0 (a 0% category, a 100%-off
+merchant coupon, or a fee that rounds to nothing), Paystack is sent the
+merchant subaccount with no `transaction_charge`. Paystack then splits the
+payment using the **percentage set on that subaccount in the Paystack
+dashboard**. If that percentage is not 0, ELEMARKET takes a share it is not
+owed and the merchant receives less than the ledger records.
+
+Until the setting below is switched on, every merchant subaccount must have
+**percentage charge = 0** on the Paystack dashboard.
+
+Set `ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT=1` to send these orders as an
+explicit flat split instead: the full amount goes to the merchant's subaccount,
+with ELEMARKET's main account bearing the Paystack fee. This is the same split
+format the group checkout uses. Verify it in the Paystack **test** environment
+first (one zero-commission card payment and one mobile money payment), then
+enable it in production. Orders that carry commission are not affected.
+
+## Stuck refunds
+
+Refunds whose outcome is unknown (a timeout, a crash, or a `refund.failed`
+webhook) are looked up on Paystack by the refund recovery job (`GET /refund/:id`,
+or the transaction's refund list). An existing refund is adopted, never
+duplicated. A new refund is sent only when Paystack shows none, or only failed
+ones, for that payment, and the first attempt is at least 10 minutes old.

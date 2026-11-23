@@ -1,0 +1,3 @@
+# Test fixture, not a credential: commit 80405b6 used idempotencyKey "attempt_123456789" in a Paystack test.
+# The value was renamed in the next commit; this line only clears that one historical commit.
+80405b6968d3a20150acce2ea03bc9093837a84a:tests/paystack-refund-reconcile.test.mjs:generic-api-key:95

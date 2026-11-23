@@ -170,8 +170,8 @@ export type CatalogSearchPage = {
 
 export async function hydrateSearchHits(sql: {query<T>(text:string,values?:unknown[]):Promise<T[]>},hits:Array<{id:string;attributionReceipt?:string}>,data:z.infer<typeof filterSchema>){
  const ids=[...new Set(hits.map(h=>h.id))].slice(0,60);if(!ids.length)return [] as ProductCard[];
- const rows=await sql.query<ProductRow>(`with ratings as (select product_id,round(avg(rating)::numeric,2)::text avg_rating,count(*)::int review_count from reviews where product_id=any($1::text[]) group by product_id)
- select p.id,p.merchant_id,m.name merchant_name,m.neighborhood,m.city,concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) merchant_address,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,p.return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,r.avg_rating,coalesce(r.review_count,0) review_count
+ const rows=await sql.query<ProductRow>(`with ratings as (select product_id,round(avg(rating)::numeric,2)::text avg_rating,count(*)::int review_count from public_reviews where product_id=any($1::text[]) group by product_id)
+ select p.id,p.merchant_id,m.name merchant_name,m.neighborhood,m.city,concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) merchant_address,p.name,p.category,p.subcategory,p.brand,p.model,p.sku,p.condition,p.warranty_months,p.fulfillment_type,p.status,p.returnable,coalesce(p.return_window_days,(elemarket_return_policy()).default_window_days) as return_window_days,p.attributes,p.financing_eligible,p.financing_min_amount,p.financing_max_amount,p.listing_type,(coalesce((select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active' and vp.stock>0),(select min(vp.price) from product_variants vp where vp.product_id=p.id and vp.status='active'),p.price))::text price,p.stock,exists(select 1 from product_variants pv where pv.product_id=p.id and pv.status='active' and pv.stock>0) has_variants,p.description,p.image_path,p.meal_type,p.cuisine,p.prep_minutes,p.guests,m.verified,m.lat,m.lon,r.avg_rating,coalesce(r.review_count,0) review_count
  from products p join merchants m on m.id=p.merchant_id left join ratings r on r.product_id=p.id
  where p.id=any($1::text[]) and p.status='active' and p.stock>0 and m.status='active' and m.verified=true
  and exists(select 1 from category_taxonomy c where c.category_key=p.category and c.active=true)
@@ -192,26 +192,31 @@ async function searchCatalogPage(data:z.infer<typeof filterSchema>):Promise<Cata
 export const searchCatalogProducts=createServerFn({method:'GET'}).validator(filterSchema).handler(({data})=>searchCatalogPage(data));
 export const listProducts=createServerFn({method:'GET'}).validator(filterSchema).handler(async({data})=>(await searchCatalogPage({...data,limit:data.limit??48})).products);
 
-export const getProduct = createServerFn({ method: "GET" })
-  .validator(z.object({ id: z.string().min(1).max(64) }))
-  .handler(async ({ data }) => {
-    const { getSql, enforceRateLimit } = await getCatalogServerDeps();
-    await enforceRateLimit("catalog-get-product", { windowSeconds: 60, maxRequests: 180 });
-    const sql = await getSql();
-    const rows = await sql.query<ProductRow>(
+/** One public product (detail page). Ratings count published reviews only (see public_reviews). */
+export function loadPublicProductRows(sql: {query<T>(text:string,values?:unknown[]):Promise<T[]>}, productId: string) {
+  return sql.query<ProductRow>(
       `select p.id, p.merchant_id, m.name as merchant_name, m.neighborhood, m.city, concat_ws(', ',nullif(m.neighborhood,''),nullif(m.city,'')) as merchant_address,
-              p.name, p.category, p.subcategory, p.brand, p.model, p.sku, p.condition, p.warranty_months, p.fulfillment_type, p.status, p.returnable, p.return_window_days, p.attributes, p.financing_eligible, p.financing_min_amount, p.financing_max_amount, p.listing_type, p.price::text as price, p.stock, p.description, p.image_path,
+              p.name, p.category, p.subcategory, p.brand, p.model, p.sku, p.condition, p.warranty_months, p.fulfillment_type, p.status, p.returnable, coalesce(p.return_window_days,(elemarket_return_policy()).default_window_days) as return_window_days, p.attributes, p.financing_eligible, p.financing_min_amount, p.financing_max_amount, p.listing_type, p.price::text as price, p.stock, p.description, p.image_path,
               p.meal_type, p.cuisine, p.prep_minutes, p.guests, m.verified, m.lat, m.lon,
-                (select round(avg(r.rating)::numeric,2)::text from reviews r where r.product_id=p.id) as avg_rating,
-                (select count(*)::int from reviews r where r.product_id=p.id) as review_count
+                (select round(avg(r.rating)::numeric,2)::text from public_reviews r where r.product_id=p.id) as avg_rating,
+                (select count(*)::int from public_reviews r where r.product_id=p.id) as review_count
          from products p
          join merchants m on m.id = p.merchant_id
          join category_taxonomy ct on ct.category_key=p.category and ct.active=true
          left join category_subcategories cs on cs.category_key=p.category and cs.subcategory_key=p.subcategory
         where p.id = $1 and m.status = 'active' and m.verified = true and p.status = 'active'
           and (p.subcategory is null or cs.active=true) and (p.catalog_source<>'enterprise_api' or exists(select 1 from brand_integration_offers o join brand_integration_connections c on c.id=o.connection_id where o.product_id=p.id and o.status='active' and c.status='active' and o.last_seen_at>=now()-make_interval(secs=>c.stale_after_seconds)))`,
-      [data.id],
-    );
+    [productId],
+  );
+}
+
+export const getProduct = createServerFn({ method: "GET" })
+  .validator(z.object({ id: z.string().min(1).max(64) }))
+  .handler(async ({ data }) => {
+    const { getSql, enforceRateLimit } = await getCatalogServerDeps();
+    await enforceRateLimit("catalog-get-product", { windowSeconds: 60, maxRequests: 180 });
+    const sql = await getSql();
+    const rows = await loadPublicProductRows(sql, data.id);
     const product = rows[0] ? toCard(rows[0]) : null;
     if (!product) return { product: null, variants: [] as ProductVariant[], media: [] as ProductMedia[], related: [] as ProductCard[], seo: null };
     const seoRows = await sql.query<{ indexability_score: number; index_decision: "index" | "noindex"; reason: JsonObject }>(

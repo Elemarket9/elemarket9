@@ -5,7 +5,10 @@
   "type": "module",
   "overrides": {
     "nf3": "0.3.17",
-    "jiti": "2.7.0"
+    "jiti": "2.7.0",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.6"
+    }
   },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
@@ -23,12 +26,18 @@
     "validate:firebase": "node scripts/validate-firebase-client-env.mjs",
     "build:production": "npm run validate:startup -- --require-shared && npm run validate:push-client && vite build",
     "security:deps": "npm audit --audit-level=high",
-    "security:signatures": "npm audit signatures",
+    "security:signatures": "node scripts/audit-signatures.mjs",
     "security:ci": "npm run security:deps && npm run security:signatures",
     "release:verify": "npm run check:architecture && npm run validate:startup && npm run validate:deployment-package && npm run security:ci && npm run typecheck && npm run lint && npm run build:production",
     "validate:deployment-package": "node scripts/validate-deployment-package.mjs",
     "test": "node scripts/test.mjs",
     "test:integration:concurrency": "node --test tests/integration.test.mjs",
+    "test:payment:simulation": "node --test tests/payment-simulation.integration.mjs",
+    "test:group:simulation": "node --test tests/group-payment.integration.mjs",
+    "test:wallet:simulation": "node --test tests/wallet-simulation.integration.mjs",
+    "test:wallet:postgres": "node --test --test-concurrency=1 tests/wallet-adversarial.postgres.mjs tests/wallet-migration-upgrade.postgres.mjs",
+    "test:db:postgres": "node --test --test-concurrency=1 tests/database-operations.postgres.mjs tests/commerce-integrity.postgres.mjs tests/scheduled-jobs.postgres.mjs tests/returns-policy.postgres.mjs tests/checkout-pickup.postgres.mjs tests/pay-on-delivery.postgres.mjs tests/admin-dual-approval.postgres.mjs tests/admin-reviews.postgres.mjs tests/admin-orders.postgres.mjs tests/admin-risk.postgres.mjs tests/admin-reports.postgres.mjs tests/admin-promotions.postgres.mjs tests/support-chat.postgres.mjs tests/wallet-enterprise.postgres.mjs",
+    "simulate:wallet": "node scripts/wallet-e2e-simulation.mjs",
     "check:architecture": "node scripts/check-architecture.mjs && node scripts/check-module-contracts.mjs && node scripts/check-provider-neutrality.mjs",
     "test:frontend": "node tests/frontend.e2e.mjs",
     "check:module-contracts": "node scripts/check-module-contracts.mjs",
@@ -37,7 +46,7 @@
     "evaluate:eide": "node scripts/eide-v11-evaluate.mjs",
     "test:discovery:browser": "node tests/discovery-browser.e2e.mjs",
     "validate:push-client": "node scripts/validate-push-client-env.mjs",
-    "test:integration:authorization": "node --test tests/authorization.integration.mjs",
+    "test:integration:authorization": "node --test --test-concurrency=1 tests/admin-permissions.test.mjs tests/admin-dual-approval.postgres.mjs",
     "test:fulfillment:postgres": "node --test tests/fulfillment.postgres.mjs",
     "test:runtime": "node --test tests/runtime.integration.mjs",
     "test:runtime:browser": "node tests/runtime-browser.e2e.mjs",
@@ -81,11 +90,11 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.0.0",
     "jose": "6.2.9",
-    "kysely": "^0.28.5",
+    "kysely": "^0.29.8",
     "lucide-react": "^0.510.0",
     "pg": "^8.16.3",
     "react": "^19.2.0",
-    "react-day-picker": "^9.14.0",
+    "react-day-picker": "^10.0.2",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.55.0",
     "react-resizable-panels": "^4.6.5",
@@ -104,7 +113,7 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^5.2.0",
+    "@vitejs/plugin-react": "^6.2.1",
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
@@ -121,6 +130,6 @@
   },
   "version": "2.11.3",
   "engines": {
-    "node": "22.x"
+    "node": "22.x || 26.x"
   }
 }

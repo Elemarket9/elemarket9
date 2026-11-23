@@ -243,10 +243,11 @@ export async function syncEnterpriseCatalog(input: { merchantId: string; source?
   const connection = connections[0];
   if (!connection) throw new Error("Enterprise catalog connection not configured");
   if (connection.status !== "active") throw new Error("Enterprise catalog connection is not active");
-  const merchantRows = await sql.query<{ settlement_model: string; catalog_source: string; status: string; verified: boolean }>(
-    `select settlement_model,catalog_source,status,verified from merchants where id=$1`, [input.merchantId]);
+  // Enterprise is the merchant tier; it may be paid by a provider subaccount or the wallet.
+  const merchantRows = await sql.query<{ tier: string; catalog_source: string; status: string; verified: boolean }>(
+    `select tier,catalog_source,status,verified from merchants where id=$1`, [input.merchantId]);
   const merchant = merchantRows[0];
-  if (!merchant || merchant.settlement_model !== "enterprise_direct" || merchant.catalog_source !== "enterprise_api" || merchant.status !== "active" || !merchant.verified) {
+  if (!merchant || merchant.tier !== "enterprise" || merchant.catalog_source !== "enterprise_api" || merchant.status !== "active" || !merchant.verified) {
     throw new Error("Merchant is not an active verified enterprise API merchant");
   }
 
@@ -492,8 +493,8 @@ export async function saveEnterpriseCatalogConnection(input: {
   if (input.orderEndpointUrl) await validateEndpoint(input.orderEndpointUrl);
   const mapping = fieldMappingSchema.parse(input.fieldMapping);
   const sql = await getSql();
-  const merchantRows = await sql.query<{ settlement_model: string; catalog_source: string }>(`select settlement_model,catalog_source from merchants where id=$1`, [input.merchantId]);
-  if (!merchantRows[0] || merchantRows[0].settlement_model !== "enterprise_direct" || merchantRows[0].catalog_source !== "enterprise_api") throw new Error("Merchant is not configured for enterprise API catalog");
+  const merchantRows = await sql.query<{ tier: string; catalog_source: string }>(`select tier,catalog_source from merchants where id=$1`, [input.merchantId]);
+  if (!merchantRows[0] || merchantRows[0].tier !== "enterprise" || merchantRows[0].catalog_source !== "enterprise_api") throw new Error("Merchant is not configured for enterprise API catalog");
 
   const existingRows = await sql.query<{
     auth_type: "none" | "bearer" | "api_key" | "basic";
@@ -554,7 +555,7 @@ export async function verifyEnterpriseWebhook(input: { merchantId: string; rawBo
       join merchants m on m.id=c.merchant_id
      where c.merchant_id=$1 and c.status='active'
        and m.status='active' and m.verified=true
-       and m.catalog_source='enterprise_api' and m.settlement_model='enterprise_direct'`, [input.merchantId]);
+       and m.catalog_source='enterprise_api' and m.tier='enterprise'`, [input.merchantId]);
   const row = rows[0];
   if (!row?.webhook_enabled || !row.webhook_secret_encrypted || !input.signature || !input.timestamp) return false;
   const timestamp = input.timestamp.trim();

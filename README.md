@@ -20,7 +20,7 @@ Portal origins are derived from the configured portal hostnames during the build
 
 ## Development
 
-Use Node.js 22.x and npm. The isolated development preview can use PGlite with
+Use Node.js 26.x (the production runtime; 22.x still works during the transition) and npm. The isolated development preview can use PGlite with
 pgcrypto; staging/production require an explicit PostgreSQL connection.
 
 ```sh
@@ -102,6 +102,10 @@ only behind ingress that overwrites client-supplied forwarded headers.
 
 ELEMARKET does not custody customer funds. Provider-managed settlement/refunds
 are available only when their configured adapters and authorization allow them.
+Merchants moved to `platform_wallet` settlement are paid from the merchant
+wallet: an append-only ledger of withheld, available, processing and paid-out
+earnings that sends payout commands to a provider-neutral payout driver, while
+the funds stay at the provider. See [merchant wallet](docs/merchant-wallet.md).
 The bundled payment adapter does not assert safe checkout-initialization replay
 or uncertain-refund reconciliation. Do not enable live checkout on the basis of
 compilation or simulated provider tests.
@@ -136,8 +140,8 @@ Mobile registry auditing and local security regression checks pass; local forks
 require maintenance. PAD contract tests do not validate
 biometric matching, liveness or resistance to spoofing. Keep facial login off.
 
-The source repository is private. Public marketplace access does not authorize public
-source publication. No version bump, tag or public deployment is implied by this
+GitHub repository visibility is managed separately from marketplace access.
+Before publishing code, audit the repository and its history for sensitive data. No version bump, tag or public deployment is implied by this
 working branch.
 
 ## Source ZIP packaging

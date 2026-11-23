@@ -12,13 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
+import { Route as DealsRouteImport } from './routes/deals'
 import { Route as DeliveryAllocationReviewRouteImport } from './routes/delivery-allocation-review'
 import { Route as DeliveryContactRecoveryRouteImport } from './routes/delivery-contact-recovery'
 import { Route as DeliveryRecoveryReviewRouteImport } from './routes/delivery-recovery-review'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MerchantShipmentReturnsRouteImport } from './routes/merchant-shipment-returns'
-import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PickupSelectionRouteImport } from './routes/pickup-selection'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -37,10 +37,17 @@ import { Route as AdminCommissionsRouteImport } from './routes/admin/commissions
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminEnterpriseRouteImport } from './routes/admin/enterprise'
 import { Route as AdminExecutiveFaceRouteImport } from './routes/admin/executive-face'
+import { Route as AdminFinanceRouteImport } from './routes/admin/finance'
 import { Route as AdminFinancingRouteImport } from './routes/admin/financing'
 import { Route as AdminOperationsRouteImport } from './routes/admin/operations'
+import { Route as AdminOrdersRouteImport } from './routes/admin/orders'
+import { Route as AdminOverviewRouteImport } from './routes/admin/overview'
 import { Route as AdminPartnersRouteImport } from './routes/admin/partners'
+import { Route as AdminPromotionsRouteImport } from './routes/admin/promotions'
 import { Route as AdminRefundsRouteImport } from './routes/admin/refunds'
+import { Route as AdminReportsRouteImport } from './routes/admin/reports'
+import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
+import { Route as AdminRiskRouteImport } from './routes/admin/risk'
 import { Route as AdminSecurityRouteImport } from './routes/admin/security'
 import { Route as AdminSupportRouteImport } from './routes/admin/support'
 import { Route as AdminTeamRouteImport } from './routes/admin/team'
@@ -52,6 +59,8 @@ import { Route as MerchantDashboardRouteImport } from './routes/merchant/dashboa
 import { Route as MerchantLoginRouteImport } from './routes/merchant/login'
 import { Route as MerchantRegisterRouteImport } from './routes/merchant/register'
 import { Route as MerchantStatusRouteImport } from './routes/merchant/status'
+import { Route as MerchantWalletRouteImport } from './routes/merchant/wallet'
+import { Route as OrdersIndexRouteImport } from './routes/orders.index'
 import { Route as OrdersIdRouteImport } from './routes/orders.$id'
 import { Route as PartnerDeliveryRouteImport } from './routes/partner.delivery'
 import { Route as PartnerFinancingRouteImport } from './routes/partner.financing'
@@ -89,6 +98,7 @@ import { Route as ApiInternalReconcilePaymentsRouteImport } from './routes/api.i
 import { Route as ApiInternalRefreshEideRouteImport } from './routes/api.internal.refresh-eide'
 import { Route as ApiInternalRiderInvitationsRouteImport } from './routes/api.internal.rider-invitations'
 import { Route as ApiInternalSyncEnterpriseCatalogsRouteImport } from './routes/api.internal.sync-enterprise-catalogs'
+import { Route as ApiInternalWalletSettlementRouteImport } from './routes/api.internal.wallet-settlement'
 import { Route as ApiMobileCatalogRouteImport } from './routes/api.mobile.catalog'
 import { Route as ApiMobileCheckoutRouteImport } from './routes/api.mobile.checkout'
 import { Route as ApiMobileDeliveryQuoteRouteImport } from './routes/api.mobile.delivery-quote'
@@ -97,6 +107,7 @@ import { Route as ApiMobilePaymentIntentRouteImport } from './routes/api.mobile.
 import { Route as ApiMobilePaymentStatusRouteImport } from './routes/api.mobile.payment-status'
 import { Route as ApiMobileProfileRouteImport } from './routes/api.mobile.profile'
 import { Route as ApiPaymentsWebhookRouteImport } from './routes/api.payments.webhook'
+import { Route as ApiPayoutsWebhookRouteImport } from './routes/api.payouts.webhook'
 import { Route as ApiProductMediaMediaIdRouteImport } from './routes/api.product-media.$mediaId'
 import { Route as SitemapsProductsChar123pageChar125DotxmlRouteImport } from './routes/sitemaps.products.{$page}[.]xml'
 import { Route as ApiBrandIntegrationWebhookRouteImport } from './routes/api.brand.integration.webhook'
@@ -117,6 +128,11 @@ const CartRoute = CartRouteImport.update({
 const CheckoutRoute = CheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsRoute = DealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeliveryAllocationReviewRoute =
@@ -148,11 +164,6 @@ const LoginRoute = LoginRouteImport.update({
 const MerchantShipmentReturnsRoute = MerchantShipmentReturnsRouteImport.update({
   id: '/merchant-shipment-returns',
   path: '/merchant-shipment-returns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OrdersRoute = OrdersRouteImport.update({
-  id: '/orders',
-  path: '/orders',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PickupSelectionRoute = PickupSelectionRouteImport.update({
@@ -245,6 +256,11 @@ const AdminExecutiveFaceRoute = AdminExecutiveFaceRouteImport.update({
   path: '/admin/executive-face',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/admin/finance',
+  path: '/admin/finance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminFinancingRoute = AdminFinancingRouteImport.update({
   id: '/admin/financing',
   path: '/admin/financing',
@@ -255,14 +271,44 @@ const AdminOperationsRoute = AdminOperationsRouteImport.update({
   path: '/admin/operations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminOrdersRoute = AdminOrdersRouteImport.update({
+  id: '/admin/orders',
+  path: '/admin/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminOverviewRoute = AdminOverviewRouteImport.update({
+  id: '/admin/overview',
+  path: '/admin/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminPartnersRoute = AdminPartnersRouteImport.update({
   id: '/admin/partners',
   path: '/admin/partners',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
+  id: '/admin/promotions',
+  path: '/admin/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRefundsRoute = AdminRefundsRouteImport.update({
   id: '/admin/refunds',
   path: '/admin/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminReviewsRoute = AdminReviewsRouteImport.update({
+  id: '/admin/reviews',
+  path: '/admin/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRiskRoute = AdminRiskRouteImport.update({
+  id: '/admin/risk',
+  path: '/admin/risk',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminSecurityRoute = AdminSecurityRouteImport.update({
@@ -320,10 +366,20 @@ const MerchantStatusRoute = MerchantStatusRouteImport.update({
   path: '/merchant/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MerchantWalletRoute = MerchantWalletRouteImport.update({
+  id: '/merchant/wallet',
+  path: '/merchant/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrdersIndexRoute = OrdersIndexRouteImport.update({
+  id: '/orders/',
+  path: '/orders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersIdRoute = OrdersIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => OrdersRoute,
+  id: '/orders/$id',
+  path: '/orders/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PartnerDeliveryRoute = PartnerDeliveryRouteImport.update({
   id: '/partner/delivery',
@@ -515,6 +571,12 @@ const ApiInternalSyncEnterpriseCatalogsRoute =
     path: '/api/internal/sync-enterprise-catalogs',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInternalWalletSettlementRoute =
+  ApiInternalWalletSettlementRouteImport.update({
+    id: '/api/internal/wallet-settlement',
+    path: '/api/internal/wallet-settlement',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMobileCatalogRoute = ApiMobileCatalogRouteImport.update({
   id: '/api/mobile/catalog',
   path: '/api/mobile/catalog',
@@ -553,6 +615,11 @@ const ApiMobileProfileRoute = ApiMobileProfileRouteImport.update({
 const ApiPaymentsWebhookRoute = ApiPaymentsWebhookRouteImport.update({
   id: '/api/payments/webhook',
   path: '/api/payments/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPayoutsWebhookRoute = ApiPayoutsWebhookRouteImport.update({
+  id: '/api/payouts/webhook',
+  path: '/api/payouts/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiProductMediaMediaIdRoute = ApiProductMediaMediaIdRouteImport.update({
@@ -595,13 +662,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -619,10 +686,17 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -634,6 +708,7 @@ export interface FileRoutesByFullPath {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -656,6 +731,7 @@ export interface FileRoutesByFullPath {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/provider/': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -672,6 +748,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -680,6 +757,7 @@ export interface FileRoutesByFullPath {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -691,13 +769,13 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -715,10 +793,17 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -730,6 +815,7 @@ export interface FileRoutesByTo {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -752,6 +838,7 @@ export interface FileRoutesByTo {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin': typeof AdminIndexRoute
+  '/orders': typeof OrdersIndexRoute
   '/provider': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -768,6 +855,7 @@ export interface FileRoutesByTo {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -776,6 +864,7 @@ export interface FileRoutesByTo {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -788,13 +877,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
+  '/deals': typeof DealsRoute
   '/delivery-allocation-review': typeof DeliveryAllocationReviewRoute
   '/delivery-contact-recovery': typeof DeliveryContactRecoveryRoute
   '/delivery-recovery-review': typeof DeliveryRecoveryReviewRoute
   '/help': typeof HelpRoute
   '/login': typeof LoginRoute
   '/merchant-shipment-returns': typeof MerchantShipmentReturnsRoute
-  '/orders': typeof OrdersRouteWithChildren
   '/pickup-selection': typeof PickupSelectionRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -812,10 +901,17 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enterprise': typeof AdminEnterpriseRoute
   '/admin/executive-face': typeof AdminExecutiveFaceRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/financing': typeof AdminFinancingRoute
   '/admin/operations': typeof AdminOperationsRoute
+  '/admin/orders': typeof AdminOrdersRoute
+  '/admin/overview': typeof AdminOverviewRoute
   '/admin/partners': typeof AdminPartnersRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
   '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/reviews': typeof AdminReviewsRoute
+  '/admin/risk': typeof AdminRiskRoute
   '/admin/security': typeof AdminSecurityRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/team': typeof AdminTeamRoute
@@ -827,6 +923,7 @@ export interface FileRoutesById {
   '/merchant/login': typeof MerchantLoginRoute
   '/merchant/register': typeof MerchantRegisterRoute
   '/merchant/status': typeof MerchantStatusRoute
+  '/merchant/wallet': typeof MerchantWalletRoute
   '/orders/$id': typeof OrdersIdRoute
   '/partner/delivery': typeof PartnerDeliveryRoute
   '/partner/financing': typeof PartnerFinancingRoute
@@ -849,6 +946,7 @@ export interface FileRoutesById {
   '/provider/status': typeof ProviderStatusRoute
   '/stores/$id': typeof StoresIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/orders/': typeof OrdersIndexRoute
   '/provider/': typeof ProviderIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/delivery/quote': typeof ApiDeliveryQuoteRoute
@@ -865,6 +963,7 @@ export interface FileRoutesById {
   '/api/internal/refresh-eide': typeof ApiInternalRefreshEideRoute
   '/api/internal/rider-invitations': typeof ApiInternalRiderInvitationsRoute
   '/api/internal/sync-enterprise-catalogs': typeof ApiInternalSyncEnterpriseCatalogsRoute
+  '/api/internal/wallet-settlement': typeof ApiInternalWalletSettlementRoute
   '/api/mobile/catalog': typeof ApiMobileCatalogRoute
   '/api/mobile/checkout': typeof ApiMobileCheckoutRoute
   '/api/mobile/delivery-quote': typeof ApiMobileDeliveryQuoteRoute
@@ -873,6 +972,7 @@ export interface FileRoutesById {
   '/api/mobile/payment-status': typeof ApiMobilePaymentStatusRoute
   '/api/mobile/profile': typeof ApiMobileProfileRoute
   '/api/payments/webhook': typeof ApiPaymentsWebhookRoute
+  '/api/payouts/webhook': typeof ApiPayoutsWebhookRoute
   '/api/product-media/$mediaId': typeof ApiProductMediaMediaIdRoute
   '/sitemaps/products/{$page}.xml': typeof SitemapsProductsChar123pageChar125DotxmlRoute
   '/api/brand/integration/webhook': typeof ApiBrandIntegrationWebhookRoute
@@ -886,13 +986,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -910,10 +1010,17 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
+    | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -925,6 +1032,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -947,6 +1055,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin/'
+    | '/orders/'
     | '/provider/'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -963,6 +1072,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -971,6 +1081,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -982,13 +1093,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -1006,10 +1117,17 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
+    | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -1021,6 +1139,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -1043,6 +1162,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin'
+    | '/orders'
     | '/provider'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -1059,6 +1179,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -1067,6 +1188,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -1078,13 +1200,13 @@ export interface FileRouteTypes {
     | '/'
     | '/cart'
     | '/checkout'
+    | '/deals'
     | '/delivery-allocation-review'
     | '/delivery-contact-recovery'
     | '/delivery-recovery-review'
     | '/help'
     | '/login'
     | '/merchant-shipment-returns'
-    | '/orders'
     | '/pickup-selection'
     | '/privacy'
     | '/profile'
@@ -1102,10 +1224,17 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enterprise'
     | '/admin/executive-face'
+    | '/admin/finance'
     | '/admin/financing'
     | '/admin/operations'
+    | '/admin/orders'
+    | '/admin/overview'
     | '/admin/partners'
+    | '/admin/promotions'
     | '/admin/refunds'
+    | '/admin/reports'
+    | '/admin/reviews'
+    | '/admin/risk'
     | '/admin/security'
     | '/admin/support'
     | '/admin/team'
@@ -1117,6 +1246,7 @@ export interface FileRouteTypes {
     | '/merchant/login'
     | '/merchant/register'
     | '/merchant/status'
+    | '/merchant/wallet'
     | '/orders/$id'
     | '/partner/delivery'
     | '/partner/financing'
@@ -1139,6 +1269,7 @@ export interface FileRouteTypes {
     | '/provider/status'
     | '/stores/$id'
     | '/admin/'
+    | '/orders/'
     | '/provider/'
     | '/api/auth/$'
     | '/api/delivery/quote'
@@ -1155,6 +1286,7 @@ export interface FileRouteTypes {
     | '/api/internal/refresh-eide'
     | '/api/internal/rider-invitations'
     | '/api/internal/sync-enterprise-catalogs'
+    | '/api/internal/wallet-settlement'
     | '/api/mobile/catalog'
     | '/api/mobile/checkout'
     | '/api/mobile/delivery-quote'
@@ -1163,6 +1295,7 @@ export interface FileRouteTypes {
     | '/api/mobile/payment-status'
     | '/api/mobile/profile'
     | '/api/payments/webhook'
+    | '/api/payouts/webhook'
     | '/api/product-media/$mediaId'
     | '/sitemaps/products/{$page}.xml'
     | '/api/brand/integration/webhook'
@@ -1175,13 +1308,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
+  DealsRoute: typeof DealsRoute
   DeliveryAllocationReviewRoute: typeof DeliveryAllocationReviewRoute
   DeliveryContactRecoveryRoute: typeof DeliveryContactRecoveryRoute
   DeliveryRecoveryReviewRoute: typeof DeliveryRecoveryReviewRoute
   HelpRoute: typeof HelpRoute
   LoginRoute: typeof LoginRoute
   MerchantShipmentReturnsRoute: typeof MerchantShipmentReturnsRoute
-  OrdersRoute: typeof OrdersRouteWithChildren
   PickupSelectionRoute: typeof PickupSelectionRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -1199,10 +1332,17 @@ export interface RootRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEnterpriseRoute: typeof AdminEnterpriseRoute
   AdminExecutiveFaceRoute: typeof AdminExecutiveFaceRoute
+  AdminFinanceRoute: typeof AdminFinanceRoute
   AdminFinancingRoute: typeof AdminFinancingRoute
   AdminOperationsRoute: typeof AdminOperationsRoute
+  AdminOrdersRoute: typeof AdminOrdersRoute
+  AdminOverviewRoute: typeof AdminOverviewRoute
   AdminPartnersRoute: typeof AdminPartnersRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRoute
   AdminRefundsRoute: typeof AdminRefundsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminReviewsRoute: typeof AdminReviewsRoute
+  AdminRiskRoute: typeof AdminRiskRoute
   AdminSecurityRoute: typeof AdminSecurityRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminTeamRoute: typeof AdminTeamRoute
@@ -1214,6 +1354,8 @@ export interface RootRouteChildren {
   MerchantLoginRoute: typeof MerchantLoginRoute
   MerchantRegisterRoute: typeof MerchantRegisterRoute
   MerchantStatusRoute: typeof MerchantStatusRoute
+  MerchantWalletRoute: typeof MerchantWalletRoute
+  OrdersIdRoute: typeof OrdersIdRoute
   PartnerDeliveryRoute: typeof PartnerDeliveryRoute
   PartnerFinancingRoute: typeof PartnerFinancingRoute
   PaymentPreviewRoute: typeof PaymentPreviewRoute
@@ -1235,6 +1377,7 @@ export interface RootRouteChildren {
   ProviderStatusRoute: typeof ProviderStatusRoute
   StoresIdRoute: typeof StoresIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  OrdersIndexRoute: typeof OrdersIndexRoute
   ProviderIndexRoute: typeof ProviderIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiDeliveryQuoteRoute: typeof ApiDeliveryQuoteRoute
@@ -1251,6 +1394,7 @@ export interface RootRouteChildren {
   ApiInternalRefreshEideRoute: typeof ApiInternalRefreshEideRoute
   ApiInternalRiderInvitationsRoute: typeof ApiInternalRiderInvitationsRoute
   ApiInternalSyncEnterpriseCatalogsRoute: typeof ApiInternalSyncEnterpriseCatalogsRoute
+  ApiInternalWalletSettlementRoute: typeof ApiInternalWalletSettlementRoute
   ApiMobileCatalogRoute: typeof ApiMobileCatalogRoute
   ApiMobileCheckoutRoute: typeof ApiMobileCheckoutRoute
   ApiMobileDeliveryQuoteRoute: typeof ApiMobileDeliveryQuoteRoute
@@ -1259,6 +1403,7 @@ export interface RootRouteChildren {
   ApiMobilePaymentStatusRoute: typeof ApiMobilePaymentStatusRoute
   ApiMobileProfileRoute: typeof ApiMobileProfileRoute
   ApiPaymentsWebhookRoute: typeof ApiPaymentsWebhookRoute
+  ApiPayoutsWebhookRoute: typeof ApiPayoutsWebhookRoute
   ApiProductMediaMediaIdRoute: typeof ApiProductMediaMediaIdRoute
   SitemapsProductsChar123pageChar125DotxmlRoute: typeof SitemapsProductsChar123pageChar125DotxmlRoute
   ApiBrandIntegrationWebhookRoute: typeof ApiBrandIntegrationWebhookRoute
@@ -1288,6 +1433,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout'
       fullPath: '/checkout'
       preLoaderRoute: typeof CheckoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals': {
+      id: '/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof DealsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/delivery-allocation-review': {
@@ -1330,13 +1482,6 @@ declare module '@tanstack/react-router' {
       path: '/merchant-shipment-returns'
       fullPath: '/merchant-shipment-returns'
       preLoaderRoute: typeof MerchantShipmentReturnsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/orders': {
-      id: '/orders'
-      path: '/orders'
-      fullPath: '/orders'
-      preLoaderRoute: typeof OrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pickup-selection': {
@@ -1465,6 +1610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminExecutiveFaceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/admin/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/financing': {
       id: '/admin/financing'
       path: '/admin/financing'
@@ -1479,6 +1631,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOperationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/orders': {
+      id: '/admin/orders'
+      path: '/admin/orders'
+      fullPath: '/admin/orders'
+      preLoaderRoute: typeof AdminOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/overview': {
+      id: '/admin/overview'
+      path: '/admin/overview'
+      fullPath: '/admin/overview'
+      preLoaderRoute: typeof AdminOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/partners': {
       id: '/admin/partners'
       path: '/admin/partners'
@@ -1486,11 +1652,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPartnersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/promotions': {
+      id: '/admin/promotions'
+      path: '/admin/promotions'
+      fullPath: '/admin/promotions'
+      preLoaderRoute: typeof AdminPromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/refunds': {
       id: '/admin/refunds'
       path: '/admin/refunds'
       fullPath: '/admin/refunds'
       preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/admin/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/reviews': {
+      id: '/admin/reviews'
+      path: '/admin/reviews'
+      fullPath: '/admin/reviews'
+      preLoaderRoute: typeof AdminReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/risk': {
+      id: '/admin/risk'
+      path: '/admin/risk'
+      fullPath: '/admin/risk'
+      preLoaderRoute: typeof AdminRiskRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/security': {
@@ -1570,12 +1764,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MerchantStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/merchant/wallet': {
+      id: '/merchant/wallet'
+      path: '/merchant/wallet'
+      fullPath: '/merchant/wallet'
+      preLoaderRoute: typeof MerchantWalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders/': {
+      id: '/orders/'
+      path: '/orders'
+      fullPath: '/orders/'
+      preLoaderRoute: typeof OrdersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders/$id': {
       id: '/orders/$id'
-      path: '/$id'
+      path: '/orders/$id'
       fullPath: '/orders/$id'
       preLoaderRoute: typeof OrdersIdRouteImport
-      parentRoute: typeof OrdersRoute
+      parentRoute: typeof rootRouteImport
     }
     '/partner/delivery': {
       id: '/partner/delivery'
@@ -1829,6 +2037,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInternalSyncEnterpriseCatalogsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/internal/wallet-settlement': {
+      id: '/api/internal/wallet-settlement'
+      path: '/api/internal/wallet-settlement'
+      fullPath: '/api/internal/wallet-settlement'
+      preLoaderRoute: typeof ApiInternalWalletSettlementRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/mobile/catalog': {
       id: '/api/mobile/catalog'
       path: '/api/mobile/catalog'
@@ -1885,6 +2100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/payouts/webhook': {
+      id: '/api/payouts/webhook'
+      path: '/api/payouts/webhook'
+      fullPath: '/api/payouts/webhook'
+      preLoaderRoute: typeof ApiPayoutsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/product-media/$mediaId': {
       id: '/api/product-media/$mediaId'
       path: '/api/product-media/$mediaId'
@@ -1930,28 +2152,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface OrdersRouteChildren {
-  OrdersIdRoute: typeof OrdersIdRoute
-}
-
-const OrdersRouteChildren: OrdersRouteChildren = {
-  OrdersIdRoute: OrdersIdRoute,
-}
-
-const OrdersRouteWithChildren =
-  OrdersRoute._addFileChildren(OrdersRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
+  DealsRoute: DealsRoute,
   DeliveryAllocationReviewRoute: DeliveryAllocationReviewRoute,
   DeliveryContactRecoveryRoute: DeliveryContactRecoveryRoute,
   DeliveryRecoveryReviewRoute: DeliveryRecoveryReviewRoute,
   HelpRoute: HelpRoute,
   LoginRoute: LoginRoute,
   MerchantShipmentReturnsRoute: MerchantShipmentReturnsRoute,
-  OrdersRoute: OrdersRouteWithChildren,
   PickupSelectionRoute: PickupSelectionRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
@@ -1969,10 +2180,17 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEnterpriseRoute: AdminEnterpriseRoute,
   AdminExecutiveFaceRoute: AdminExecutiveFaceRoute,
+  AdminFinanceRoute: AdminFinanceRoute,
   AdminFinancingRoute: AdminFinancingRoute,
   AdminOperationsRoute: AdminOperationsRoute,
+  AdminOrdersRoute: AdminOrdersRoute,
+  AdminOverviewRoute: AdminOverviewRoute,
   AdminPartnersRoute: AdminPartnersRoute,
+  AdminPromotionsRoute: AdminPromotionsRoute,
   AdminRefundsRoute: AdminRefundsRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminReviewsRoute: AdminReviewsRoute,
+  AdminRiskRoute: AdminRiskRoute,
   AdminSecurityRoute: AdminSecurityRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminTeamRoute: AdminTeamRoute,
@@ -1984,6 +2202,8 @@ const rootRouteChildren: RootRouteChildren = {
   MerchantLoginRoute: MerchantLoginRoute,
   MerchantRegisterRoute: MerchantRegisterRoute,
   MerchantStatusRoute: MerchantStatusRoute,
+  MerchantWalletRoute: MerchantWalletRoute,
+  OrdersIdRoute: OrdersIdRoute,
   PartnerDeliveryRoute: PartnerDeliveryRoute,
   PartnerFinancingRoute: PartnerFinancingRoute,
   PaymentPreviewRoute: PaymentPreviewRoute,
@@ -2005,6 +2225,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProviderStatusRoute: ProviderStatusRoute,
   StoresIdRoute: StoresIdRoute,
   AdminIndexRoute: AdminIndexRoute,
+  OrdersIndexRoute: OrdersIndexRoute,
   ProviderIndexRoute: ProviderIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiDeliveryQuoteRoute: ApiDeliveryQuoteRoute,
@@ -2025,6 +2246,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalRiderInvitationsRoute: ApiInternalRiderInvitationsRoute,
   ApiInternalSyncEnterpriseCatalogsRoute:
     ApiInternalSyncEnterpriseCatalogsRoute,
+  ApiInternalWalletSettlementRoute: ApiInternalWalletSettlementRoute,
   ApiMobileCatalogRoute: ApiMobileCatalogRoute,
   ApiMobileCheckoutRoute: ApiMobileCheckoutRoute,
   ApiMobileDeliveryQuoteRoute: ApiMobileDeliveryQuoteRoute,
@@ -2033,6 +2255,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMobilePaymentStatusRoute: ApiMobilePaymentStatusRoute,
   ApiMobileProfileRoute: ApiMobileProfileRoute,
   ApiPaymentsWebhookRoute: ApiPaymentsWebhookRoute,
+  ApiPayoutsWebhookRoute: ApiPayoutsWebhookRoute,
   ApiProductMediaMediaIdRoute: ApiProductMediaMediaIdRoute,
   SitemapsProductsChar123pageChar125DotxmlRoute:
     SitemapsProductsChar123pageChar125DotxmlRoute,

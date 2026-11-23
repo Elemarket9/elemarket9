@@ -8,7 +8,10 @@ import { readBodyWithLimit } from "@/lib/security/body.server";
 import { enforceRateLimit, rateLimitResponse } from "@/lib/security/rate-limit.server";
 import { assertSameSiteRequest } from "@/modules/identity/public/auth/isolation.server";
 
-const schema = z.object({ paymentId: z.string().min(1).max(128) });
+const schema = z.union([
+  z.object({paymentId:z.string().min(1).max(128)}),
+  z.object({groupId:z.string().min(16).max(128)}),
+]);
 
 export const Route = createFileRoute("/api/mobile/payment-status")({
   server: { handlers: { POST: async ({ request }) => {
@@ -30,6 +33,11 @@ export const Route = createFileRoute("/api/mobile/payment-status")({
     const parsed = schema.safeParse(body);
     if (!parsed.success) return Response.json({ error: "Invalid payment request" }, { status: 400 });
     try {
+      if ("groupId" in parsed.data) {
+        const {getCustomerGroupPaymentStatus}=await import("@/modules/payments/public/group-checkout.server");
+        const grouped=await getCustomerGroupPaymentStatus({groupId:parsed.data.groupId,userId:current.user.id});
+        return Response.json(grouped,{headers:{"cache-control":"no-store"}});
+      }
       const payment = await requireCustomerPayment(parsed.data.paymentId, current.user.id);
       const sql = await getSql();
       const attempts = await sql.query<{ provider_reference: string | null }>(`select provider_reference from payment_attempts where payment_id=$1 order by attempt_no desc limit 1`, [payment.id]);

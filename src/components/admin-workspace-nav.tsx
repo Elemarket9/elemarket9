@@ -4,14 +4,21 @@ import { getAdminAccessState, type AdminAccessState } from "@/modules/administra
 /** Navigation is not a security boundary. Every destination has server checks. */
 const links: Array<{ href: string; label: string; permissions: string[] }> = [
   { href: "/admin/dashboard", label: "Main control centre", permissions: ["admin.full"] },
-  { href: "/admin/operations", label: "Marketplace operations", permissions: ["admin.operations", "admin.merchants.review", "admin.merchants.moderate", "admin.products.moderate", "admin.customers.moderate", "admin.categories.manage"] },
-  { href: "/admin/support", label: "Support inbox", permissions: ["admin.support"] },
+  { href: "/admin/overview", label: "Marketplace overview", permissions: ["admin.overview.view"] },
+  { href: "/admin/orders", label: "Orders", permissions: ["admin.orders.view", "admin.orders.manage"] },
+  { href: "/admin/operations", label: "Marketplace operations", permissions: ["admin.operations", "admin.merchants.review", "admin.merchants.moderate", "admin.products.moderate", "admin.customers.moderate", "admin.categories.manage", "admin.catalog.view"] },
+  { href: "/admin/support", label: "Support inbox", permissions: ["admin.support", "admin.support.view"] },
+  { href: "/admin/risk", label: "Fraud & risk", permissions: ["admin.risk.review"] },
+  { href: "/admin/reviews", label: "Product reviews", permissions: ["admin.reviews.moderate"] },
+  { href: "/admin/promotions", label: "Deals & promotions", permissions: ["admin.promotions.manage"] },
+  { href: "/admin/reports", label: "Reports", permissions: ["admin.reports.view"] },
   { href: "/admin/partners", label: "Providers & delivery", permissions: ["admin.providers.manage"] },
   { href: "/admin/enterprise", label: "Enterprise merchants", permissions: ["admin.enterprise.manage"] },
   { href: "/admin/financing", label: "Financing", permissions: ["admin.financing.manage"] },
   { href: "/admin/campaigns", label: "Campaigns & advertising", permissions: ["admin.campaigns.manage"] },
   { href: "/admin/commissions", label: "Commission policy", permissions: ["admin.finance.view", "admin.finance.policy"] },
   { href: "/admin/refunds", label: "Refund requests", permissions: ["admin.finance.refunds"] },
+  { href: "/admin/finance", label: "Finance approvals & payouts", permissions: ["admin.finance.refunds", "admin.finance.payouts", "admin.finance.view", "admin.finance.policy"] },
   { href: "/admin/team", label: "Team, HR & permissions", permissions: ["admin.staff.directory", "admin.staff.manage"] },
   { href: "/admin/activity", label: "Audit history", permissions: ["admin.audit.read"] },
 ];

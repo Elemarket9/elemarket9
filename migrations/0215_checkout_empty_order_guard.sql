@@ -1,7 +1,9 @@
--- Forward fix for create_pending_order. Migration 0214 may already be applied,
--- so this replaces the function instead of editing that file.
--- The empty-order guard used v_delivery before this merchant's quote price was
--- assigned, and a previous merchant's fee could leak into the next basket.
+-- Checkout empty-order guard reads this merchant's delivery price.
+-- 0214 compared v_product_total + v_delivery before assigning v_delivery. The
+-- first merchant saw NULL (the comparison never fired) and later merchants were
+-- checked against the previous merchant's delivery fee. The quote is now
+-- assigned before the guard. Behaviour is otherwise identical to 0214: a fully
+-- discounted basket (GHS 0 products) still pays for delivery.
 
 CREATE OR REPLACE FUNCTION public.create_pending_order(p_user_id text, p_idem text, p_fingerprint text, p_items jsonb, p_quotes jsonb, p_address text, p_method text, p_promo_code text DEFAULT NULL::text)
  RETURNS jsonb
@@ -133,8 +135,6 @@ begin
     if v_quote.user_id<>p_user_id or v_quote.merchant_id<>v_merchant then raise exception 'delivery quote ownership mismatch'; end if;
     if v_quote.expires_at<=v_now then raise exception 'delivery quote expired'; end if;
     if v_quote.dest_address<>trim(p_address) then raise exception 'delivery quote does not match this address'; end if;
-    -- This merchant's fee, before the empty-order guard. Never reuse the previous merchant.
-    v_delivery := v_quote.price;
 
     -- Promotions are evaluated only after the authoritative merchant is known.
     v_promo_id := null;
@@ -333,7 +333,11 @@ begin
       end loop;
     end if;
     if jsonb_array_length(v_lines) < 1 then raise exception 'empty merchant order'; end if;
-    if v_product_total < 0 or v_product_total + v_delivery <= 0 then raise exception 'empty merchant order'; end if;
+    -- Use THIS merchant's quote. The delivery fee pays the rider and is always
+    -- positive, so a fully discounted basket remains payable for delivery.
+    v_delivery:=v_quote.price;
+    if v_delivery is null or v_delivery <= 0 then raise exception 'invalid delivery quote price'; end if;
+    if v_product_total is null or v_product_total < 0 or v_product_total + v_delivery <= 0 then raise exception 'empty merchant order'; end if;
     if v_flash_sale_id is not null then
       v_promo_discount:=round(v_cart_subtotal-v_product_total,2);
       if v_promo_discount<>round(v_flash_discount,2) then raise exception 'flash sale discount integrity failure'; end if;

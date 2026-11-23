@@ -10,7 +10,7 @@ services:
       - key: ELEMARKET_ENV
         value: production
       - key: NODE_VERSION
-        value: 22
+        value: 26
   - type: worker
     name: elemarket-scheduler
     env: node
@@ -19,7 +19,7 @@ services:
     autoDeploy: false
     envVars:
       - key: NODE_VERSION
-        value: 22
+        value: 26
       - key: ELEMARKET_SCHEDULER_BASE_URL
         fromService:
           name: elemarket-web

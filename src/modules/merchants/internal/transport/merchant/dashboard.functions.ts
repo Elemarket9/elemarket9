@@ -57,7 +57,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
               pp.status as participation_status,pp.terms_version
          from promotions p cross join unnest($1::text[]) as m(id)
          left join promotion_participations pp on pp.promotion_id=p.id and pp.merchant_id=m.id
-        where p.merchant_id is null and p.status in ('active','draft') and p.ends_at>now()
+        where p.merchant_id is null and p.funding_source='merchant' and p.status in ('active','draft') and p.ends_at>now()
         order by p.starts_at asc`,
       [merchantIds],
     );
@@ -136,7 +136,7 @@ export const loadMerchantDashboard = createServerFn({ method: "GET" })
         ...products.map((row) => ({ id:`listing:${row.id}`, type:"listing" as const, title:`Listed ${row.name}`, detail:`GHS ${row.price} · ${row.stock} in stock`, status:row.status, createdAt:row.created_at })),
       ].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,20);
       return {
-        ...merchant, profile, products, productMedia: productMedia.map(pm=>({...pm,url:`/api/product-media/${encodeURIComponent(pm.id)}`})), recentOrders:orders, variants, inventoryHistory, activities,
+        ...merchant, listingCount: merchant.products, profile, products, productMedia: productMedia.map(pm=>({...pm,url:`/api/product-media/${encodeURIComponent(pm.id)}`})), recentOrders:orders, variants, inventoryHistory, activities,
         finance:financeSnapshot, merchantHealth, merchantFinancingProviders, merchantFinancingApplications, performance, funnel, productQuestions:questionRows, settlementModel:merchant.settlement_model, catalogSource:merchant.catalog_source,
         enterpriseCatalog:catalogRows[0] ?? null,
         enterpriseHealth: merchant.catalog_source === "enterprise_api" ? await getEnterpriseHealth({merchantId:merchant.merchant_id}) : null,
@@ -319,3 +319,14 @@ export const listMerchantAdCampaigns=createServerFn({method:"GET"}).middleware([
   const userId=getAuthenticatedUserId(context); await authorizeMerchant(data.merchantId,userId); const sql=await getSql();
   return sql.query<{id:string;product_id:string;product_name:string;name:string;title:string;subtitle:string|null;placement:string;status:string;starts_at:string;ends_at:string;target_city:string|null;priority:number;impression_count:number;click_count:number;rejection_reason:string|null}>(`select c.id,c.product_id,p.name product_name,c.name,c.title,c.subtitle,c.placement,c.status,c.starts_at,c.ends_at,c.target_city,c.priority,c.impression_count,c.click_count,c.rejection_reason from homepage_ad_campaigns c join products p on p.id=c.product_id and p.merchant_id=c.merchant_id where c.merchant_id=$1 order by c.created_at desc limit 100`,[data.merchantId]);
 });
+
+
+/** Seller-scoped operational sales analytics; financial ledger remains authoritative. */
+export const loadMerchantSalesInsights = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .validator(z.object({ merchantId: merchantIdSchema, days: z.union([z.literal(7), z.literal(30), z.literal(90)]) }))
+  .handler(async ({ data, context }) => {
+    await authorizeMerchant(data.merchantId, getAuthenticatedUserId(context));
+    const { getMerchantSalesInsights } = await import("@/modules/merchants/internal/sales-insights.server");
+    return getMerchantSalesInsights(data.merchantId, data.days);
+  });

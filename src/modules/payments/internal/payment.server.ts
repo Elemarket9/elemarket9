@@ -16,10 +16,12 @@ import {
   PaymentWebhookError,
 } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
+import { isExactProviderSplit } from "@/modules/payments/internal/group-split-proof";
+import type { MobileMoneyNetwork } from "@/modules/payments/internal/adapters/payment";
 
 export type PaymentStatus = "initiated" | "authorized" | "completed" | "failed" | "refunded";
 
-function validateProviderCheckoutUrl(
+export function validateProviderCheckoutUrl(
   value: string | undefined,
   providerKey: string,
 ): string | undefined {
@@ -59,8 +61,17 @@ export async function createExternalPaymentIntent(input: {
   paymentId: string;
   providerKey?: string;
   userId: string;
+  /**
+   * Pay on delivery: send a mobile money approval prompt to this verified phone
+   * instead of creating a hosted checkout. Callers must have authorized the
+   * person at the door; `userId` is still the paying customer.
+   */
+  mobileMoneyPrompt?: { phone: string; network: MobileMoneyNetwork };
 }) {
+  const prompt = input.mobileMoneyPrompt;
   const sql = await getSql();
+  const groupOwner = await sql.query<{charge_id:string}>(`select charge_id from checkout_group_charge_members where payment_id=$1 limit 1`, [input.paymentId]);
+  if (groupOwner[0]) throw new Error("This merchant belongs to a single-charge order group; use the combined checkout");
   const owned = await requireCustomerPayment(input.paymentId, input.userId);
   const payment = {
     payment_id: owned.id,
@@ -95,6 +106,8 @@ export async function createExternalPaymentIntent(input: {
     provider[0].driver_key ?? undefined,
   );
   assertPaymentInitializationReady(adapter, normalizedProviderKey);
+  if (prompt && (adapter.supportsMobileMoneyPrompt !== true || !adapter.requestMobileMoneyPrompt))
+    throw new Error("Payment provider cannot send mobile money prompts");
   if (
     provider[0].requires_merchant_account &&
     adapter.supportsDirectSubaccountSettlement !== true
@@ -108,11 +121,28 @@ export async function createExternalPaymentIntent(input: {
   );
   const customerEmail = customerRows[0]?.email?.trim();
   if (!customerEmail) throw new Error("Customer email is required for payment");
-  const subaccountRows = await sql.query<{ provider_account_ref: string }>(
-    `select provider_account_ref from merchant_payment_accounts where merchant_id=(select merchant_id from orders where id=$1) and provider_key=$2 and status='active' limit 1`,
-    [payment.order_id, normalizedProviderKey],
+  // platform_wallet merchants are paid out by the merchant wallet, so their
+  // charge must stay in the platform's provider account. Splitting it to the
+  // merchant here as well would pay the merchant twice.
+  // The choice is fixed on the payment the first time it is initialized, so
+  // retries use the same settlement even if the merchant's mode changes later.
+  const settlementRows = await sql.query<{ settlement_model: string }>(
+    `update payments p
+        set settlement_model = coalesce(p.settlement_model,
+              case when m.settlement_model = 'platform_wallet' then 'platform_wallet' else 'provider_split' end)
+       from orders o join merchants m on m.id = o.merchant_id
+      where p.id = $1 and o.id = p.order_id
+      returning p.settlement_model`,
+    [payment.payment_id],
   );
-  if (provider[0].requires_merchant_account && !subaccountRows[0]?.provider_account_ref)
+  const walletSettled = settlementRows[0]?.settlement_model === "platform_wallet";
+  const subaccountRows = walletSettled
+    ? []
+    : await sql.query<{ provider_account_ref: string }>(
+        `select provider_account_ref from merchant_payment_accounts where merchant_id=(select merchant_id from orders where id=$1) and provider_key=$2 and status='active' limit 1`,
+        [payment.order_id, normalizedProviderKey],
+      );
+  if (!walletSettled && provider[0].requires_merchant_account && !subaccountRows[0]?.provider_account_ref)
     throw new Error("Merchant provider account is not configured");
 
   const attemptRows = await sql.query<{
@@ -134,6 +164,11 @@ export async function createExternalPaymentIntent(input: {
   ]);
   const result = attemptRows[0]?.result;
   if (!result) throw new Error("Payment attempt could not be created");
+  // A prompt already out: never send a second one while the first can still be
+  // approved (that could charge the customer twice). The caller closes stale ones.
+  if (prompt && result.existing) {
+    return { ...result, status: "pending" as const, providerReference: result.providerReference ?? undefined, checkoutUrl: undefined, awaitingCustomer: true };
+  }
   if (result.existing && result.providerReference && result.checkoutUrl) {
     return {
       ...result,
@@ -184,8 +219,9 @@ export async function createExternalPaymentIntent(input: {
     : undefined;
   let external;
   let safeCheckoutUrl: string | undefined;
+  let needsCustomerCode = false;
   try {
-    external = await adapter.createPayment({
+    const adapterInput = {
       paymentId: result.paymentId,
       attemptId: result.attemptId,
       amount: String(payment.amount),
@@ -196,11 +232,18 @@ export async function createExternalPaymentIntent(input: {
       idempotencyKey: result.attemptId,
       callbackUrl,
       platformFee: owned.platform_fee,
-    });
+    };
+    if (prompt) {
+      const prompted = await adapter.requestMobileMoneyPrompt!({ ...adapterInput, phone: prompt.phone, network: prompt.network });
+      needsCustomerCode = prompted.needsCustomerCode === true;
+      external = prompted;
+    } else {
+      external = await adapter.createPayment(adapterInput);
+    }
     if (external.providerReference !== reference) {
       throw new Error("Payment provider reference did not match the reserved attempt");
     }
-    safeCheckoutUrl = validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
+    safeCheckoutUrl = prompt ? undefined : validateProviderCheckoutUrl(external.checkoutUrl, normalizedProviderKey);
   } catch (error) {
     await sql.query(
       `update payment_attempts
@@ -241,10 +284,15 @@ export async function createExternalPaymentIntent(input: {
   });
   return {
     ...result,
-    status: external.status === "completed" ? "completed" as const : initializedStatus,
+    // A provider read-back can report a successful charge while the local order
+    // is still unpaid. Only the verified webhook/reconciliation transaction may
+    // transition the authoritative payment and order records to completed.
+    status: initializedStatus,
     providerReference: external.providerReference,
     checkoutUrl: safeCheckoutUrl,
     recovered,
+    needsCustomerCode,
+    displayText: typeof external.metadata?.displayText === "string" ? external.metadata.displayText : null,
   };
 }
 
@@ -397,13 +445,17 @@ export async function handlePaymentWebhook(
     `select id from payment_attempts where provider_key=$1 and provider_reference=$2 limit 1`,
     [normalizedProviderKey, body.providerReference],
   );
-  const depositBinding = binding[0]
+  const groupBinding = binding[0] ? [] : await sql.query<{ id: string }>(
+    `select id from checkout_group_charges where provider_key=$1 and provider_reference=$2 limit 1`,
+    [normalizedProviderKey, body.providerReference],
+  );
+  const depositBinding = binding[0] || groupBinding[0]
     ? []
     : await sql.query<{ id: string }>(
         `select id from financing_deposit_payment_attempts where provider_key=$1 and provider_reference=$2 limit 1`,
         [normalizedProviderKey, body.providerReference],
       );
-  if (!binding[0] && !depositBinding[0]) {
+  if (!binding[0] && !depositBinding[0] && !groupBinding[0]) {
     throw new PaymentWebhookError("Payment reference is not bound yet", {
       status: 503,
       retryable: true,
@@ -460,6 +512,60 @@ export async function handlePaymentWebhook(
   const payloadHash = Array.from(new Uint8Array(digest), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
+
+  if (groupBinding[0]) {
+    const isRefund = body.eventType.startsWith("refund.");
+    if (!isRefund && body.status === "completed") {
+      // A successful total does not prove each seller received their exact
+      // share. Require signed PSP split evidence before marking any order paid.
+      const [group] = await sql.query<{
+        id:string;settlement_model:string;split_snapshot:{split?:unknown};
+      }>(`select id,settlement_model,split_snapshot from checkout_group_charges
+          where id=$1`,[groupBinding[0].id]);
+      const correct = group && (group.settlement_model === "provider_split"
+        ? isExactProviderSplit(group.split_snapshot?.split,body.providerSplit)
+        : !body.providerSplit || body.providerSplit.subaccounts.length === 0);
+      if (!correct) {
+        await sql.query(`update checkout_group_charges set status='needs_attention',
+          failure_reason='provider did not prove the expected per-merchant allocation',updated_at=now()
+          where id=$1 and status in ('initializing','pending','needs_attention')`,[groupBinding[0].id]);
+        void emitSecurityAlert({
+          alertKey:`group-charge-split:${groupBinding[0].id}`,
+          severity:"error",
+          eventName:"security.group_charge_allocation_unverified",
+          message:"Provider transaction total succeeded but merchant allocation could not be verified.",
+          metadata:{groupChargeId:groupBinding[0].id,providerKey:normalizedProviderKey},
+          dedupeKey:`group-charge-split:${groupBinding[0].id}`,
+        });
+        return {reconciliationRequired:true,reason:"merchant_allocation_unverified"};
+      }
+    }
+    const rows = isRefund
+      ? await sql.query<{ result: unknown }>(
+        `select apply_checkout_group_refund_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
+        [normalizedProviderKey,body.eventId,body.eventType,body.providerReference,
+         body.amount,body.currency,body.providerRefundId ?? null,payloadHash],
+      )
+      : await sql.query<{ result: unknown }>(
+        `select apply_checkout_group_charge_event($1,$2,$3,$4,$5,$6,$7,$8) as result`,
+        [normalizedProviderKey,body.eventId,body.eventType,body.providerReference,
+         body.status,body.amount,body.currency,payloadHash],
+      );
+    const outcome = rows[0]?.result ?? null;
+    if (outcome && typeof outcome === "object") {
+      if ("rejected" in outcome && outcome.rejected === true) {
+        throw new PaymentWebhookError("Group payment evidence was rejected", { status: 400, retryable: false });
+      }
+      if ("retryable" in outcome && outcome.retryable === true) {
+        throw new PaymentWebhookError("Group payment evidence cannot yet be bound", { status: 503, retryable: true });
+      }
+    }
+    await recordMetric("payment.group_webhook.processed", {
+      entityId: body.providerReference,
+      metadata: {providerKey:normalizedProviderKey,eventType:body.eventType,status:body.status},
+    });
+    return outcome;
+  }
 
   if (depositBinding[0]) {
     const deposit = await ports.applyFinancingDeposit({

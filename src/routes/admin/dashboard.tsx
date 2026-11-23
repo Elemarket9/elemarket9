@@ -5,6 +5,7 @@ import { getAdminAccessState } from "../../modules/administration/public/transpo
 import { reviewMerchantApplication } from "../../modules/merchants/public/transport/admin/merchant-review.functions";
 import { loadAdminModeration, moderateCustomer, moderateMerchant, moderateProduct, setMerchantEnterpriseMode, type AdminModerationData } from "../../modules/administration/public/transport/admin/moderation.functions";
 import { loadCommissionPolicy, removeCommissionOverride, setCommissionRule, setGlobalCommissionRule, type AdminCommissionData } from "../../modules/administration/public/transport/admin/fee.functions";
+import { enableMerchantWallet } from "../../modules/wallet/public/transport/merchant/wallet.functions";
 import { AdminSupportWorkspace } from "@/components/admin-support-workspace";
 import { AdminWorkspaceNav } from "@/components/admin-workspace-nav";
 
@@ -47,7 +48,7 @@ const metricLabels: Array<[keyof AdminDashboardData["metrics"], string]> = [
 function VerificationBadge({ label, status }: { label: string; status: string }) {
   const good = status === "verified";
   return (
-    <span className={`rounded-full border px-2 py-1 text-[11px] font-bold ${good ? "border-green-200 bg-green-50 text-green-700" : "border-market-line bg-market-soft text-market-muted"}`}>
+    <span className={`rounded-full border px-2 py-1 text-xs font-bold ${good ? "border-green-200 bg-green-50 text-green-700" : "border-market-line bg-market-soft text-market-muted"}`}>
       {label}: {status.replaceAll("_", " ")}
     </span>
   );
@@ -99,6 +100,13 @@ function Dashboard() {
     finally { setModerationBusy(null); }
   }
 
+  async function moveMerchantToWallet(merchantId: string) {
+    if (!window.confirm("Move this merchant to the ELEMARKET wallet? New sales will stay in the platform's provider account and be paid out from the wallet instead of being split at checkout.")) return;
+    setModerationBusy(`merchant-wallet:${merchantId}`); setMessage(null);
+    try { await enableMerchantWallet({ data: { merchantId } }); window.location.reload(); }
+    catch (error) { setMessage(error instanceof Error && /unpaid checkouts/i.test(error.message) ? "This merchant has unpaid checkouts. Try again once they complete or expire." : "Wallet change failed."); }
+    finally { setModerationBusy(null); }
+  }
   async function moderateMerchantAccount(merchantId: string, action: "suspend" | "reinstate") {
     const reason = moderationReason[`merchant:${merchantId}`]?.trim();
     if (!reason || reason.length < 10) { setMessage("A moderation reason of at least 10 characters is required."); return; }
@@ -132,7 +140,11 @@ function Dashboard() {
     setRefundBusyId(orderId);
     setMessage(null);
     try {
-      await requestAdminProviderRefund({ data: { orderId, note } });
+      const result = await requestAdminProviderRefund({ data: { orderId, note } });
+      if (result.status === "awaiting_approval") {
+        setMessage("Refund recorded and waiting for a second administrator in Finance approvals. No money has moved yet.");
+        return;
+      }
       window.location.reload();
     } catch {
       setMessage("Provider refund request failed. Verify the payment and provider status.");
@@ -232,7 +244,7 @@ function Dashboard() {
         ))}
       </section>
 
-      <AdminWorkspaceNav staffRole="owner" /><div className="mt-10"><AdminSupportWorkspace compact /></div>
+      <AdminWorkspaceNav staffRole="owner" /><div className="mt-10"><AdminSupportWorkspace compact canReply /></div>
 
       <section id="merchant-reviews" className="mt-10 rounded-2xl border border-market-line bg-white p-6 shadow-market">
         <div className="flex items-center justify-between gap-3">
@@ -335,7 +347,7 @@ function Dashboard() {
             <article key={product.id} className="rounded-xl border border-market-line p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="font-black">{product.name}</p><p className="text-xs text-market-muted">{product.merchantName} · GHS {product.price} · {product.createdAt}</p></div>
-                <span className="rounded-full border border-market-line px-2 py-1 text-[11px] font-bold">{product.status}</span>
+                <span className="rounded-full border border-market-line px-2 py-1 text-xs font-bold">{product.status}</span>
               </div>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <input value={moderationReason[`product:${product.id}`] ?? ""} onChange={(e) => setModerationReason((c) => ({ ...c, [`product:${product.id}`]: e.target.value }))} maxLength={2000} placeholder="Reason / review note" className="flex-1 rounded-xl border border-market-line px-3 py-2 text-sm" />
@@ -403,7 +415,7 @@ function Dashboard() {
           {data.catalogTaxonomy.map((category)=><div key={category.key} className="rounded-xl border border-market-line p-4">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="font-black">{category.name}</p><p className="text-xs text-market-muted">{category.key} · {category.activeProducts} active product{category.activeProducts===1?"":"s"}</p></div><span className={`rounded-full px-2 py-1 text-xs font-bold ${category.active?"bg-green-50 text-green-700":"bg-red-50 text-red-700"}`}>{category.active?"Enabled":"Disabled"}</span></div>
             <div className="mt-3 flex flex-wrap gap-2"><input value={taxonomyReason[category.key]??""} onChange={e=>setTaxonomyReason(v=>({...v,[category.key]:e.target.value}))} maxLength={2000} placeholder="Reason for category change" className="min-w-[240px] flex-1 rounded-xl border border-market-line px-3 py-2 text-sm"/><button disabled={taxonomyBusy===category.key} onClick={()=>void setTaxonomyState("category",category.key,null,!category.active)} className={`rounded-xl px-3 py-2 text-xs font-black text-white disabled:opacity-50 ${category.active?"bg-red-600":"bg-market-green"}`}>{category.active?"Disable category":"Enable category"}</button></div>
-            {category.subcategories.length?<div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">{category.subcategories.map(sub=>{const id=`${category.key}:${sub.key}`;return <div key={sub.key} className="rounded-lg border border-market-line p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-sm font-bold">{sub.name}</p><p className="text-[11px] text-market-muted">{sub.activeProducts} active products</p></div><span className={`text-[11px] font-bold ${sub.active&&category.active?"text-green-700":"text-red-700"}`}>{sub.active?"On":"Off"}{!category.active?" · parent off":""}</span></div><input value={taxonomyReason[id]??""} onChange={e=>setTaxonomyReason(v=>({...v,[id]:e.target.value}))} maxLength={2000} placeholder="Reason" className="mt-2 w-full rounded-lg border border-market-line px-2 py-1.5 text-xs"/><button disabled={taxonomyBusy===id} onClick={()=>void setTaxonomyState("subcategory",category.key,sub.key,!sub.active)} className={`mt-2 w-full rounded-lg px-2 py-1.5 text-xs font-black text-white disabled:opacity-50 ${sub.active?"bg-red-600":"bg-market-green"}`}>{sub.active?"Disable":"Enable"}</button></div>})}</div>:null}
+            {category.subcategories.length?<div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">{category.subcategories.map(sub=>{const id=`${category.key}:${sub.key}`;return <div key={sub.key} className="rounded-lg border border-market-line p-3"><div className="flex items-center justify-between gap-2"><div><p className="text-sm font-bold">{sub.name}</p><p className="text-xs text-market-muted">{sub.activeProducts} active products</p></div><span className={`text-xs font-bold ${sub.active&&category.active?"text-green-700":"text-red-700"}`}>{sub.active?"On":"Off"}{!category.active?" · parent off":""}</span></div><input value={taxonomyReason[id]??""} onChange={e=>setTaxonomyReason(v=>({...v,[id]:e.target.value}))} maxLength={2000} placeholder="Reason" className="mt-2 w-full rounded-lg border border-market-line px-2 py-1.5 text-xs"/><button disabled={taxonomyBusy===id} onClick={()=>void setTaxonomyState("subcategory",category.key,sub.key,!sub.active)} className={`mt-2 w-full rounded-lg px-2 py-1.5 text-xs font-black text-white disabled:opacity-50 ${sub.active?"bg-red-600":"bg-market-green"}`}>{sub.active?"Disable":"Enable"}</button></div>})}</div>:null}
           </div>)}
         </div>
       </section>
@@ -442,6 +454,7 @@ function Dashboard() {
               <div key={merchant.id} className="rounded-xl border border-market-line p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-black">{merchant.name}</p><p className="text-xs text-market-muted">{merchant.ownerEmail ?? "No owner email"} · {merchant.id}</p></div><span className="rounded-full border px-2 py-1 text-xs font-bold">{merchant.status}</span></div>
                 <p className="mt-2 text-xs text-market-muted">Tier: {merchant.tier} · Settlement: {merchant.settlementModel} · Catalog: {merchant.catalogSource}</p>
+                {merchant.settlementModel === "provider_direct" ? <button disabled={moderationBusy===`merchant-wallet:${merchant.id}`} onClick={()=>void moveMerchantToWallet(merchant.id)} className="mt-2 rounded-xl border border-market-line px-3 py-2 text-xs font-bold">Move to wallet payouts</button> : null}
                 <input value={moderationReason[`merchant:${merchant.id}`] ?? ""} onChange={e=>setModerationReason(v=>({...v,[`merchant:${merchant.id}`]:e.target.value}))} maxLength={2000} placeholder="Reason (optional)" className="mt-3 w-full rounded-xl border border-market-line px-3 py-2 text-sm" />
                 <input value={moderationReason[`merchant-enterprise:${merchant.id}`] ?? ""} onChange={e=>setModerationReason(v=>({...v,[`merchant-enterprise:${merchant.id}`]:e.target.value}))} maxLength={2000} placeholder="Enterprise-mode reason (required)" className="mt-2 w-full rounded-xl border border-market-line px-3 py-2 text-sm" />
                 <div className="mt-3 flex flex-wrap gap-2">{merchant.status === "suspended" ? <button disabled={moderationBusy===`merchant:${merchant.id}`} onClick={()=>void moderateMerchantAccount(merchant.id,"reinstate")} className="rounded-xl bg-market-green px-3 py-2 text-xs font-bold text-white">Reinstate</button> : <button disabled={moderationBusy===`merchant:${merchant.id}`} onClick={()=>void moderateMerchantAccount(merchant.id,"suspend")} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-bold text-white">Suspend merchant</button>} {merchant.settlementModel === "enterprise_direct" ? <button disabled={moderationBusy===`merchant-enterprise:${merchant.id}`} onClick={()=>void setEnterpriseMode(merchant.id,false)} className="rounded-xl border border-market-line px-3 py-2 text-xs font-bold">Disable enterprise mode</button> : <button disabled={moderationBusy===`merchant-enterprise:${merchant.id}`} onClick={()=>void setEnterpriseMode(merchant.id,true)} className="rounded-xl bg-black px-3 py-2 text-xs font-bold text-white">Enable enterprise API mode</button>}</div>

@@ -1,6 +1,10 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { readResponseBodyWithLimit } from "@/lib/security/body.server";
 import type {
+  MobileMoneyNetwork,
+  MobileMoneyPromptInput,
+  MobileMoneyPromptResult,
   PaymentAdapterInput,
   PaymentAdapterResult,
   PaymentProviderAdapter,
@@ -41,14 +45,54 @@ const verifyResponse = z.object({
   status: z.boolean(),
   data: z
     .object({
+      id: z.union([z.string(), z.number()]).optional(),
       status: z.string().min(1).max(64),
       reference: z.string().min(1).max(256),
       amount: z.number().int().positive().safe(),
       currency: z.string().regex(/^[A-Z]{3}$/),
+      split: z.unknown().optional(),
     })
     .nullable()
     .optional(),
 });
+
+const refundRecord = z.object({
+  id: z.union([z.string(), z.number()]),
+  status: z.string().min(1).max(64),
+  amount: z.number().int().nonnegative().safe(),
+  currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+  transaction: z.union([z.string(), z.number(), z.object({ id: z.union([z.string(), z.number()]).optional(), reference: z.string().optional().nullable() })]).optional().nullable(),
+  expected_at: z.string().optional().nullable(),
+});
+const refundFetchResponse = z.object({ status: z.boolean(), data: refundRecord.nullable().optional() });
+const refundListResponse = z.object({ status: z.boolean(), data: z.array(refundRecord).max(100).optional() });
+
+/** Paystack refund state -> our refund state. "failed"/"reversed" mean no money left: treat as absent. */
+/**
+ * Zero ELEMARKET commission (0% category, 100%-off merchant coupon, a fee that
+ * rounds to nothing). Without an explicit split Paystack falls back to the
+ * percentage typed into the subaccount on the Paystack dashboard, so the
+ * merchant can receive less than the ledger says (money audit H1).
+ *
+ * With ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT=1 the whole amount is assigned to
+ * the merchant with the same flat dynamic split the group checkout already
+ * uses. Off by default until verified in the Paystack sandbox: if Paystack
+ * refused it, zero-commission checkouts would fail to start.
+ */
+export function applyZeroCommissionSplit(body: Record<string, unknown>, subaccount: string, amount: string) {
+  if (process.env.ELEMARKET_PAYSTACK_EXPLICIT_ZERO_SPLIT !== "1") return;
+  delete body.subaccount;
+  delete body.transaction_charge;
+  delete body.bearer;
+  body.split = { type: "flat", bearer_type: "account", subaccounts: [{ subaccount, share: moneyToMinorUnits(amount) }] };
+}
+
+export function mapPaystackRefundStatus(status: string): "processed" | "processing" | "needs_attention" | "absent" {
+  if (status === "processed") return "processed";
+  if (status === "pending" || status === "processing") return "processing";
+  if (status === "failed" || status === "reversed") return "absent";
+  return "needs_attention";
+}
 
 const refundResponse = z.object({
   status: z.boolean(),
@@ -68,6 +112,36 @@ const refundResponse = z.object({
     .optional(),
 });
 
+const chargeResponse = z.object({
+  status: z.boolean(),
+  message: z.string().max(500).optional(),
+  data: z
+    .object({
+      reference: z.string().min(1).max(256),
+      status: z.string().min(1).max(64),
+      display_text: z.string().max(500).optional().nullable(),
+    })
+    .nullable()
+    .optional(),
+});
+
+/**
+ * Paystack's Ghana mobile money codes. Its documentation names Telecel as "vod"
+ * and AirtelTigo as "atl" (older pages say "tgo"), so each can be overridden with
+ * ELEMARKET_PAYMENT_PAYSTACK_MOMO_<NETWORK>_CODE after a sandbox check.
+ */
+function mobileMoneyProviderCode(network: MobileMoneyNetwork): string {
+  const defaults: Record<MobileMoneyNetwork, string> = { mtn: "mtn", telecel: "vod", airteltigo: "atl" };
+  const override = process.env[`ELEMARKET_PAYMENT_PAYSTACK_MOMO_${network.toUpperCase()}_CODE`]?.trim().toLowerCase();
+  return override && /^[a-z]{2,8}$/.test(override) ? override : defaults[network];
+}
+
+/** +233XXXXXXXXX -> 0XXXXXXXXX, the local form Paystack's Ghana examples use. */
+function localGhanaPhone(phone: string): string {
+  if (!/^\+233[25][0-9]{8}$/.test(phone)) throw new Error("A verified Ghana mobile number is required");
+  return `0${phone.slice(4)}`;
+}
+
 const webhookSchema = z.object({
   event: z.string().min(1).max(128),
   data: z.record(z.string(), z.unknown()).default({}),
@@ -85,13 +159,51 @@ function asProviderId(value: unknown): string | null {
   return asString(value);
 }
 
+/** Paystack's signed charge.success split includes immutable formula and
+ * applied subaccount shares. Require BOTH to agree to avoid mistaking a
+ * transaction amount for evidence of merchant settlement allocation. */
+function flatProviderSplit(value: unknown): ProviderSplitProof | undefined {
+  const parsed = z.object({
+    formula: z.object({
+      type: z.literal("flat"),
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        share:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+    shares: z.object({
+      subaccounts: z.array(z.object({
+        subaccount_code:z.string().min(1).max(256),
+        amount:z.number().int().positive().safe(),
+      })).min(1).max(40),
+    }),
+  }).safeParse(value);
+  if (!parsed.success) return undefined;
+  const formula = new Map<string,number>();
+  for (const sub of parsed.data.formula.subaccounts) {
+    if (formula.has(sub.subaccount_code)) return undefined;
+    formula.set(sub.subaccount_code,sub.share);
+  }
+  const observed: ProviderSplitProof["subaccounts"]=[];
+  const seen = new Set<string>();
+  for (const sub of parsed.data.shares.subaccounts) {
+    if (seen.has(sub.subaccount_code) || formula.get(sub.subaccount_code)!==sub.amount) return undefined;
+    seen.add(sub.subaccount_code);
+    observed.push({subaccount:sub.subaccount_code,share:sub.amount});
+  }
+  if (seen.size!==formula.size) return undefined;
+  return {type:"flat",subaccounts:observed};
+}
+
 export class PaystackPaymentAdapter implements PaymentProviderAdapter {
   // A request header is not evidence of refund idempotency. Automatic retries stay disabled.
   readonly supportsIdempotentRefunds = false;
+  readonly reconcileProvesAbsence = true;
   // The charge reference is the payment attempt id. A retry reuses that reference
   // and verifies it before another initialize, so it cannot create a second charge.
   readonly supportsIdempotentInitialization = true;
   readonly supportsDirectSubaccountSettlement = true;
+  readonly supportsMultiMerchantSplit = true;
   readonly webhookSignatureHeaders = ["x-paystack-signature"] as const;
   constructor(
     private readonly secret: string,
@@ -111,15 +223,29 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference,
       metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId }),
     };
+    if (input.multiMerchantSplit && input.merchantSubaccount) throw new Error("Conflicting payment split modes");
+    if (input.multiMerchantSplit) {
+      const split = input.multiMerchantSplit;
+      const accounts = new Set(split.subaccounts.map((x) => x.subaccount));
+      const allocated = split.subaccounts.reduce((n, x) => n + x.share, 0);
+      if (split.amountMinor !== amountMinor || split.platformMinor !== amountMinor - allocated ||
+        split.platformMinor < 0 || split.subaccounts.length < 2 || accounts.size !== split.subaccounts.length ||
+        !split.subaccounts.every((x) => typeof x.subaccount === "string" && x.subaccount.length > 0 && x.subaccount.length <= 256 &&
+          Number.isSafeInteger(x.share) && x.share > 0) || !Number.isSafeInteger(allocated)) {
+        throw new Error("Unsafe multi-seller split allocation");
+      }
+      // Exact pesewa merchant shares. Platform bears processor fees.
+      body.split = { type: "flat", bearer_type: "account", subaccounts: split.subaccounts };
+    }
     if (input.merchantSubaccount) {
       body.subaccount = input.merchantSubaccount;
       if (input.platformFee != null) {
         const charge = marketplaceSettlementChargePesewas(input.amount, input.platformFee);
-        // A zero commission keeps the provider's configured split. Delivery is not commission.
+        // Delivery is not commission.
         if (charge > 0) {
           body.transaction_charge = charge;
           body.bearer = "account";
-        }
+        } else applyZeroCommissionSplit(body, input.merchantSubaccount, input.amount);
       }
     }
     if (input.callbackUrl) body.callback_url = input.callbackUrl;
@@ -143,11 +269,24 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       parsed.data.data.reference !== reference ||
       !parsed.data.data.authorization_url
     ) {
+      // An amount-matched charge is NOT proof of a merchant-by-merchant split.
+      // The provider split configuration must be read back and reconciled
+      // independently before any group charge can be resumed or settled.
+      if (input.multiMerchantSplit) {
+        throw new Error("Uncertain multi-seller charge requires verified provider split reconciliation");
+      }
       // The reference was reserved before this call. If the provider already
       // has it, do not mint another one. Checkout can resume from verification.
       try {
         const existing = await this.verifyTransaction(reference);
-        if (existing.reference === reference) {
+        // The reference alone is insufficient: reject a provider record with
+        // a different amount/currency instead of reporting recovery as safe.
+        if (
+          existing.reference === reference &&
+          existing.currency === input.currency &&
+          Number.isFinite(existing.amount) &&
+          Math.round(existing.amount * 100) === amountMinor
+        ) {
           return {
             providerReference: reference,
             status: existing.status === "completed" ? "completed" : "initiated",
@@ -164,6 +303,60 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: "initiated",
       checkoutUrl: parsed.data.data.authorization_url,
       metadata: { accessCode: parsed.data.data.access_code },
+    };
+  }
+  readonly supportsMobileMoneyPrompt = true;
+  async requestMobileMoneyPrompt(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult> {
+    if (input.multiMerchantSplit) throw new Error("Atomic multi-seller split requires hosted checkout");
+    if (!input.customerEmail) throw new Error("Provider requires a customer email");
+    if (input.currency !== "GHS") throw new Error("Mobile money prompts support GHS only");
+    const amountMinor = moneyToMinorUnits(input.amount);
+    if (amountMinor <= 0) throw new Error("Invalid payment amount");
+    const reference = deterministicPaymentReference(input.attemptId);
+    const body: Record<string, unknown> = {
+      email: input.customerEmail,
+      amount: String(amountMinor),
+      currency: "GHS",
+      reference,
+      mobile_money: { phone: localGhanaPhone(input.phone), provider: mobileMoneyProviderCode(input.network) },
+      metadata: JSON.stringify({ paymentId: input.paymentId, attemptId: input.attemptId, channel: "pay_on_delivery" }),
+    };
+    if (input.merchantSubaccount) {
+      body.subaccount = input.merchantSubaccount;
+      if (input.platformFee != null) {
+        const charge = marketplaceSettlementChargePesewas(input.amount, input.platformFee);
+        if (charge > 0) {
+          body.transaction_charge = charge;
+          body.bearer = "account";
+        } else applyZeroCommissionSplit(body, input.merchantSubaccount, input.amount);
+      }
+    }
+    return this.chargeCall("/charge", body, reference);
+  }
+  async submitMobileMoneyCode(input: { reference: string; code: string }): Promise<MobileMoneyPromptResult> {
+    if (!/^[A-Za-z0-9]{3,12}$/.test(input.code)) throw new Error("Enter the code exactly as the network gave it");
+    return this.chargeCall("/charge/submit_otp", { otp: input.code, reference: input.reference }, input.reference);
+  }
+  private async chargeCall(path: string, body: Record<string, unknown>, reference: string): Promise<MobileMoneyPromptResult> {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${this.secret}` },
+      body: JSON.stringify(body),
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const parsed = chargeResponse.safeParse(await readProviderJson(response));
+    const data = parsed.success ? parsed.data.data : null;
+    if (!response.ok || !parsed.success || !data || data.reference !== reference) {
+      throw new PaymentProviderError("Provider could not send the mobile money prompt", response.status, response.status >= 500);
+    }
+    // Only the signed webhook completes a payment; "success" here is not settlement.
+    const providerStatus = data.status.toLowerCase();
+    return {
+      providerReference: reference,
+      status: providerStatus === "failed" ? "failed" : "initiated",
+      needsCustomerCode: providerStatus === "send_otp",
+      metadata: { providerStatus, displayText: data.display_text ?? null, channel: "pay_on_delivery" },
     };
   }
   async verifyWebhook(rawBody: string, signature: string | null): Promise<boolean> {
@@ -227,6 +420,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       status: normalized.status,
       amount: amountMinor / 100,
       currency,
+      providerSplit: !isRefund && event==="charge.success" ? flatProviderSplit(data.split) : undefined,
       providerRefundId: isRefund
         ? (asProviderId(data.id) ?? asString(data.refund_reference) ?? undefined)
         : undefined,
@@ -299,6 +493,52 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
     };
   }
 
+  /**
+   * Find out what really happened to a refund whose outcome we don't know.
+   * Never creates a refund. With a provider refund id we fetch it directly;
+   * otherwise we list every refund on the transaction and match the amount.
+   */
+  async reconcileRefund(input: {
+    providerReference: string;
+    providerRefundId: string | null;
+    amount: string;
+    currency: string;
+    idempotencyKey: string;
+  }): Promise<PaymentRefundResult | { status: "not_found" }> {
+    const amountMinor = moneyToMinorUnits(input.amount);
+    const get = async (path: string) => {
+      const response = await fetch(`${this.baseUrl}${path}`, {
+        headers: { authorization: `Bearer ${this.secret}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new PaymentProviderError("Provider refund lookup failed", response.status);
+      return readProviderJson(response);
+    };
+    const result = (record: z.infer<typeof refundRecord>): PaymentRefundResult | { status: "not_found" } => {
+      if (record.amount !== amountMinor) throw new Error("Provider refund amount does not match this request");
+      const state = mapPaystackRefundStatus(record.status);
+      if (state === "absent") return { status: "not_found" };
+      return { providerRefundId: String(record.id), status: state, metadata: { providerStatus: record.status, reconciled: true, amount: record.amount } };
+    };
+    if (input.providerRefundId) {
+      const parsed = refundFetchResponse.safeParse(await get(`/refund/${encodeURIComponent(input.providerRefundId)}`));
+      if (!parsed.success || parsed.data.status !== true || !parsed.data.data) throw new Error("Provider refund lookup failed");
+      return result(parsed.data.data);
+    }
+    const verified = verifyResponse.safeParse(await get(`/transaction/verify/${encodeURIComponent(input.providerReference)}`));
+    const transactionId = verified.success ? verified.data.data?.id : undefined;
+    if (!verified.success || verified.data.status !== true || transactionId === undefined)
+      throw new Error("Provider transaction lookup failed");
+    const listed = refundListResponse.safeParse(await get(`/refund?transaction=${encodeURIComponent(String(transactionId))}&perPage=100`));
+    if (!listed.success || listed.data.status !== true) throw new Error("Provider refund list failed");
+    const live = (listed.data.data ?? []).filter((r) => mapPaystackRefundStatus(r.status) !== "absent");
+    if (live.length === 0) return { status: "not_found" };
+    // More than one live refund for one payment must never be auto-resolved.
+    if (live.length > 1) return { providerRefundId: null, status: "needs_attention", metadata: { reconciled: true, liveRefunds: live.map((r) => String(r.id)) } };
+    return result(live[0]);
+  }
+
   async verifyTransaction(reference: string): Promise<VerifiedPayment> {
     const response = await fetch(
       `${this.baseUrl}/transaction/verify/${encodeURIComponent(reference)}`,
@@ -322,6 +562,7 @@ export class PaystackPaymentAdapter implements PaymentProviderAdapter {
       reference: parsed.data.data.reference,
       amount: parsed.data.data.amount / 100,
       currency: parsed.data.data.currency,
+      providerSplit: flatProviderSplit(parsed.data.data.split),
     };
   }
 }

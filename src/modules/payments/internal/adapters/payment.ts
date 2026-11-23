@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProviderSplitProof } from "@/modules/payments/internal/group-split-proof";
 import { fetchPinnedPublicHttps } from "@/lib/security/pinned-https.server";
 import { PaymentProviderError } from "@/modules/payments/internal/payment-errors";
 import { deterministicPaymentReference } from "@/modules/payments/internal/payment-reference";
@@ -11,10 +12,26 @@ export type PaymentAdapterInput = {
   customerReference?: string;
   customerEmail?: string;
   merchantSubaccount?: string;
+  /** Immutable, server-authorized atomic multi-seller settlement in minor units. */
+  multiMerchantSplit?: { amountMinor: number; platformMinor: number; subaccounts: Array<{ subaccount: string; share: number }> };
   idempotencyKey?: string;
   callbackUrl?: string;
   /** Merchandise commission retained by the platform account, in major units. */
   platformFee?: string;
+};
+
+/** Ghana mobile money networks, named neutrally; drivers map them to provider codes. */
+export type MobileMoneyNetwork = "mtn" | "telecel" | "airteltigo";
+
+export type MobileMoneyPromptInput = PaymentAdapterInput & {
+  /** The order's verified customer phone, +233XXXXXXXXX. Never rider-supplied. */
+  phone: string;
+  network: MobileMoneyNetwork;
+};
+
+export type MobileMoneyPromptResult = PaymentAdapterResult & {
+  /** The network needs a code from the customer (e.g. a voucher) before it prompts. */
+  needsCustomerCode?: boolean;
 };
 
 export type PaymentRefundResult = {
@@ -35,14 +52,32 @@ export interface PaymentProviderAdapter {
   readonly supportsIdempotentInitialization: boolean;
   /** True only when the adapter can route a payment directly to a supplied provider/subaccount reference. */
   readonly supportsDirectSubaccountSettlement: boolean;
+  /** True only after the adapter can issue one provider charge with atomic subaccount allocation. */
+  readonly supportsMultiMerchantSplit?: boolean;
   /** Provider-specific webhook signature headers belong to the adapter boundary. */
   readonly webhookSignatureHeaders?: readonly string[];
   createPayment(input: PaymentAdapterInput): Promise<PaymentAdapterResult>;
+  /**
+   * Pay on delivery: ask the provider to send a mobile money approval prompt to
+   * the customer's phone, under the attempt's deterministic reference. Completion
+   * still arrives only through the signed webhook. Declare it only when the
+   * provider supports direct mobile money charges.
+   */
+  readonly supportsMobileMoneyPrompt?: boolean;
+  requestMobileMoneyPrompt?(input: MobileMoneyPromptInput): Promise<MobileMoneyPromptResult>;
+  submitMobileMoneyCode?(input: { reference: string; code: string }): Promise<MobileMoneyPromptResult>;
   verifyWebhook?(rawBody: string, signature: string | null): Promise<boolean>;
   parseWebhook?(rawBody: string): Promise<ParsedPaymentWebhook | null>;
   verifyTransaction?(reference: string): Promise<VerifiedPayment>;
   /** Enable only after provider contract and concurrency tests prove duplicate safety. */
   readonly supportsIdempotentRefunds?: boolean;
+  /**
+   * True only when reconcileRefund lists EVERY refund the provider holds for the
+   * transaction, so "not_found" proves no refund exists (or only failed ones).
+   * The executor then re-creates a stuck refund, but only once the first attempt
+   * is old enough for the provider's records to have settled.
+   */
+  readonly reconcileProvesAbsence?: boolean;
   /** Must identify the exact attempt, verify amount/currency/reference, and never create a refund. */
   reconcileRefund?(input: {
     providerReference: string;
@@ -67,6 +102,8 @@ export type CanonicalPaymentEvent =
   | "refund.failed" | "refund.processed";
 
 export type ParsedPaymentWebhook = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   eventId: string;
   eventType: CanonicalPaymentEvent;
   providerReference: string;
@@ -77,6 +114,8 @@ export type ParsedPaymentWebhook = {
 };
 
 export type VerifiedPayment = {
+  /** External seller allocation proof when the provider supplies it. */
+  providerSplit?: ProviderSplitProof;
   status: string;
   reference: string;
   amount: number;

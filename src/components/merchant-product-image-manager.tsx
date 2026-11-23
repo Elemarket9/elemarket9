@@ -56,7 +56,7 @@ export function MerchantProductImageManager({merchantId,productId,productName,ex
     </div>
     {existing.length>0?<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {existing.map(image=><div key={image.id} className="overflow-hidden rounded-xl border border-market-line bg-white">
-        <div className="relative aspect-square bg-market-soft"><img loading="lazy" src={image.url} alt={image.alt_text??productName} className="h-full w-full object-contain"/>{image.is_primary?<span className="absolute left-2 top-2 rounded-full bg-market-green px-2 py-1 text-[10px] font-black text-white">Cover</span>:null}</div>
+        <div className="relative aspect-square bg-market-soft"><img loading="lazy" src={image.url} alt={image.alt_text??productName} className="h-full w-full object-contain"/>{image.is_primary?<span className="absolute left-2 top-2 rounded-full bg-market-green px-2 py-1 text-xs font-black text-white">Cover</span>:null}</div>
         <div className="flex flex-wrap gap-2 p-2">
           {!image.is_primary?<button type="button" disabled={busy||!canEdit} onClick={()=>void execute(()=>setMerchantProductPrimaryImage({data:{merchantId,productId,mediaId:image.id}}),"Cover updated; listing sent for review.")} className="rounded-lg bg-market-soft px-2 py-1 text-xs font-bold disabled:opacity-50">Set cover</button>:null}
           <button type="button" disabled={busy||!canEdit} onClick={()=>{if(window.confirm("Remove this product photograph?"))void execute(()=>removeMerchantProductImage({data:{merchantId,productId,mediaId:image.id}}),"Photograph removed.")}} className="rounded-lg bg-red-50 px-2 py-1 text-xs font-bold text-red-700 disabled:opacity-50">Remove</button>

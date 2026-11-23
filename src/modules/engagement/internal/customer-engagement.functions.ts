@@ -160,17 +160,23 @@ export const searchSuggestions = createServerFn({ method: "GET" })
     return rows.map((r) => r.value);
   });
 
+export type PublicProductReview = { id:string; rating:number; body:string; created_at:string; merchant_response:string|null; response_at:string|null };
+
+/** Public review list: published (not hidden) reviews only, via the public_reviews view. */
+export async function queryPublicProductReviews(sql: { query<T>(text: string, params?: unknown[]): Promise<T[]> }, data: { productId: string; before?: string; limit: number }) {
+  const rows = await sql.query<PublicProductReview>(
+    `select r.id,r.rating,r.body,r.created_at,rr.body as merchant_response,rr.created_at as response_at
+       from public_reviews r left join review_responses rr on rr.review_id=r.id
+      where r.product_id=$1 and ($2::timestamptz is null or r.created_at < $2::timestamptz)
+      order by r.created_at desc,r.id desc limit $3`, [data.productId, data.before ?? null, data.limit]);
+  return { reviews: rows, nextBefore: rows.length === data.limit ? rows.at(-1)?.created_at ?? null : null };
+}
+
 export const listProductReviews = createServerFn({ method: "GET" })
   .validator(z.object({ productId: id, before: z.string().datetime().optional(), limit: z.number().int().min(1).max(50).default(20) }))
   .handler(async ({ data }) => {
     await enforceRateLimit("product-review-list", { windowSeconds: 60, maxRequests: 180 });
-    const sql = await getSql();
-    const rows = await sql.query<{ id:string; rating:number; body:string; created_at:string; merchant_response:string|null; response_at:string|null }>(
-      `select r.id,r.rating,r.body,r.created_at,rr.body as merchant_response,rr.created_at as response_at
-         from reviews r left join review_responses rr on rr.review_id=r.id
-        where r.product_id=$1 and ($2::timestamptz is null or r.created_at < $2::timestamptz)
-        order by r.created_at desc,r.id desc limit $3`, [data.productId, data.before ?? null, data.limit]);
-    return { reviews: rows, nextBefore: rows.length === data.limit ? rows.at(-1)?.created_at ?? null : null };
+    return queryPublicProductReviews(await getSql(), data);
   });
 
 export const personalizedRecommendations = createServerFn({ method: "GET" })

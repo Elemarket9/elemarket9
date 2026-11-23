@@ -108,7 +108,20 @@ export const createPendingCheckoutServer = createServerOnlyFn(async (data: Pendi
       data.promoCode ?? null,
       data.assistedDraftId ?? null,
     ],
-  );
+  ).catch(async (error: unknown) => {
+    // A risk block aborts the checkout transaction, which also rolls back its
+    // risk assessment. Record it separately so it reaches the fraud review queue
+    // (migration 0236). Never let this bookkeeping mask the original refusal.
+    const detail = (error as { detail?: unknown } | null)?.detail;
+    if (error instanceof Error && error.message.includes("checkout blocked by ELEMARKET risk controls") && typeof detail === "string") {
+      try {
+        await sql.query(
+          `with identity as (select set_config('app.user_id', $1, true) as user_id)
+           select record_blocked_checkout_attempt($1, $2::jsonb) from identity`, [userId, detail]);
+      } catch { /* best effort */ }
+    }
+    throw error;
+  });
   const result = rows[0]?.result;
   if (
     !result ||
@@ -148,4 +161,44 @@ export const createPendingCheckout = createServerFn({ method: "POST" })
       await import("@/modules/identity/public/auth/authorization.server");
     await requireCustomerForUserId(context.userId);
     return createPendingCheckoutServer(data, getAuthenticatedUserId(context));
+  });
+
+/** Whether this customer can choose pay on delivery now, and the order limit. */
+export const getPayOnDeliveryOption = createServerFn({ method: "GET" })
+  .middleware([authMiddleware])
+  .handler(async ({ context }) => {
+    const userId = getAuthenticatedUserId(context);
+    const [{ requireCustomerForUserId }, { getSql }, { payOnDeliveryProviderReady }] = await Promise.all([
+      import("@/modules/identity/public/auth/authorization.server"),
+      import("@/lib/db"),
+      import("@/modules/payments/public/pay-on-delivery.server"),
+    ]);
+    await requireCustomerForUserId(userId);
+    if (!(await payOnDeliveryProviderReady())) return { eligible: false as const, reason: "Pay on delivery is not available yet" };
+    const sql = await getSql();
+    const [row] = await sql.query<{ r: { eligible: boolean; reason?: string; maxOrderAmount?: string } }>(
+      `select elemarket_pay_on_delivery_eligibility($1) as r`, [userId]);
+    return row.r.eligible
+      ? { eligible: true as const, maxOrderAmount: row.r.maxOrderAmount ?? "0.00" }
+      : { eligible: false as const, reason: row.r.reason ?? "Pay on delivery is not available" };
+  });
+
+/** Switch a freshly created, unpaid order group to pay on delivery (mobile money at the door). */
+export const choosePayOnDelivery = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(z.object({ groupId: z.string().trim().min(1).max(128) }))
+  .handler(async ({ data, context }) => {
+    const userId = getAuthenticatedUserId(context);
+    const [{ requireCustomerForUserId }, { getSql }, { enforceRateLimit }, { payOnDeliveryProviderReady }] = await Promise.all([
+      import("@/modules/identity/public/auth/authorization.server"),
+      import("@/lib/db"),
+      import("@/lib/security/rate-limit.server"),
+      import("@/modules/payments/public/pay-on-delivery.server"),
+    ]);
+    await requireCustomerForUserId(userId);
+    await enforceRateLimit("pay-on-delivery-choice", { windowSeconds: 600, maxRequests: 10, subject: userId });
+    if (!(await payOnDeliveryProviderReady())) throw new Error("Pay on delivery is not available yet");
+    const sql = await getSql();
+    const [row] = await sql.query<{ r: { orders: number } }>(`select choose_pay_on_delivery($1,$2) as r`, [userId, data.groupId]);
+    return { orders: row.r.orders, paymentTiming: "on_delivery" as const };
   });

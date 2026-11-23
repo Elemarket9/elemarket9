@@ -12,6 +12,7 @@ export const JOBS = Object.freeze([
   { path: '/api/internal/sync-enterprise-catalogs', everyMinutes: 5 },
   { path: '/api/internal/refresh-eide', everyMinutes: 5 },
   { path: '/api/internal/purge-retention', everyMinutes: 5 },
+  { path: '/api/internal/wallet-settlement', everyMinutes: 1 },
 ]);
 export function signedHeaders({ secret, path, timestamp = Date.now(), nonce = randomBytes(24).toString('hex') }) {
   if (typeof secret !== 'string' || secret.length < 32) throw new Error('Scheduler signing secret must be at least 32 characters');

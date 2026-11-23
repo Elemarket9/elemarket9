@@ -44,6 +44,13 @@
     "braces": "$braces",
     "node-forge": "$node-forge",
     "sprintf-js": "$sprintf-js",
-    "zod": "4.6.6"
+    "zod": "4.6.6",
+    "glob@13": {
+      ".": "^14.0.4",
+      "minimatch": "^11.0.6"
+    },
+    "@expo/fingerprint": {
+      "minimatch": "^11.0.6"
+    }
   }
 }

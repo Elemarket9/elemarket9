@@ -151,7 +151,7 @@ export async function claimEnterpriseOrderOutbox(limit = 50) {
        limit $1
     )
     update enterprise_order_outbox o
-       set status='processing',locked_at=now(),locked_token=$2,attempts=o.attempts+1,delivery_attempt_id='ed_'+replace(gen_random_uuid()::text,'-',''),updated_at=now()
+       set status='processing',locked_at=now(),locked_token=$2,attempts=o.attempts+1,delivery_attempt_id='ed_'||replace(gen_random_uuid()::text,'-',''),updated_at=now()
       from claimed
      where o.id=claimed.id
      returning o.id,o.merchant_id,o.order_id,o.event_type,o.payload,o.attempts,o.locked_token,o.delivery_attempt_id`,

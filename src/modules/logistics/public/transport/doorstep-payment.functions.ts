@@ -1,2 +1,2 @@
 // Public module contract. Keep browser and server entry points separate.
-export * from "../internal/risk.server";
+export * from "../../internal/transport/doorstep-payment.functions";

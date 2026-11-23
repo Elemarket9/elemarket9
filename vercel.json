@@ -43,6 +43,10 @@
     {
       "path": "/api/internal/collection-notifications",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/wallet-settlement",
+      "schedule": "* * * * *"
     }
   ]
 }

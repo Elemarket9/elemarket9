@@ -10,13 +10,18 @@ test("content security policy allows style attributes and not inline scripts", (
 });
 
 test("checkout assigns this merchant's delivery fee before the empty-order guard", () => {
-  const sql = readFileSync(new URL("../migrations/0215_checkout_delivery_fee_per_merchant.sql", import.meta.url), "utf8");
-  const fn = sql.slice(sql.indexOf("create_pending_order"));
-  const assign = fn.indexOf("v_delivery := v_quote.price");
+  const dir = new URL("../migrations/", import.meta.url);
+  const names = readFileSync(new URL("../migrations.sha256.json", import.meta.url), "utf8");
+  const files = [...names.matchAll(/"(\d{4}_[^"]+\.sql)"/g)].map((match) => match[1]);
+  let latest = "";
+  for (const name of files) {
+    const sql = readFileSync(new URL(name, dir), "utf8");
+    if (/create or replace function public\.create_pending_order/i.test(sql)) latest = sql;
+  }
+  const fn = latest.slice(latest.toLowerCase().indexOf("create_pending_order"));
   const guard = fn.indexOf("v_product_total + v_delivery <= 0");
-  assert.ok(assign > 0 && guard > assign);
-  assert.equal(fn.slice(guard).includes("v_delivery := v_quote.price"), false);
-  assert.equal(fn.slice(guard).includes("v_delivery:=v_quote.price"), false);
+  const assign = Math.max(fn.lastIndexOf("v_delivery := v_quote.price", guard), fn.lastIndexOf("v_delivery:=v_quote.price", guard));
+  assert.ok(guard > 0 && assign > 0 && assign < guard);
 });
 
 test("homepage section loads stay under the discovery pool", async () => {

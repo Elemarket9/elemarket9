@@ -26,8 +26,9 @@ export const requestShipmentReturn=createServerFn({method:'POST'}).middleware([a
   if(prior){if(prior.shipment_id!==data.shipmentId||prior.order_item_id!==data.orderItemId||prior.quantity!==data.quantity)throw new Error('Idempotency key reused for a different return');return {returnId:prior.id,replayed:true};}
   const valid=await tx.query(`select s.id from shipments s join shipment_items si on si.shipment_id=s.id and si.order_item_id=$2
    join order_items i on i.id=si.order_item_id join products p on p.id=i.product_id
-   where s.id=$1 and s.delivered_at is not null and p.returnable and now()<=s.delivered_at+make_interval(days=>p.return_window_days)
-   and si.quantity>=$3 for update of s`,[data.shipmentId,data.orderItemId,data.quantity]);
+   where s.id=$1 and s.delivered_at is not null
+   and now()<=s.delivered_at+make_interval(days=>elemarket_return_window_days(p.returnable,p.return_window_days,$4))
+   and si.quantity>=$3 for update of s`,[data.shipmentId,data.orderItemId,data.quantity,data.reasonCode]);
   if(!valid[0])throw new Error('Item is unavailable or outside the shipment return window');
   const payment=(await tx.query<{id:string}>(`select id from payments where order_id=$1 and user_id=$2 and status='completed' for update`,[order.id,actor]))[0];
   if(!payment)throw new Error('Verified payment record required for a return request');

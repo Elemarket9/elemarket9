@@ -2,15 +2,22 @@
 export function adminDefaultRoute(access: { staffRole: string | null; capabilities: string[] }): string {
   const has = (cap:string) => access.staffRole === 'owner' || access.capabilities.includes(cap);
   if (has('admin.full')) return '/admin/dashboard';
+  if (has('admin.overview.view')) return '/admin/overview';
+  if (has('admin.orders.view') || has('admin.orders.manage')) return '/admin/orders';
   if (['admin.operations','admin.merchants.review','admin.merchants.moderate',
-       'admin.customers.moderate','admin.products.moderate','admin.categories.manage'].some(has)) return '/admin/operations';
-  if (has('admin.support')) return '/admin/support';
+       'admin.customers.moderate','admin.products.moderate','admin.categories.manage','admin.catalog.view'].some(has)) return '/admin/operations';
+  if (has('admin.support') || has('admin.support.view')) return '/admin/support';
+  if (has('admin.risk.review')) return '/admin/risk';
+  if (has('admin.reviews.moderate')) return '/admin/reviews';
+  if (has('admin.promotions.manage')) return '/admin/promotions';
+  if (has('admin.reports.view')) return '/admin/reports';
   if (has('admin.providers.manage')) return '/admin/partners';
   if (has('admin.enterprise.manage')) return '/admin/enterprise';
   if (has('admin.financing.manage')) return '/admin/financing';
   if (has('admin.campaigns.manage')) return '/admin/campaigns';
   if (has('admin.finance.view') || has('admin.finance.policy')) return '/admin/commissions';
   if (has('admin.finance.refunds')) return '/admin/refunds';
+  if (has('admin.finance.payouts')) return '/admin/finance';
   if (has('admin.staff.directory') || has('admin.staff.manage')) return '/admin/team';
   if (has('admin.audit.read')) return '/admin/activity';
   return '/admin/security';

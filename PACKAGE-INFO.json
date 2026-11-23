@@ -2,7 +2,7 @@
   "package": "ELEMARKET_EIDE_FINAL_CLEAN_SOURCE",
   "date": "2026-10-16",
   "variant": "CLEAN_SOURCE",
-  "node": "22.x",
+  "node": "22.x || 26.x (production: 26)",
   "deployment_migrations": 209,
   "tracked_source_files": 815
 }
