@@ -20,6 +20,8 @@ export function securityHeaders(options: { production: boolean; nonce?: string }
     `img-src 'self' data: blob:${imageOrigins ? ` ${imageOrigins}` : ""}`,
     "font-src 'self' data:",
     "style-src 'self'",
+    // Radix overlays set element style attributes. That is not a script source.
+    "style-src-attr 'unsafe-inline'",
     `script-src 'self'${options.nonce ? ` 'nonce-${options.nonce}'` : ""}${extraScriptSources ? ` ${extraScriptSources}` : ""}`,
     `connect-src 'self'${extraConnectSources ? ` ${extraConnectSources}` : ""}`,
   ].join("; ");
